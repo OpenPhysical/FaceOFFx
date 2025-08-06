@@ -42,8 +42,10 @@ public static class ServiceCollectionExtensions
 
         // Register CLI commands
         services.AddTransient<ProcessCommand>();
-
         services.AddTransient<RoiCommand>();
+        services.AddTransient<QualityCommand>();
+        services.AddTransient<ValidateCommand>();
+        services.AddTransient<InteractiveCommand>();
 
         return services;
     }

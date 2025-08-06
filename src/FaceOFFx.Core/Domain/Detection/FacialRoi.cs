@@ -198,4 +198,46 @@ public record FacialRoiSet(RoiRegion InnerRegion)
             );
         }
     }
+
+    /// <summary>
+    /// Creates an Appendix C.6 compliant facial ROI set for any image dimensions.
+    /// This is a pure function that calculates ROI based on the formula regardless of image size.
+    /// </summary>
+    /// <param name="imageWidth">The width of the image in pixels.</param>
+    /// <param name="imageHeight">The height of the image in pixels.</param>
+    /// <returns>A FacialRoiSet with dynamically calculated Inner Region based on image dimensions.</returns>
+    /// <remarks>
+    /// This pure function applies the INCITS 385-2004 Appendix C.6 formula to any image size:
+    /// Formula: (0.1×W-1, 0.1×W-1) to (0.9×W-1, 1.1×W-1)
+    /// The formula uses the image width (W) for both X and Y calculations as per the standard.
+    /// This allows ROI to be calculated for non-standard image sizes when using --no-resize.
+    /// </remarks>
+    [PublicAPI]
+    public static FacialRoiSet CalculateRoiForDimensions(int imageWidth, int imageHeight)
+    {
+        // Apply Appendix C.6 formula using width for both dimensions as per spec
+        var innerRegionX = Math.Max(0, (int)(0.1f * imageWidth - 1));
+        var innerRegionY = Math.Max(0, (int)(0.1f * imageWidth - 1));
+        var innerRegionMaxX = Math.Min(imageWidth - 1, (int)(0.9f * imageWidth - 1));
+        var innerRegionMaxY = Math.Min(imageHeight - 1, (int)(1.1f * imageWidth - 1));
+
+        // Calculate dimensions ensuring they stay within bounds
+        var innerRegionWidth = innerRegionMaxX - innerRegionX + 1;
+        var innerRegionHeight = innerRegionMaxY - innerRegionY + 1;
+
+        // Create bounding box
+        var innerRegionBox = new RoiBoundingBox(
+            innerRegionX,
+            innerRegionY,
+            innerRegionWidth,
+            innerRegionHeight
+        );
+
+        // All 68 landmark indices for consistency (even though no face detection is performed)
+        var allLandmarkIndices = Enumerable.Range(0, 68).ToList();
+
+        // Create and return the ROI set
+        var innerRegion = new RoiRegion("Inner", 3, innerRegionBox, allLandmarkIndices);
+        return new FacialRoiSet(innerRegion);
+    }
 }

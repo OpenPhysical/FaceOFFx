@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FaceOFFx Quality Assessment Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .high { color: green; font-weight: bold; }
+        .medium { color: orange; }
+        .low { color: red; font-weight: bold; }
+        .compliant { background-color: #d4edda; }
+        .non-compliant { background-color: #f8d7da; }
+        img { max-width: 100px; cursor: pointer; }
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); }
+        .modal-content { margin: auto; display: block; max-width: 80%; max-height: 80%; margin-top: 50px; }
+        .close { position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>FaceOFFx Quality Assessment Report</h1>
+    <p>Generated: <span id="timestamp"></span></p>
+    <table id="results">
+        <tr>
+            <th>Image</th>
+            <th>Original</th>
+            <th>Quality Overlay</th>
+            <th>Overall</th>
+            <th>Symmetry</th>
+            <th>Sharpness</th>
+            <th>Geometry</th>
+            <th>Status</th>
+            <th>Violations</th>
+        </tr>
+        <tr class="non-compliant">
+            <td>generic_guy_quality.png</td>
+            <td><img src=".././tests/sample_images/generic_guy_quality.png" onclick="showModal('.././tests/sample_images/generic_guy_quality.png')" /></td>
+            <td><img src="generic_guy_quality_quality_visual.png" onclick="showModal('generic_guy_quality_quality_visual.png')" /></td>
+            <td>0.29</td>
+            <td>0.00</td>
+            <td>0.01</td>
+            <td>0.71</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 1.1% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1024x1536 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>generic_guy_rotated_10.png</td>
+            <td><img src=".././tests/sample_images/generic_guy_rotated_10.png" onclick="showModal('.././tests/sample_images/generic_guy_rotated_10.png')" /></td>
+            <td><img src="generic_guy_rotated_10_quality_visual.png" onclick="showModal('generic_guy_rotated_10_quality_visual.png')" /></td>
+            <td>0.26</td>
+            <td>0.00</td>
+            <td>0.00</td>
+            <td>0.65</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 0.3% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1278x1692 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>generic_guy_rotated_15.png</td>
+            <td><img src=".././tests/sample_images/generic_guy_rotated_15.png" onclick="showModal('.././tests/sample_images/generic_guy_rotated_15.png')" /></td>
+            <td><img src="generic_guy_rotated_15_quality_visual.png" onclick="showModal('generic_guy_rotated_15_quality_visual.png')" /></td>
+            <td>0.25</td>
+            <td>0.00</td>
+            <td>0.00</td>
+            <td>0.63</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 0.3% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Head size ratio 68.0% is outside acceptable range; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1388x1750 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>generic_guy_rotated_20.png</td>
+            <td><img src=".././tests/sample_images/generic_guy_rotated_20.png" onclick="showModal('.././tests/sample_images/generic_guy_rotated_20.png')" /></td>
+            <td><img src="generic_guy_rotated_20_quality_visual.png" onclick="showModal('generic_guy_rotated_20_quality_visual.png')" /></td>
+            <td>0.24</td>
+            <td>0.00</td>
+            <td>0.00</td>
+            <td>0.60</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 0.2% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Head size ratio 59.8% is outside acceptable range; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1490x1796 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>generic_guy_rotated_5.png</td>
+            <td><img src=".././tests/sample_images/generic_guy_rotated_5.png" onclick="showModal('.././tests/sample_images/generic_guy_rotated_5.png')" /></td>
+            <td><img src="generic_guy_rotated_5_quality_visual.png" onclick="showModal('generic_guy_rotated_5_quality_visual.png')" /></td>
+            <td>0.27</td>
+            <td>0.00</td>
+            <td>0.00</td>
+            <td>0.68</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 0.4% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1156x1622 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>generic_guy_rotated_neg10.png</td>
+            <td><img src=".././tests/sample_images/generic_guy_rotated_neg10.png" onclick="showModal('.././tests/sample_images/generic_guy_rotated_neg10.png')" /></td>
+            <td><img src="generic_guy_rotated_neg10_quality_visual.png" onclick="showModal('generic_guy_rotated_neg10_quality_visual.png')" /></td>
+            <td>0.26</td>
+            <td>0.00</td>
+            <td>0.00</td>
+            <td>0.64</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 0.3% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1278x1692 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>generic_guy.png</td>
+            <td><img src=".././tests/sample_images/generic_guy.png" onclick="showModal('.././tests/sample_images/generic_guy.png')" /></td>
+            <td><img src="generic_guy_quality_visual.png" onclick="showModal('generic_guy_quality_visual.png')" /></td>
+            <td>0.29</td>
+            <td>0.00</td>
+            <td>0.01</td>
+            <td>0.71</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 0.9% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1024x1536 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>bush_photo.jpg</td>
+            <td><img src=".././tests/sample_images/bush_photo.jpg" onclick="showModal('.././tests/sample_images/bush_photo.jpg')" /></td>
+            <td><img src="bush_photo_quality_visual.png" onclick="showModal('bush_photo_quality_visual.png')" /></td>
+            <td>0.27</td>
+            <td>0.00</td>
+            <td>0.02</td>
+            <td>0.67</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 1.7% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 808x1024 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>generic_guy.jpg</td>
+            <td><img src=".././tests/sample_images/generic_guy.jpg" onclick="showModal('.././tests/sample_images/generic_guy.jpg')" /></td>
+            <td><img src="generic_guy_quality_visual.png" onclick="showModal('generic_guy_quality_visual.png')" /></td>
+            <td>0.29</td>
+            <td>0.00</td>
+            <td>0.01</td>
+            <td>0.71</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 0.9% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1024x1536 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>johnson_photo.jpg</td>
+            <td><img src=".././tests/sample_images/johnson_photo.jpg" onclick="showModal('.././tests/sample_images/johnson_photo.jpg')" /></td>
+            <td><img src="johnson_photo_quality_visual.png" onclick="showModal('johnson_photo_quality_visual.png')" /></td>
+            <td>0.21</td>
+            <td>0.00</td>
+            <td>0.08</td>
+            <td>0.47</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 8.2% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.09; Geometry: Head size ratio 43.7% is outside acceptable range; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 1728x2160 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>starmer_photo.jpg</td>
+            <td><img src=".././tests/sample_images/starmer_photo.jpg" onclick="showModal('.././tests/sample_images/starmer_photo.jpg')" /></td>
+            <td><img src="starmer_photo_quality_visual.png" onclick="showModal('starmer_photo_quality_visual.png')" /></td>
+            <td>0.17</td>
+            <td>0.00</td>
+            <td>0.00</td>
+            <td>0.42</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 0.3% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Head size ratio 19.1% is outside acceptable range; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 7499x5002 differ from expected 420x560</td>
+        </tr>
+        <tr class="non-compliant">
+            <td>trump_photo.jpg</td>
+            <td><img src=".././tests/sample_images/trump_photo.jpg" onclick="showModal('.././tests/sample_images/trump_photo.jpg')" /></td>
+            <td><img src="trump_photo_quality_visual.png" onclick="showModal('trump_photo_quality_visual.png')" /></td>
+            <td>0.26</td>
+            <td>0.00</td>
+            <td>0.04</td>
+            <td>0.61</td>
+            <td>❌ Non-compliant</td>
+            <td>Symmetry: Facial symmetry score 0.0% is below acceptable threshold; Illumination: Uneven illumination detected; Pose: Non-frontal pose detected; Sharpness: Image sharpness 4.0% is below acceptable threshold; Sharpness: Face region has poor sharpness: 0.00; Geometry: Inter-pupillary distance is outside acceptable range; Dimensions: Image dimensions 808x1024 differ from expected 420x560</td>
+        </tr>
+    </table>
+    
+    <div id="myModal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img class="modal-content" id="modalImg">
+    </div>
+    
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        
+        function showModal(src) {
+            var modal = document.getElementById("myModal");
+            var modalImg = document.getElementById("modalImg");
+            modal.style.display = "block";
+            // Handle relative paths correctly
+            if (!src.startsWith('../') && !src.startsWith('./') && !src.startsWith('/')) {
+                src = './' + src;
+            }
+            modalImg.src = src;
+        }
+        
+        function closeModal() {
+            document.getElementById("myModal").style.display = "none";
+        }
+        
+        function get_quality_class(value) {
+            if (value >= 0.8) return 'high';
+            if (value >= 0.6) return 'medium';
+            return 'low';
+        }
+    </script>
+</body>
+</html>

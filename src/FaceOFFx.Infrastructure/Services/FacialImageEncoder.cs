@@ -4,6 +4,9 @@ using FaceOFFx.Core.Domain.Transformations;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging.Abstractions;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Tiff;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace FaceOFFx.Infrastructure.Services;
@@ -34,6 +37,29 @@ public static class FacialImageEncoder
         ILogger? logger = null
     )
     {
+        return await ProcessAsync(imageData, options, "jp2", 85, logger);
+    }
+    
+    /// <summary>
+    /// Process image bytes and encode in the specified format
+    /// </summary>
+    /// <param name="imageData">Input image data</param>
+    /// <param name="options">Processing options. Uses PIV standard if not specified.</param>
+    /// <param name="outputFormat">Output format: "jp2", "jpeg", "png", or "tiff"</param>
+    /// <param name="jpegQuality">JPEG quality (1-100) when outputFormat is "jpeg"</param>
+    /// <param name="logger">Optional logger for processing information. Uses NullLogger if not provided.</param>
+    /// <returns>Processing result with encoded image data and metadata</returns>
+    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
+    /// <exception cref="ArgumentException">Thrown when processing options are invalid</exception>
+    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
+    /// <exception cref="TimeoutException">Thrown when processing exceeds the timeout</exception>
+    public static async Task<ProcessingResultDto> ProcessAsync(
+        byte[] imageData,
+        ProcessingOptions? options,
+        string outputFormat,
+        int jpegQuality,
+        ILogger? logger)
+    {
         if (imageData == null)
         {
             throw new ArgumentNullException(nameof(imageData));
@@ -56,6 +82,8 @@ public static class FacialImageEncoder
             var result = await ProcessImageInternalAsync(
                 imageData,
                 processingOptions,
+                outputFormat,
+                jpegQuality,
                 logger,
                 cts.Token
             );
@@ -204,6 +232,181 @@ public static class FacialImageEncoder
         }
     }
 
+    /// <summary>
+    /// Process image bytes without face detection, using the image as-is
+    /// </summary>
+    /// <param name="imageData">Input image data</param>
+    /// <param name="options">Processing options. Uses PIV standard if not specified.</param>
+    /// <param name="outputFormat">Output format: "jp2" or "jpeg"</param>
+    /// <param name="jpegQuality">JPEG quality (1-100) when outputFormat is "jpeg"</param>
+    /// <param name="logger">Optional logger for processing information</param>
+    /// <returns>Processing result with encoded image data and metadata</returns>
+    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
+    /// <exception cref="ArgumentException">Thrown when processing options are invalid</exception>
+    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
+    /// <remarks>
+    /// This method skips face detection and PIV transformation, using the image in its original dimensions.
+    /// For JPEG 2000 output, it applies the Appendix C.6 ROI formula dynamically based on image dimensions.
+    /// For JPEG output, no ROI is applied as JPEG doesn't support ROI encoding.
+    /// </remarks>
+    [PublicAPI]
+    public static async Task<ProcessingResultDto> ProcessWithoutFaceDetectionAsync(
+        byte[] imageData,
+        ProcessingOptions? options = null,
+        string outputFormat = "jp2",
+        int jpegQuality = 85,
+        ILogger? logger = null
+    )
+    {
+        if (imageData == null)
+        {
+            throw new ArgumentNullException(nameof(imageData));
+        }
+
+        var processingOptions = options ?? ProcessingOptions.PivBalanced;
+        logger ??= NullLogger.Instance;
+
+        // Validate options
+        ValidateProcessingOptions(processingOptions);
+
+        // Validate JPEG quality
+        if (
+            (
+                outputFormat.Equals("jpeg", StringComparison.OrdinalIgnoreCase)
+                || outputFormat.Equals("jpg", StringComparison.OrdinalIgnoreCase)
+            ) && (jpegQuality < 1 || jpegQuality > 100)
+        )
+        {
+            throw new ArgumentException(
+                "JPEG quality must be between 1 and 100",
+                nameof(jpegQuality)
+            );
+        }
+
+        var startTime = DateTime.UtcNow;
+
+        try
+        {
+            using var image = LoadImage(imageData);
+            logger.LogDebug(
+                "ProcessWithoutFaceDetection: Loaded image {Width}x{Height}",
+                image.Width,
+                image.Height
+            );
+
+            byte[] encodedData;
+            float compressionRate = 0;
+
+            if (
+                outputFormat.Equals("jpeg", StringComparison.OrdinalIgnoreCase)
+                || outputFormat.Equals("jpg", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                // JPEG encoding path
+                logger.LogDebug("Encoding as JPEG with quality {Quality}", jpegQuality);
+                encodedData = await EncodeAsJpegAsync(image, jpegQuality);
+            }
+            else if (outputFormat.Equals("png", StringComparison.OrdinalIgnoreCase))
+            {
+                // PNG encoding path
+                logger.LogDebug("Encoding as PNG");
+                encodedData = await EncodeAsPngAsync(image);
+            }
+            else if (
+                outputFormat.Equals("tiff", StringComparison.OrdinalIgnoreCase)
+                || outputFormat.Equals("tif", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                // TIFF encoding path
+                logger.LogDebug("Encoding as TIFF");
+                encodedData = await EncodeAsTiffAsync(image);
+            }
+            else
+            {
+                // JPEG 2000 encoding path with dynamic ROI
+                logger.LogDebug("Encoding as JPEG 2000 with dynamic ROI calculation");
+
+                // Calculate ROI based on image dimensions using Appendix C.6 formula
+                var roiSet = FacialRoiSet.CalculateRoiForDimensions(image.Width, image.Height);
+
+                using var services = new FacialProcessingServices(logger);
+                var encodingResult = ExecuteEncodingStrategy(
+                    image,
+                    roiSet,
+                    processingOptions,
+                    services,
+                    logger
+                );
+
+                encodedData = encodingResult.Data;
+                compressionRate = encodingResult.ActualRate;
+            }
+
+            var processingTime = DateTime.UtcNow - startTime;
+            logger.LogInformation(
+                "ProcessWithoutFaceDetection completed in {ProcessingTime}ms. Output size: {FileSize} bytes",
+                processingTime.TotalMilliseconds,
+                encodedData.Length
+            );
+
+            // Build metadata
+            var metadata = new ProcessingMetadataDto(
+                new ImageDimensions(image.Width, image.Height),
+                0f, // No rotation applied
+                1f, // No face detection, so confidence is N/A (use 1.0)
+                encodedData.Length,
+                processingTime
+            )
+            {
+                CompressionRate = compressionRate,
+                AdditionalData = new Dictionary<string, object>
+                {
+                    ["ProcessingMode"] = "NoResize",
+                    ["OutputFormat"] = outputFormat.ToUpperInvariant(),
+                },
+            };
+
+            return new ProcessingResultDto(encodedData, metadata);
+        }
+        catch (Exception ex) when (ex is not (ArgumentException or ArgumentNullException))
+        {
+            throw new InvalidOperationException($"Image processing failed: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Encodes an image as JPEG with the specified quality
+    /// </summary>
+    private static async Task<byte[]> EncodeAsJpegAsync(Image<Rgba32> image, int quality)
+    {
+        using var ms = new MemoryStream();
+        await image.SaveAsJpegAsync(ms, new JpegEncoder { Quality = quality });
+        return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Encodes an image as PNG
+    /// </summary>
+    private static async Task<byte[]> EncodeAsPngAsync(Image<Rgba32> image)
+    {
+        using var ms = new MemoryStream();
+        await image.SaveAsPngAsync(
+            ms,
+            new PngEncoder { CompressionLevel = PngCompressionLevel.BestCompression }
+        );
+        return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Encodes an image as TIFF
+    /// </summary>
+    private static async Task<byte[]> EncodeAsTiffAsync(Image<Rgba32> image)
+    {
+        using var ms = new MemoryStream();
+        await image.SaveAsTiffAsync(ms, new TiffEncoder());
+        return ms.ToArray();
+    }
+
     private static void ValidateProcessingOptions(ProcessingOptions options)
     {
         if (options.MinFaceConfidence < 0 || options.MinFaceConfidence > 1)
@@ -240,6 +443,18 @@ public static class FacialImageEncoder
         CancellationToken cancellationToken
     )
     {
+        return await ProcessImageInternalAsync(imageData, options, "jp2", 85, logger, cancellationToken);
+    }
+    
+    private static async Task<ProcessingResult> ProcessImageInternalAsync(
+        byte[] imageData,
+        ProcessingOptions options,
+        string outputFormat,
+        int jpegQuality,
+        ILogger logger,
+        CancellationToken cancellationToken
+    )
+    {
         using var image = LoadImage(imageData);
         using var services = new FacialProcessingServices(logger);
 
@@ -268,12 +483,47 @@ public static class FacialImageEncoder
             cancellationToken
         );
 
-        // Step 3: Encode using strategy (retries are handled within the encoding strategy)
-        logger.LogDebug(
-            "Starting JPEG 2000 encoding with strategy: {Strategy}",
-            options.Strategy.GetType().Name
-        );
-        var encoding = ExecuteEncodingStrategy(pivImage, roiSet, options, services, logger);
+        // Step 3: Encode based on output format
+        EncodingResult encoding;
+        if (outputFormat.Equals("jp2", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogDebug(
+                "Starting JPEG 2000 encoding with strategy: {Strategy}",
+                options.Strategy.GetType().Name
+            );
+            encoding = ExecuteEncodingStrategy(pivImage, roiSet, options, services, logger);
+        }
+        else
+        {
+            // For non-JP2 formats, encode directly
+            logger.LogDebug("Encoding as {Format}", outputFormat.ToUpperInvariant());
+            byte[] encodedData;
+            
+            if (outputFormat.Equals("jpeg", StringComparison.OrdinalIgnoreCase) || 
+                outputFormat.Equals("jpg", StringComparison.OrdinalIgnoreCase))
+            {
+                encodedData = await EncodeAsJpegAsync(pivImage, jpegQuality);
+            }
+            else if (outputFormat.Equals("png", StringComparison.OrdinalIgnoreCase))
+            {
+                encodedData = await EncodeAsPngAsync(pivImage);
+            }
+            else if (outputFormat.Equals("tiff", StringComparison.OrdinalIgnoreCase) || 
+                     outputFormat.Equals("tif", StringComparison.OrdinalIgnoreCase))
+            {
+                encodedData = await EncodeAsTiffAsync(pivImage);
+            }
+            else
+            {
+                throw new ArgumentException($"Unsupported output format: {outputFormat}");
+            }
+            
+            encoding = new EncodingResult(
+                encodedData,
+                ActualRate: 0, // Not applicable for non-JP2
+                TargetSize: Maybe<int>.None
+            );
+        }
 
         var processingTime = DateTime.UtcNow - startTime;
         logger.LogInformation(

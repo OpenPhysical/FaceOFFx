@@ -12,7 +12,16 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 [TestFixture]
 public class FacialImageEncoderParameterTests : IntegrationTestBase
 {
-    private static readonly string TestImagesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "tests", "sample_images");
+    private static readonly string TestImagesPath = Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory,
+        "..",
+        "..",
+        "..",
+        "..",
+        "..",
+        "tests",
+        "sample_images"
+    );
 
     /// <summary>
     /// Tests processing with default 15 degree rotation limit

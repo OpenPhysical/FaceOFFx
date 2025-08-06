@@ -344,8 +344,8 @@ public static class PivLandmarkProcessor
         var minHeadWidth = finalWidth / 2.0f; // 210px (2:1 ratio)
         var maxHeadWidth = finalWidth * 4.0f / 7.0f; // 240px (7:4 ratio)
 
-        // Target the maximum allowed head width for best appearance
-        var targetHeadWidthInFinal = maxHeadWidth; // 240px
+        // Target slightly below maximum to avoid floating-point precision issues
+        var targetHeadWidthInFinal = 235f; // 235px (5px margin from 240px max)
         logger?.LogDebug(
             "Target head width in final image: {TargetWidth:F1}px (range: {MinWidth:F1}px - {MaxWidth:F1}px)",
             targetHeadWidthInFinal,

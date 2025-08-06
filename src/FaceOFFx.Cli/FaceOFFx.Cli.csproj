@@ -12,7 +12,7 @@
     <PackageOutputPath>./nupkg</PackageOutputPath>
     <!-- NuGet Package Metadata -->
     <PackageId>FaceOFFx.Cli</PackageId>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>FaceOFFx Contributors</Authors>
     <Company>FaceOFFx</Company>
     <Product>FaceOFFx CLI</Product>
@@ -24,7 +24,7 @@
     <PackageTags>piv;facial-recognition;face-detection;biometrics;jpeg2000;fips201;id-card;cli;dotnet-tool</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <Copyright>Copyright © 2024 FaceOFFx Contributors</Copyright>
+    <Copyright>Copyright © 2025 FaceOFFx Contributors</Copyright>
     <!-- Include models and dependencies in the tool package -->
     <IncludeContentInPack>true</IncludeContentInPack>
     <IncludeBuildOutput>true</IncludeBuildOutput>

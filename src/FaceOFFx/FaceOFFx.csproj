@@ -6,11 +6,11 @@
     <IncludeBuildOutput>true</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <Description>PIV-compliant facial processing library for .NET with FIPS 201-3 compliance and JPEG 2000 ROI encoding</Description>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>FaceOFFx Contributors</Authors>
     <Company>FaceOFFx</Company>
     <Product>FaceOFFx</Product>
-    <Copyright>Copyright © 2024 FaceOFFx Contributors</Copyright>
+    <Copyright>Copyright © 2025 FaceOFFx Contributors</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/mistial-dev/FaceOFFx</PackageProjectUrl>
     <RepositoryUrl>https://github.com/mistial-dev/FaceOFFx</RepositoryUrl>

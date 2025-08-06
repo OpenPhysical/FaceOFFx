@@ -1,0 +1,67 @@
+{
+  "IsCompliant": false,
+  "OverallScore": 0.28687698,
+  "Summary": "Non-compliant (Quality: 28.7%, Critical violations: 3)",
+  "Scores": {
+    "Symmetry": {
+      "Overall": 0,
+      "Illumination": 0,
+      "Pose": 0
+    },
+    "Sharpness": {
+      "Overall": 0.00870803,
+      "HighFrequencyRatio": 0.00870803,
+      "Regional": {
+        "Center": 0.0031330464,
+        "Top": 0.0015495458,
+        "Bottom": 0.0015516379,
+        "Left": 0.0012084048,
+        "Right": 0.0013801883
+      }
+    },
+    "Geometry": {
+      "Overall": 0.7106614,
+      "HeadSize": 0.9500761,
+      "Centering": 0.9842471,
+      "InterPupillaryDistance": 0.19766109
+    }
+  },
+  "Violations": [
+    {
+      "Category": "Symmetry",
+      "Description": "Facial symmetry score 0.0% is below acceptable threshold",
+      "Severity": "Critical"
+    },
+    {
+      "Category": "Illumination",
+      "Description": "Uneven illumination detected",
+      "Severity": "Moderate"
+    },
+    {
+      "Category": "Pose",
+      "Description": "Non-frontal pose detected",
+      "Severity": "Moderate"
+    },
+    {
+      "Category": "Sharpness",
+      "Description": "Image sharpness 0.9% is below acceptable threshold",
+      "Severity": "Critical"
+    },
+    {
+      "Category": "Sharpness",
+      "Description": "Face region has poor sharpness: 0.00",
+      "Severity": "Critical"
+    },
+    {
+      "Category": "Geometry",
+      "Description": "Inter-pupillary distance is outside acceptable range",
+      "Severity": "Minor"
+    },
+    {
+      "Category": "Dimensions",
+      "Description": "Image dimensions 1024x1536 differ from expected 420x560",
+      "Severity": "Minor"
+    }
+  ],
+  "AssessmentTime": "2025-08-05T22:04:07.455401Z"
+}
