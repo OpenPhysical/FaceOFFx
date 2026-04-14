@@ -122,6 +122,33 @@ public class QualityCommandTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task QualityCommand_WithStrictIcao_PreservesRequestedStandardGeometry()
+    {
+        var app = CliTestHarness.Create();
+
+        var result = await app.RunAsync(new[]
+        {
+            "quality", "--input", _testImagePath, "--strict", "--standard", "icao", "--format", "detailed"
+        });
+
+        result.Output.Should().Contain("Expected: 413×531");
+    }
+
+    [Test]
+    public async Task QualityCommand_WithRequestedThreshold_ShowsRequestedGateFailureInTextOutput()
+    {
+        var app = CliTestHarness.Create();
+
+        var result = await app.RunAsync(new[]
+        {
+            "quality", "--input", _testImagePath, "--threshold", "0.9"
+        });
+
+        result.ExitCode.Should().Be(1);
+        result.Output.Should().Contain("Requested Gate:");
+    }
+
+    [Test]
     public async Task QualityCommand_WithOutputPath_SavesReportToFile()
     {
         var app = CliTestHarness.Create();

@@ -532,6 +532,14 @@ internal sealed class DatasetReviewCommand : AsyncCommand<DatasetReviewCommand.S
 
     private void OpenInBrowser(string htmlPath)
     {
+        if (string.Equals(
+                Environment.GetEnvironmentVariable("FACEOFFX_DISABLE_BROWSER_LAUNCH"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
         try
         {
             if (OperatingSystem.IsWindows())

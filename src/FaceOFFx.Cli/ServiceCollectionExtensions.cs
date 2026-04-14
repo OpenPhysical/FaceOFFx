@@ -62,6 +62,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<DatasetCommand>();
         services.AddTransient<DatasetValidateCommand>();
         services.AddTransient<DatasetReviewCommand>();
+        services.AddTransient<TestCommand>();
+        services.AddTransient<TestBlurCommand>();
+        services.AddTransient<TestSharpnessCommand>();
+        services.AddTransient<TestReportCommand>();
+        services.AddTransient<TestCleanCommand>();
 
         return services;
     }
