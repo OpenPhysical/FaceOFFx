@@ -10,6 +10,7 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 /// Tests for FacialImageEncoder with various image formats and configurations
 /// </summary>
 [TestFixture]
+[NonParallelizable]
 public class FacialImageEncoderFormatTests : IntegrationTestBase
 {
     private static readonly string TestImagesPath = Path.Combine(

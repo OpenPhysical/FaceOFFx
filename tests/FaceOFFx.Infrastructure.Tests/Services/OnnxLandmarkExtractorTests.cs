@@ -15,6 +15,7 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 /// Contains unit and integration tests for the ONNX-based landmark extractor.
 /// </summary>
 [TestFixture]
+[NonParallelizable]
 public class OnnxLandmarkExtractorTests : IntegrationTestBase
 {
     /// <summary>

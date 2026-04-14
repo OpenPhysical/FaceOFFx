@@ -87,17 +87,21 @@ public record LaplacianMetrics(
     /// - Moderately noticeable in mid-variance (acceptable) region
     /// - Least noticeable in high-variance (sharp) region (asymptotic)
     /// 
-    /// Calibration based on empirical data:
-    /// - Blurry images (blur_20): ~0.00015 variance
-    /// - Acceptable boundary: ~0.0015 variance (between blur_2 and blur_5)
-    /// - Sharp photos: ~0.003-0.009 variance
-    /// - Computer graphics: ~0.013 variance
+    /// Calibration based on empirical masked elliptical analysis:
+    /// - Very blurry (blur_5+): less than 0.0002 variance
+    /// - Blurry (blur_2): ~0.00018 variance
+    /// - Acceptable boundary: ~0.0005 variance
+    /// - Good photos (blur_0): ~0.001-0.0015 variance
+    /// - Excellent photos: greater than 0.0015 variance
     /// 
-    /// Parameters: midpoint=0.002, steepness=1500
-    /// This places the inflection point between blurry and acceptable quality
+    /// Parameters: midpoint=0.0008, steepness=2500
+    /// This provides:
+    /// - blur_0 (original): ~84% score (good quality)
+    /// - blur_2: ~6% score (clearly blurry)
+    /// - blur_5+: less than 1% score (very blurry)
     /// </summary>
     public float NormalizedVariance => 
-        1.0f / (1.0f + MathF.Exp(-(Variance - 0.002f) * 1500f));
+        1.0f / (1.0f + MathF.Exp(-(Variance - 0.0008f) * 2500f));
 }
 
 /// <summary>

@@ -10,6 +10,7 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 /// Tests for the FacialImageEncoder API
 /// </summary>
 [TestFixture]
+[NonParallelizable]
 public class FacialImageEncoderTests : IntegrationTestBase
 {
     private byte[] _validImageData = null!;

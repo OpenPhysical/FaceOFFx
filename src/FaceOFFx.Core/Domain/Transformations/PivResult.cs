@@ -4,6 +4,28 @@ using JetBrains.Annotations;
 namespace FaceOFFx.Core.Domain.Transformations;
 
 /// <summary>
+/// Defines strategies for handling crop constraints when ideal cropping cannot be achieved.
+/// </summary>
+[PublicAPI]
+public enum CropFallbackMode
+{
+    /// <summary>
+    /// Strict mode - fail if target head width and positioning cannot be achieved.
+    /// </summary>
+    Strict,
+    
+    /// <summary>
+    /// Adaptive mode - progressively reduce head width to fit within boundaries.
+    /// </summary>
+    Adaptive,
+    
+    /// <summary>
+    /// Best effort mode - make best possible crop even if it doesn't meet all PIV requirements.
+    /// </summary>
+    BestEffort
+}
+
+/// <summary>
 /// Represents the result of PIV (Personal Identity Verification) transformation processing,
 /// containing the transformed image data and comprehensive metadata about the transformation.
 /// </summary>
@@ -354,6 +376,67 @@ public sealed record PivProcessingOptions
     public float MaxRotationDegrees { get; init; } = 15.0f;
 
     /// <summary>
+    /// Gets the minimum inter-eye distance required for processing.
+    /// </summary>
+    /// <value>
+    /// Minimum distance between eyes in pixels. Default is 90 pixels.
+    /// </value>
+    /// <remarks>
+    /// This ensures sufficient resolution for biometric accuracy.
+    /// Lower values may be used for pre-cropped faces or specific datasets.
+    /// </remarks>
+    public int MinEyeDistance { get; init; } = 90;
+
+    /// <summary>
+    /// Gets a value indicating whether to allow processing of pre-cropped faces.
+    /// </summary>
+    /// <value>
+    /// <c>true</c> to relax cropping constraints for pre-cropped faces; <c>false</c> for standard processing. Default is <c>false</c>.
+    /// </value>
+    /// <remarks>
+    /// Enable this for datasets like SFHQ-T2I that contain pre-cropped faces.
+    /// This relaxes padding and cropping requirements.
+    /// </remarks>
+    public bool AllowPreCropped { get; init; } = false;
+
+    /// <summary>
+    /// Gets a value indicating whether to allow reduced head width when crop is constrained by image boundaries.
+    /// </summary>
+    /// <value>
+    /// <c>true</c> to allow adaptive head width reduction; <c>false</c> to fail if target cannot be achieved.
+    /// Default is <c>false</c>.
+    /// </value>
+    /// <remarks>
+    /// When enabled, the processor will progressively reduce the target head width
+    /// from 235px down to the minimum allowed 210px to fit within image boundaries.
+    /// </remarks>
+    public bool AllowReducedHeadWidth { get; init; } = false;
+
+    /// <summary>
+    /// Gets the minimum top margin in pixels to prevent cutting off tops of heads.
+    /// </summary>
+    /// <value>
+    /// Minimum pixels between top of crop and top of head. Default is 20 pixels.
+    /// </value>
+    public int MinimumTopMargin { get; init; } = 20;
+
+    /// <summary>
+    /// Gets the minimum side margin in pixels to prevent cutting off sides of faces.
+    /// </summary>
+    /// <value>
+    /// Minimum pixels between side of crop and side of face. Default is 10 pixels.
+    /// </value>
+    public int MinimumSideMargin { get; init; } = 10;
+
+    /// <summary>
+    /// Gets the fallback mode for handling crop constraints.
+    /// </summary>
+    /// <value>
+    /// The strategy to use when ideal cropping cannot be achieved. Default is <see cref="CropFallbackMode.Strict"/>.
+    /// </value>
+    public CropFallbackMode FallbackMode { get; init; } = CropFallbackMode.Strict;
+
+    /// <summary>
     /// Gets the default PIV processing options with balanced settings.
     /// </summary>
     /// <value>
@@ -404,5 +487,27 @@ public sealed record PivProcessingOptions
             BaseRate = 0.8f,
             RoiStartLevel = 0,
             MinFaceConfidence = 0.7f,
+        };
+
+    /// <summary>
+    /// Gets adaptive processing options that prevent aggressive cropping.
+    /// </summary>
+    /// <value>
+    /// Options with adaptive fallback mode, reduced head width allowed,
+    /// and sensible margin constraints.
+    /// </value>
+    /// <remarks>
+    /// Use these settings when processing images with limited space around faces,
+    /// such as portrait photos or pre-cropped datasets. The processor will
+    /// adaptively reduce head width requirements to avoid cutting off facial features.
+    /// </remarks>
+    public static PivProcessingOptions Adaptive =>
+        new()
+        {
+            AllowReducedHeadWidth = true,
+            FallbackMode = CropFallbackMode.Adaptive,
+            MinimumTopMargin = 30,
+            MinimumSideMargin = 15,
+            MinFaceConfidence = 0.8f
         };
 }

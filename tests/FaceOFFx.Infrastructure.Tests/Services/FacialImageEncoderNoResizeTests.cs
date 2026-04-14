@@ -13,6 +13,7 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 /// Tests for the new no-resize functionality in FacialImageEncoder
 /// </summary>
 [TestFixture]
+[NonParallelizable]
 public class FacialImageEncoderNoResizeTests : IntegrationTestBase
 {
     [Test]

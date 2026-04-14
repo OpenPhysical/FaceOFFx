@@ -88,6 +88,7 @@ public static class PivLandmarkProcessor
             rotatedLandmarks,
             rotatedImage.Width,
             rotatedImage.Height,
+            options,
             logger
         );
         if (isFailure)
@@ -306,6 +307,7 @@ public static class PivLandmarkProcessor
         FaceLandmarks68 landmarks,
         int imageWidth,
         int imageHeight,
+        PivProcessingOptions options,
         ILogger? logger = null
     )
     {
@@ -345,9 +347,10 @@ public static class PivLandmarkProcessor
         var maxHeadWidth = finalWidth * 4.0f / 7.0f; // 240px (7:4 ratio)
 
         // Target slightly below maximum to avoid floating-point precision issues
-        var targetHeadWidthInFinal = 235f; // 235px (5px margin from 240px max)
+        var initialTargetHeadWidth = 235f; // 235px (5px margin from 240px max)
+        var targetHeadWidthInFinal = initialTargetHeadWidth;
         logger?.LogDebug(
-            "Target head width in final image: {TargetWidth:F1}px (range: {MinWidth:F1}px - {MaxWidth:F1}px)",
+            "Initial target head width in final image: {TargetWidth:F1}px (range: {MinWidth:F1}px - {MaxWidth:F1}px)",
             targetHeadWidthInFinal,
             minHeadWidth,
             maxHeadWidth
@@ -423,8 +426,88 @@ public static class PivLandmarkProcessor
             );
         }
 
-        // Step 9: Log boundary constraints if any
-        if (cropX == 0 || cropY == 0 || cropMaxX == imageWidth || cropMaxY == imageHeight)
+        // Step 9: Check if we hit boundary constraints and apply adaptive fallback if enabled
+        bool hitBoundary = cropX == 0 || cropY == 0 || cropMaxX == imageWidth || cropMaxY == imageHeight;
+        
+        if (hitBoundary && options.FallbackMode != CropFallbackMode.Strict)
+        {
+            logger?.LogDebug("Crop hit image boundaries, attempting adaptive fallback");
+            
+            // Try progressively smaller head widths
+            var headWidthCandidates = new[] { 235f, 225f, 215f, minHeadWidth };
+            Rectangle? bestCrop = null;
+            float bestHeadWidth = 0;
+            
+            foreach (var candidateWidth in headWidthCandidates)
+            {
+                if (candidateWidth < targetHeadWidthInFinal)
+                {
+                    logger?.LogDebug("Trying reduced head width: {Width}px", candidateWidth);
+                    
+                    // Recalculate with smaller head width
+                    var candidateScale = candidateWidth / pivLines.LineCC_Width;
+                    var candidateCropWidth = pivLines.LineCC_Width * (finalWidth / candidateWidth);
+                    var candidateCropHeight = candidateCropWidth * (finalHeight / (float)finalWidth);
+                    
+                    var candidateTargetEyeY = candidateCropHeight * targetEyeFromTopRatio;
+                    var candidateCropCenterY = pivLines.LineBB_Y - candidateTargetEyeY + (candidateCropHeight / 2.0f);
+                    
+                    // Check margins
+                    var candidateCropX = Math.Max(0, (int)(cropCenterX - candidateCropWidth / 2f));
+                    var candidateCropY = Math.Max(0, (int)(candidateCropCenterY - candidateCropHeight / 2f));
+                    var candidateCropMaxX = Math.Min(imageWidth, (int)(cropCenterX + candidateCropWidth / 2f));
+                    var candidateCropMaxY = Math.Min(imageHeight, (int)(candidateCropCenterY + candidateCropHeight / 2f));
+                    
+                    var candidateFinalWidth = candidateCropMaxX - candidateCropX;
+                    var candidateFinalHeight = candidateCropMaxY - candidateCropY;
+                    
+                    // Check if this gives us enough margins
+                    var topMargin = pivLines.LineBB_Y - candidateCropY;
+                    var leftMargin = pivLines.LineAA_X - pivLines.LineCC_Width / 2 - candidateCropX;
+                    var rightMargin = candidateCropMaxX - (pivLines.LineAA_X + pivLines.LineCC_Width / 2);
+                    
+                    if (topMargin >= options.MinimumTopMargin && 
+                        leftMargin >= options.MinimumSideMargin && 
+                        rightMargin >= options.MinimumSideMargin &&
+                        candidateFinalWidth >= minCropWidth &&
+                        candidateFinalHeight >= minCropHeight)
+                    {
+                        bestCrop = new Rectangle(candidateCropX, candidateCropY, candidateFinalWidth, candidateFinalHeight);
+                        bestHeadWidth = candidateWidth;
+                        logger?.LogDebug("Found acceptable crop with head width {Width}px", candidateWidth);
+                        break;
+                    }
+                }
+            }
+            
+            if (bestCrop.HasValue)
+            {
+                cropX = bestCrop.Value.X;
+                cropY = bestCrop.Value.Y;
+                finalCropWidth = bestCrop.Value.Width;
+                finalCropHeight = bestCrop.Value.Height;
+                targetHeadWidthInFinal = bestHeadWidth;
+                
+                logger?.LogInformation(
+                    "Applied adaptive crop with reduced head width: {Width}px (was {Original}px)",
+                    bestHeadWidth,
+                    initialTargetHeadWidth
+                );
+            }
+            else if (options.FallbackMode == CropFallbackMode.BestEffort)
+            {
+                logger?.LogWarning("Could not find acceptable adaptive crop, using best effort");
+                // Keep the constrained crop as-is
+            }
+            else
+            {
+                logger?.LogWarning("Adaptive fallback failed to find acceptable crop");
+                return Result.Failure<Rectangle>(
+                    "Could not calculate acceptable crop within image boundaries"
+                );
+            }
+        }
+        else if (hitBoundary)
         {
             logger?.LogWarning(
                 "Crop was constrained by image boundaries - this may affect PIV compliance"

@@ -227,11 +227,16 @@ public class QualityAssessmentPipelineTests
     [Test]
     public async Task AssessAsync_DetectsCriticalViolations()
     {
-        // Arrange - create very poor quality scenario
-        using var veryPoorImage = new Image<Rgba32>(100, 100);
-        veryPoorImage.Mutate(ctx => ctx.Fill(Color.DarkGray));
+        // Arrange - create poor quality image with enough structure to assess
+        using var veryPoorImage = new Image<Rgba32>(640, 480);
+        veryPoorImage.Mutate(ctx =>
+        {
+            ctx.Fill(Color.Gray);
+            ctx.Fill(Color.DarkGray, new Rectangle(220, 140, 200, 200));
+            ctx.GaussianBlur(18);
+        });
         
-        var tinyLandmarks = CreateTinyFaceLandmarks();
+        var tinyLandmarks = CreateSmallFaceLandmarks();
         var options = QualityAssessmentOptions.Strict;
         
         // Act
@@ -324,8 +329,8 @@ public class QualityAssessmentPipelineTests
         var image = new Image<Rgba32>(640, 480);
         image.Mutate(ctx =>
         {
-            // Create a very blurry, low contrast image
-            ctx.Fill(Color.Gray);
+            ctx.Fill(Color.LightGray);
+            ctx.Fill(Color.DarkGray, new Rectangle(220, 120, 200, 240));
             ctx.GaussianBlur(20);
         });
         return image;

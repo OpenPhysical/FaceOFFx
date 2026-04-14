@@ -43,8 +43,10 @@ public static class SharpnessAssessor
     private const float GrayscaleGreenCoefficient = 0.587f;
     private const float GrayscaleBlueCoefficient = 0.114f;
     
-    // Sharpness score normalization factor
-    private const float SharpnessNormalizationFactor = 50f;
+    // Sharpness score normalization factor.
+    // This is tuned empirically for the current DCT implementation and should be
+    // validated by monotonic blur-progression tests rather than fixed score folklore.
+    private const float SharpnessNormalizationFactor = 294f;
     private const float MaxNormalizedSharpness = 1f;
     
     // Regional sharpness threshold for critical regions

@@ -18,6 +18,7 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 /// including its behavior with different image sizes, cancellation token handling, and multiple concurrent executions.
 /// </remarks>
 [TestFixture]
+[NonParallelizable]
 public class RetinaFaceDetectorTests : IDisposable
 {
     /// <summary>
