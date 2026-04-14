@@ -25,7 +25,7 @@ namespace FaceOFFx.Cli.Commands;
 /// Quick compliance validation command - returns pass/fail without processing
 /// </summary>
 [Description("Quick compliance validation - pass/fail without processing")]
-public sealed class ValidateCommand(
+internal sealed class ValidateCommand(
     IFaceDetector faceDetector,
     ILandmarkExtractor landmarkExtractor,
     ILogger<ValidateCommand> logger
@@ -33,7 +33,7 @@ public sealed class ValidateCommand(
 {
     /// <inheritdoc />
     [UsedImplicitly]
-    public sealed class Settings : CommandSettings
+    internal sealed class Settings : CommandSettings
     {
         /// <summary>
         /// Input file path
@@ -108,7 +108,11 @@ public sealed class ValidateCommand(
     private readonly ILogger<ValidateCommand> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <inheritdoc />
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         try
         {

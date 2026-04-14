@@ -11,10 +11,11 @@ namespace FaceOFFx.Cli.Tests.Commands;
 /// Tests for PIV command-line interface
 /// </summary>
 [TestFixture]
+[NonParallelizable]
 public class ProcessCommandTests : IntegrationTestBase
 {
     private string _testImagePath = null!;
-    private string _cliProjectPath = null!;
+    private string _cliAssemblyPath = null!;
 
     /// <summary>
     /// One-time setup for the test fixture.
@@ -24,7 +25,7 @@ public class ProcessCommandTests : IntegrationTestBase
     {
         base.OneTimeSetUp();
 
-        // Find the CLI project path
+        // Find the built CLI assembly path
         var currentDir = TestContext.CurrentContext.TestDirectory;
         var searchDir = new DirectoryInfo(currentDir);
 
@@ -38,12 +39,20 @@ public class ProcessCommandTests : IntegrationTestBase
             throw new InvalidOperationException("Could not find solution root");
         }
 
-        _cliProjectPath = Path.Combine(
+        _cliAssemblyPath = Path.Combine(
             searchDir.FullName,
-            "src",
+            "artifacts",
+            "bin",
             "FaceOFFx.Cli",
-            "FaceOFFx.Cli.csproj"
+            "Debug",
+            "net8.0",
+            "faceoffx.dll"
         );
+
+        if (!File.Exists(_cliAssemblyPath))
+        {
+            throw new FileNotFoundException($"Built CLI assembly not found: {_cliAssemblyPath}");
+        }
     }
 
     /// <summary>
@@ -209,7 +218,7 @@ public class ProcessCommandTests : IntegrationTestBase
         var processInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --project \"{_cliProjectPath}\" -- {arguments}",
+            Arguments = $"\"{_cliAssemblyPath}\" {arguments}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -229,7 +238,7 @@ public class ProcessCommandTests : IntegrationTestBase
         var processInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --project \"{_cliProjectPath}\" -- {arguments}",
+            Arguments = $"\"{_cliAssemblyPath}\" {arguments}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

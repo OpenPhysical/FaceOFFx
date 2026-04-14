@@ -28,7 +28,7 @@ namespace FaceOFFx.Cli.Commands;
 ///
 /// The output shows the ROI Inner Region precisely positioned for JPEG 2000 encoding of PIV-compliant images.
 /// </remarks>
-public sealed class RoiCommand(
+internal sealed class RoiCommand(
     IFaceDetector faceDetector,
     ILandmarkExtractor landmarkExtractor,
     IJpeg2000Encoder jpeg2000Encoder,
@@ -38,7 +38,7 @@ public sealed class RoiCommand(
     /// <summary>
     /// Settings for the ROI visualization command.
     /// </summary>
-    public sealed class Settings : CommandSettings
+    internal sealed class Settings : CommandSettings
     {
         /// <summary>
         /// Path to the input image file to process.
@@ -142,8 +142,13 @@ public sealed class RoiCommand(
     /// </summary>
     /// <param name="context">The command context.</param>
     /// <param name="settings">The command settings.</param>
+    /// <param name="cancellationToken">Cancellation token for the command execution.</param>
     /// <returns>Exit code: 0 for success, 1 for failure.</returns>
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         _logger.LogDebug(
             "RoiCommand.ExecuteAsync started - InputPath: {InputPath}, OutputPath: {OutputPath}, Format: {Format}, Quality: {Quality}, StrokeWidth: {StrokeWidth}, ShowLabels: {ShowLabels}, ShowLandmarks: {ShowLandmarks}, ShowPivLines: {ShowPivLines}, Verbose: {Verbose}, NoBoxes: {NoBoxes}",

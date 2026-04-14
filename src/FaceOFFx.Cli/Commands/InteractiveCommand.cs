@@ -33,7 +33,7 @@ namespace FaceOFFx.Cli.Commands;
 /// <summary>
 /// Interactive mode for step-by-step validation and processing
 /// </summary>
-public class InteractiveCommand : AsyncCommand<InteractiveCommand.Settings>
+internal sealed class InteractiveCommand : AsyncCommand<InteractiveCommand.Settings>
 {
     private readonly IFaceDetector _faceDetector;
     private readonly ILandmarkExtractor _landmarkExtractor;
@@ -58,7 +58,7 @@ public class InteractiveCommand : AsyncCommand<InteractiveCommand.Settings>
     /// <summary>
     /// Settings for the interactive command
     /// </summary>
-    public class Settings : CommandSettings
+    internal sealed class Settings : CommandSettings
     {
         /// <summary>
         /// Initial directory to browse for images
@@ -71,7 +71,11 @@ public class InteractiveCommand : AsyncCommand<InteractiveCommand.Settings>
     /// <summary>
     /// Executes the interactive validation workflow
     /// </summary>
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         AnsiConsole.Write(new FigletText("FaceOFFx")
             .LeftJustified()

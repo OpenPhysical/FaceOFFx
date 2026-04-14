@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
     <AssemblyName>faceoffx</AssemblyName>
     <!-- Only enable PublishSingleFile when actually publishing -->
     <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
@@ -12,19 +12,9 @@
     <PackageOutputPath>./nupkg</PackageOutputPath>
     <!-- NuGet Package Metadata -->
     <PackageId>FaceOFFx.Cli</PackageId>
-    <Version>2.1.0</Version>
-    <Authors>FaceOFFx Contributors</Authors>
-    <Company>FaceOFFx</Company>
     <Product>FaceOFFx CLI</Product>
     <Description>PIV-compliant facial processing CLI tool for .NET. Converts photos to FIPS 201-3 compliant ID card format with JPEG 2000 ROI encoding.</Description>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/mistial-dev/FaceOFFx</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/mistial-dev/FaceOFFx</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
     <PackageTags>piv;facial-recognition;face-detection;biometrics;jpeg2000;fips201;id-card;cli;dotnet-tool</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageIcon>icon.png</PackageIcon>
-    <Copyright>Copyright © 2025 FaceOFFx Contributors</Copyright>
     <!-- Include models and dependencies in the tool package -->
     <IncludeContentInPack>true</IncludeContentInPack>
     <IncludeBuildOutput>true</IncludeBuildOutput>
@@ -40,8 +30,8 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
-    <PackageReference Include="Spectre.Console" Version="0.50.0" />
-    <PackageReference Include="Spectre.Console.Cli" Version="0.50.0" />
+    <PackageReference Include="Spectre.Console" Version="0.53.1" />
+    <PackageReference Include="Spectre.Console.Cli" Version="0.53.1" />
     <PackageReference
       Include="Spectre.Console.Cli.Extensions.DependencyInjection"
       Version="0.10.1-preview.0.1"
@@ -52,9 +42,8 @@
       Include="Microsoft.Extensions.Configuration.EnvironmentVariables"
       Version="9.0.7"
     />
-    <PackageReference Update="PolySharp" Version="1.15.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="FaceOFFx.Cli.Tests" />
   </ItemGroup>
 </Project>

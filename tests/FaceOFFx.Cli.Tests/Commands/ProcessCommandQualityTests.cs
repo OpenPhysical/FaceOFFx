@@ -1,18 +1,13 @@
 using System.Text.Json;
 using FaceOFFx.Cli.Commands;
+using FaceOFFx.Cli.Tests;
 using FaceOFFx.Tests.Common;
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Formats.Jpeg;
-using Spectre.Console;
-using Spectre.Console.Cli;
-using Spectre.Console.Cli.Extensions.DependencyInjection;
-using Spectre.Console.Testing;
 
 namespace FaceOFFx.Cli.Tests.Commands;
 
@@ -92,7 +87,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
     public async Task ProcessCommand_WithQualityGate_EnforcesMinimumQuality()
     {
         // Arrange
-        var (app, console) = CreateApplication();
+        var app = CliTestHarness.Create();
         
         // Act
         var result = await app.RunAsync(
@@ -100,10 +95,10 @@ public class ProcessCommandQualityTests : IntegrationTestBase
         
         // Assert
         // Quality gate of 0.5 should pass for our test image (which has score ~55.9%)
-        result.Should().Be(0);
+        result.ExitCode.Should().Be(0);
         File.Exists(_outputPath).Should().BeTrue();
         
-        var output = console.Output;
+        var output = result.Output;
         output.Should().Contain("Quality assessment passed");
     }
     
@@ -114,7 +109,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
     public async Task ProcessCommand_WithHighQualityGate_MayRejectImage()
     {
         // Arrange
-        var (app, console) = CreateApplication();
+        var app = CliTestHarness.Create();
         
         // Act - Use the JPEG version which is naturally lower quality than PNG
         var result = await app.RunAsync(
@@ -122,8 +117,8 @@ public class ProcessCommandQualityTests : IntegrationTestBase
         
         // Assert
         // With 0.95 threshold, low quality image should be rejected
-        var output = console.Output;
-        if (result != 0)
+        var output = result.Output;
+        if (result.ExitCode != 0)
         {
             output.Should().Contain("below quality threshold");
             File.Exists(_outputPath).Should().BeFalse();
@@ -137,7 +132,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
     public async Task ProcessCommand_WithQualityReport_GeneratesReportFile()
     {
         // Arrange
-        var (app, console) = CreateApplication();
+        var app = CliTestHarness.Create();
         var qualityReportPath = Path.ChangeExtension(_outputPath, ".quality.json");
         
         // Act
@@ -150,7 +145,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
             });
         
         // Assert
-        result.Should().Be(0);
+        result.ExitCode.Should().Be(0);
         File.Exists(_outputPath).Should().BeTrue();
         File.Exists(qualityReportPath).Should().BeTrue();
         
@@ -170,7 +165,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
     public async Task ProcessCommand_WithVerboseAndQualityGate_ShowsDetailedQuality()
     {
         // Arrange
-        var (app, console) = CreateApplication();
+        var app = CliTestHarness.Create();
         
         // Act
         var result = await app.RunAsync(
@@ -182,8 +177,8 @@ public class ProcessCommandQualityTests : IntegrationTestBase
             });
         
         // Assert
-        result.Should().Be(0);
-        var output = console.Output;
+        result.ExitCode.Should().Be(0);
+        var output = result.Output;
         
         // Verbose mode should show quality details
         output.Should().Contain("Quality assessment");
@@ -198,7 +193,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
     public async Task ProcessCommand_WithStrictQualityGate_AppliesHigherThreshold()
     {
         // Arrange
-        var (app, console) = CreateApplication();
+        var app = CliTestHarness.Create();
         
         // Act
         var result = await app.RunAsync(
@@ -210,8 +205,8 @@ public class ProcessCommandQualityTests : IntegrationTestBase
             });
         
         // Assert - strict mode actually requires 0.85 minimum, our test image should fail
-        var output = console.Output;
-        result.Should().Be(1); // Should fail with strict quality requirements
+        var output = result.Output;
+        result.ExitCode.Should().Be(1); // Should fail with strict quality requirements
         output.Should().ContainAny("below quality threshold", "does not meet compliance requirements");
     }
     
@@ -226,7 +221,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
         
         foreach (var standard in standards)
         {
-            var (app, console) = CreateApplication();
+            var app = CliTestHarness.Create();
             var outputFile = Path.Combine(Path.GetTempPath(), $"test-{standard}-{Guid.NewGuid()}.jp2");
             
             try
@@ -240,7 +235,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
                     });
                 
                 // Should process with standard-specific quality criteria
-                result.Should().Be(0);
+                result.ExitCode.Should().Be(0);
                 File.Exists(outputFile).Should().BeTrue();
             }
             finally
@@ -258,7 +253,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
     public async Task ProcessCommand_WithQualityGateAndNoResize_PerformsQualityCheck()
     {
         // Arrange
-        var (app, console) = CreateApplication();
+        var app = CliTestHarness.Create();
         
         // Act
         var result = await app.RunAsync(
@@ -270,12 +265,12 @@ public class ProcessCommandQualityTests : IntegrationTestBase
             });
         
         // Assert
-        result.Should().Be(0);
+        result.ExitCode.Should().Be(0);
         File.Exists(_outputPath).Should().BeTrue();
         
-        var output = console.Output;
+        var output = result.Output;
         output.Should().Contain("Quality assessment");
-        output.Should().Contain("No face detection - full image processing");
+        output.Should().Contain("No resize requested - preserving original image geometry");
     }
     
     /// <summary>
@@ -285,7 +280,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
     public async Task ProcessCommand_WithInvalidQualityGate_ShowsError()
     {
         // Arrange
-        var (app, console) = CreateApplication();
+        var app = CliTestHarness.Create();
         
         // Act
         var result = await app.RunAsync(
@@ -296,8 +291,8 @@ public class ProcessCommandQualityTests : IntegrationTestBase
             });
         
         // Assert
-        result.Should().Be(1);
-        var output = console.Output;
+        result.ExitCode.Should().Be(1);
+        var output = result.Output;
         output.Should().Contain("Error");
         output.Should().Contain("quality");
     }
@@ -309,7 +304,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
     public async Task ProcessCommand_QualityReportWithJsonFormat_GeneratesQualityReport()
     {
         // Arrange
-        var (app, console) = CreateApplication();
+        var app = CliTestHarness.Create();
         var qualityReportPath = Path.ChangeExtension(_outputPath, ".quality.json");
         
         // Act
@@ -322,7 +317,7 @@ public class ProcessCommandQualityTests : IntegrationTestBase
             });
         
         // Assert
-        result.Should().Be(0);
+        result.ExitCode.Should().Be(0);
         File.Exists(qualityReportPath).Should().BeTrue();
         
         var jsonContent = await File.ReadAllTextAsync(qualityReportPath);
@@ -331,32 +326,6 @@ public class ProcessCommandQualityTests : IntegrationTestBase
         // Quality report should include compliance and scores
         json.RootElement.GetProperty("IsCompliant").Should().NotBeNull();
         json.RootElement.GetProperty("OverallScore").Should().NotBeNull();
-    }
-    
-    /// <summary>
-    /// Creates a test CommandApp instance with proper dependency injection setup
-    /// </summary>
-    /// <returns>A tuple containing the CommandApp and TestConsole for testing</returns>
-    private (CommandApp app, TestConsole console) CreateApplication()
-    {
-        var services = new ServiceCollection();
-        services.AddFaceOffxCli();
-        services.AddLogging(builder => builder.AddSimpleConsole());
-        
-        var registrar = new DependencyInjectionRegistrar(services);
-        var console = new TestConsole();
-        
-        // Configure console output properly
-        AnsiConsole.Console = console;
-        
-        var app = new CommandApp(registrar);
-        
-        app.Configure(config =>
-        {
-            config.AddCommand<ProcessCommand>("process");
-        });
-        
-        return (app, console);
     }
     
 }
