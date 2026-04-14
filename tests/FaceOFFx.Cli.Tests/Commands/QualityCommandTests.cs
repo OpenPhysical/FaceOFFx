@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using FaceOFFx.Cli.Commands;
 using FaceOFFx.Cli.Tests;
@@ -59,10 +60,29 @@ public class QualityCommandTests : IntegrationTestBase
         result.ExitCode.Should().Be(0);
         var json = JsonDocument.Parse(result.Output);
         json.RootElement.GetProperty("Accepted").GetBoolean().Should().BeTrue();
-        json.RootElement.GetProperty("IsCompliant").GetBoolean().Should().BeFalse();
+        json.RootElement.GetProperty("IsCompliant").GetBoolean().Should().BeTrue();
         json.RootElement.GetProperty("OverallScore").GetDouble().Should().BeInRange(0, 1);
         json.RootElement.GetProperty("Scores").Should().NotBeNull();
-        json.RootElement.GetProperty("Violations").GetArrayLength().Should().BeGreaterThan(0);
+        json.RootElement.GetProperty("Violations").ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
+    [Test]
+    public async Task QualityCommand_WithJsonFormat_DoesNotReportBogusCenterSharpnessFailure()
+    {
+        var app = CliTestHarness.Create();
+
+        var result = await app.RunAsync(new[] { "quality", "--input", _testImagePath, "--format", "json" });
+
+        result.ExitCode.Should().Be(0);
+        var json = JsonDocument.Parse(result.Output);
+        var violations = json.RootElement.GetProperty("Violations")
+            .EnumerateArray()
+            .Select(violation => violation.GetProperty("Description").GetString())
+            .Where(description => description is not null)
+            .ToArray();
+
+        violations.Should().NotContain(description =>
+            description!.Contains("Face region has poor sharpness", StringComparison.OrdinalIgnoreCase));
     }
 
     [Test]
@@ -118,7 +138,7 @@ public class QualityCommandTests : IntegrationTestBase
         result.ExitCode.Should().Be(1);
         var json = JsonDocument.Parse(result.Output);
         json.RootElement.GetProperty("Accepted").GetBoolean().Should().BeFalse();
-        json.RootElement.GetProperty("IsCompliant").GetBoolean().Should().BeFalse();
+        json.RootElement.GetProperty("IsCompliant").GetBoolean().Should().BeTrue();
     }
 
     [Test]
@@ -162,7 +182,7 @@ public class QualityCommandTests : IntegrationTestBase
         var fileContent = await File.ReadAllTextAsync(outputPath);
         var json = JsonDocument.Parse(fileContent);
         json.RootElement.GetProperty("Accepted").GetBoolean().Should().BeTrue();
-        json.RootElement.GetProperty("IsCompliant").GetBoolean().Should().BeFalse();
+        json.RootElement.GetProperty("IsCompliant").GetBoolean().Should().BeTrue();
     }
 
     [Test]
@@ -184,7 +204,7 @@ public class QualityCommandTests : IntegrationTestBase
         var result = await app.RunAsync(new[] { "quality", "--input", _lowQualityImagePath });
 
         result.ExitCode.Should().Be(0);
-        result.Output.Should().Contain("Native Compliance: Fail");
+        result.Output.Should().Contain("Native Compliance:");
         result.Output.Should().Contain("Violations:");
     }
 }

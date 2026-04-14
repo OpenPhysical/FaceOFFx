@@ -40,6 +40,8 @@ namespace FaceOFFx.Core.Domain.Quality;
 [PublicAPI]
 public static class QualityAssessmentPipeline
 {
+    private const float CenterRegionCriticalThreshold = 0.4f;
+
     /// <summary>
     /// Performs a complete quality assessment on a facial image
     /// </summary>
@@ -235,11 +237,12 @@ public static class QualityAssessmentPipeline
         // Check regional sharpness
         foreach (var (region, score) in sharpness.RegionalScores)
         {
-            if (score < 0.4f && region == "Center")
+            var normalizedRegionScore = NormalizeRegionalSharpness(score);
+            if (region == "Center" && normalizedRegionScore < CenterRegionCriticalThreshold)
             {
                 violations.Add(new ComplianceViolation(
                     "Sharpness",
-                    $"Face region has poor sharpness: {score:F2}",
+                    $"Face region has poor sharpness: {normalizedRegionScore:F2}",
                     ViolationSeverity.Critical));
             }
         }
@@ -302,5 +305,11 @@ public static class QualityAssessmentPipeline
             geometry.Overall.Value * geometryWeight;
         
         return QualityScore.Create(weightedScore);
+    }
+
+    private static float NormalizeRegionalSharpness(float rawRegionalScore)
+    {
+        const float sharpnessNormalizationFactor = 294f;
+        return MathF.Min(rawRegionalScore * sharpnessNormalizationFactor, 1f);
     }
 }

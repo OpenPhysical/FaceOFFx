@@ -138,8 +138,8 @@ public class SymmetryAssessorTests
         {
             // Left half bright
             ctx.Fill(Color.White, new Rectangle(0, 0, 320, 480));
-            // Right half dark
-            ctx.Fill(Color.Gray, new Rectangle(320, 0, 320, 480));
+            // Right half very dark to force a strong illumination asymmetry signal.
+            ctx.Fill(Color.Black, new Rectangle(320, 0, 320, 480));
         });
         
         try
@@ -151,12 +151,9 @@ public class SymmetryAssessorTests
             // Assert
             symmetricResult.IsSuccess.Should().BeTrue();
             asymmetricResult.IsSuccess.Should().BeTrue();
-            
-            // Asymmetric face should have different scores (may be higher or lower)
-            // The test images might not have significant illumination differences
-            // so we just verify that we get valid results
-            asymmetricResult.Value.Illumination.Value.Should().BeGreaterThanOrEqualTo(0.0f);
-            symmetricResult.Value.Illumination.Value.Should().BeGreaterThanOrEqualTo(0.0f);
+
+            asymmetricResult.Value.Overall.Value.Should().BeInRange(0f, 1f);
+            symmetricResult.Value.Overall.Value.Should().BeInRange(0f, 1f);
         }
         finally
         {
@@ -259,8 +256,8 @@ public class SymmetryAssessorTests
             var angle = i * 2 * MathF.PI / 68;
             var baseRadius = 100 + (i % 3) * 20;
             
-            // Make left side smaller
-            var radius = angle > MathF.PI ? baseRadius * 0.8f : baseRadius;
+            // Make left side substantially smaller to produce a clear geometric asymmetry.
+            var radius = angle > MathF.PI ? baseRadius * 0.5f : baseRadius;
             
             var x = centerX + radius * MathF.Cos(angle);
             var y = centerY + radius * MathF.Sin(angle);

@@ -157,6 +157,25 @@ public class FacialSymmetryScoreTests
         score.Pose.Value.Should().Be(0f); // 1 - min(2, 1) = 0
         score.Overall.Value.Should().Be(0f);
     }
+
+    [Test]
+    public void FromAsymmetryValues_WithLowerAsymmetry_ProducesHigherQuality()
+    {
+        var lowAsymmetry = FacialSymmetryScore.FromAsymmetryValues(
+            0.1f,
+            0.15f,
+            Array.Empty<float>());
+        var highAsymmetry = FacialSymmetryScore.FromAsymmetryValues(
+            0.65f,
+            0.7f,
+            Array.Empty<float>());
+
+        lowAsymmetry.IsSuccess.Should().BeTrue();
+        highAsymmetry.IsSuccess.Should().BeTrue();
+        lowAsymmetry.Value.Overall.Value.Should().BeGreaterThan(highAsymmetry.Value.Overall.Value);
+        lowAsymmetry.Value.Illumination.Value.Should().BeGreaterThan(highAsymmetry.Value.Illumination.Value);
+        lowAsymmetry.Value.Pose.Value.Should().BeGreaterThan(highAsymmetry.Value.Pose.Value);
+    }
 }
 
 [TestFixture]

@@ -42,10 +42,14 @@ services.AddLogging(builder =>
 services.AddSingleton<IAnsiConsole>(console);
 services.AddFaceOffxCli();
 
-// Display banner
-console.Write(new FigletText("FaceOFFx").LeftJustified().Color(Color.Blue));
-console.MarkupLine("[grey]\"I want to take his face... off.\"[/] - Face/Off (1997)");
-console.WriteLine();
+if (!StructuredOutputDetector.RequiresCleanStdout(args))
+{
+    console.MarkupLine(" [grey]╭───╮[/]   [bold blue]Face[/][bold]OFF[/][bold yellow]x[/]");
+    console.MarkupLine(" [grey]│[/][bold cyan]◉ ◉[/][grey]│[/]   [grey]──────────────────────────[/]");
+    console.MarkupLine(" [grey]│[/][white]╰─╯[/][grey]│[/]   [grey]PIV · ICAO · TWIC Biometrics[/]");
+    console.MarkupLine(" [grey]╰───╯[/]   [dim]\"I want to take his face... off.\"[/]");
+    console.WriteLine();
+}
 
 // Create the CLI app with dependency injection
 using var registrar = new DependencyInjectionRegistrar(services);

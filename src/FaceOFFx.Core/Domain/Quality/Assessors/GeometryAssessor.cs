@@ -226,18 +226,16 @@ public static class GeometryAssessor
             }
             
             var ipdPixels = MathF.Sqrt(deltaX * deltaX + deltaY * deltaY);
-            
-            // Score based on expected IPD range
-            var ipdMm = ipdPixels / PixelsPerMm;
-            
+
+            // Score based on expected IPD range in pixels.
             float score;
-            if (ipdMm < standard.MinInterPupillaryDistance)
+            if (ipdPixels < standard.MinInterPupillaryDistance)
             {
-                score = ipdMm / standard.MinInterPupillaryDistance;
+                score = ipdPixels / standard.MinInterPupillaryDistance;
             }
-            else if (ipdMm > standard.MaxInterPupillaryDistance)
+            else if (ipdPixels > standard.MaxInterPupillaryDistance)
             {
-                score = standard.MaxInterPupillaryDistance / ipdMm;
+                score = standard.MaxInterPupillaryDistance / ipdPixels;
             }
             else
             {

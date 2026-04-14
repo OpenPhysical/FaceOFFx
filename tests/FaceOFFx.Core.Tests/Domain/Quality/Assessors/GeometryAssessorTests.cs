@@ -168,8 +168,8 @@ public class GeometryAssessorTests
         result.IsSuccess.Should().Be(true);
         var compliance = result.Value;
         
-        // IPD should be within acceptable range for PIV
-        compliance.InterPupillaryDistance.Value.Should().BeGreaterThan(0.05f); // Realistic for test data
+        // A 100px IPD is within the PIV target range and should receive full credit.
+        compliance.InterPupillaryDistance.Value.Should().BeApproximately(1f, 0.001f);
     }
     
     private FaceLandmarks68 CreateCenteredLandmarks(ImageDimensions dims)
