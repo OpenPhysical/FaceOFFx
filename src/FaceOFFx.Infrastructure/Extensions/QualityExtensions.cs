@@ -181,42 +181,76 @@ public static class QualityExtensions
         {
             using var image = Image.Load<Rgba32>(imageData);
             using var services = new FacialProcessingServices(logger);
-            
-            // Detect face
-            var faceResult = await services.Detector.DetectFacesAsync(image);
-            if (faceResult.IsFailure)
+            OutputPortraitAssessmentInput? outputPortrait = null;
+            try
             {
-                return Result.Failure<ComplianceAssessment>($"Face detection failed: {faceResult.Error}");
+                // Detect face
+                var faceResult = await services.Detector.DetectFacesAsync(image);
+                if (faceResult.IsFailure)
+                {
+                    return Result.Failure<ComplianceAssessment>($"Face detection failed: {faceResult.Error}");
+                }
+                
+                var faces = faceResult.Value;
+                if (!faces.Any())
+                {
+                    return Result.Failure<ComplianceAssessment>("No faces detected in the image");
+                }
+                
+                var primaryFace = faces.OrderByDescending(f => f.Confidence).First();
+                if (primaryFace.Confidence < minConfidence)
+                {
+                    return Result.Failure<ComplianceAssessment>(
+                        $"Face detection confidence {primaryFace.Confidence:P1} is below minimum {minConfidence:P1}");
+                }
+                
+                // Extract landmarks
+                var landmarksResult = await services.LandmarkExtractor
+                    .ExtractLandmarksAsync(image, primaryFace.BoundingBox);
+                if (landmarksResult.IsFailure)
+                {
+                    return Result.Failure<ComplianceAssessment>($"Landmark extraction failed: {landmarksResult.Error}");
+                }
+
+                if (mode == AssessmentMode.OutputValidation)
+                {
+                    var portraitLogger = NullLogger<StandardPortraitProcessorService>.Instance;
+                    var portraitProcessor = new StandardPortraitProcessorService(
+                        services.Detector,
+                        services.LandmarkExtractor,
+                        services.Encoder,
+                        portraitLogger);
+
+                    var alignmentResult = await portraitProcessor.AlignAsync(
+                        image,
+                        standardName,
+                        minConfidence,
+                        minFaceSize: 50);
+
+                    if (alignmentResult.IsFailure)
+                    {
+                        return Result.Failure<ComplianceAssessment>(
+                            $"Output portrait alignment failed: {alignmentResult.Error}");
+                    }
+
+                    using var alignedPortrait = alignmentResult.Value;
+                    outputPortrait = new OutputPortraitAssessmentInput(
+                        alignedPortrait.ProcessedImage.Clone(),
+                        alignedPortrait.ProcessedLandmarks);
+                }
+                
+                return await ComplianceAssessmentPipeline.AssessComplianceAsync(
+                    image,
+                    primaryFace,
+                    landmarksResult.Value,
+                    standardName,
+                    mode,
+                    outputPortrait);
             }
-            
-            var faces = faceResult.Value;
-            if (!faces.Any())
+            finally
             {
-                return Result.Failure<ComplianceAssessment>("No faces detected in the image");
+                outputPortrait?.Image.Dispose();
             }
-            
-            var primaryFace = faces.OrderByDescending(f => f.Confidence).First();
-            if (primaryFace.Confidence < minConfidence)
-            {
-                return Result.Failure<ComplianceAssessment>(
-                    $"Face detection confidence {primaryFace.Confidence:P1} is below minimum {minConfidence:P1}");
-            }
-            
-            // Extract landmarks
-            var landmarksResult = await services.LandmarkExtractor
-                .ExtractLandmarksAsync(image, primaryFace.BoundingBox);
-            if (landmarksResult.IsFailure)
-            {
-                return Result.Failure<ComplianceAssessment>($"Landmark extraction failed: {landmarksResult.Error}");
-            }
-            
-            // Perform compliance assessment using new pipeline
-            return await ComplianceAssessmentPipeline.AssessComplianceAsync(
-                image,
-                primaryFace,
-                landmarksResult.Value,
-                standardName,
-                mode);
         }
         catch (Exception ex)
         {

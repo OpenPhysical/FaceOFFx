@@ -38,34 +38,33 @@ public static class ComplianceEvaluators
     /// </summary>
     public static SymmetryCompliance EvaluateSymmetryCompliance(
         SymmetryMeasurement measurement,
-        ComplianceRules rules)
+        ComplianceRules rules,
+        bool countsTowardsCompliance = true)
     {
         var standard = rules.ToStandard();
-        // Lower asymmetry percentages are BETTER (more symmetric)
-        // So we need asymmetry to be BELOW the maximum allowed threshold
-        var illuminationPassed = measurement.IlluminationAsymmetryPercent <= rules.MinSymmetryPercent;
-        var posePassed = measurement.PoseAsymmetryPercent <= rules.MinSymmetryPercent;
+        var illuminationPassed = measurement.IlluminationAsymmetryPercent >= rules.MinSymmetryPercent;
+        var posePassed = measurement.PoseAsymmetryPercent >= rules.MinSymmetryPercent;
         
         RejectionReason? rejection = null;
-        if (!illuminationPassed)
+        if (countsTowardsCompliance && !illuminationPassed)
         {
             rejection = RejectionReason.Create(
                 "Illumination Asymmetry",
                 measurement.IlluminationAsymmetryPercent,
                 rules.MinSymmetryPercent,
                 standard,
-                ComparisonType.MustBeLessThan,
+                ComparisonType.MustBeGreaterThan,
                 MetricUnit.Percentage
             );
         }
-        else if (!posePassed)
+        else if (countsTowardsCompliance && !posePassed)
         {
             rejection = RejectionReason.Create(
                 "Pose Asymmetry",
                 measurement.PoseAsymmetryPercent,
                 rules.MinSymmetryPercent,
                 standard,
-                ComparisonType.MustBeLessThan,
+                ComparisonType.MustBeGreaterThan,
                 MetricUnit.Percentage
             );
         }
@@ -75,7 +74,8 @@ public static class ComplianceEvaluators
             IlluminationAsymmetryPercent: measurement.IlluminationAsymmetryPercent,
             PoseAsymmetryPercent: measurement.PoseAsymmetryPercent,
             RequiredThreshold: rules.MinSymmetryPercent,
-            Rejection: rejection
+            Rejection: rejection,
+            CountsTowardsCompliance: countsTowardsCompliance
         );
     }
 
@@ -261,9 +261,13 @@ public static class ComplianceEvaluators
         SymmetryMeasurement symmetryMeasurement,
         SharpnessMeasurement sharpnessMeasurement,
         GeometryMeasurement geometryMeasurement,
-        ComplianceRules rules)
+        ComplianceRules rules,
+        bool symmetryCountsTowardsCompliance = true)
     {
-        var symmetryCompliance = EvaluateSymmetryCompliance(symmetryMeasurement, rules);
+        var symmetryCompliance = EvaluateSymmetryCompliance(
+            symmetryMeasurement,
+            rules,
+            symmetryCountsTowardsCompliance);
         var sharpnessCompliance = EvaluateSharpnessCompliance(sharpnessMeasurement, rules);
         var geometryCompliance = EvaluateGeometryCompliance(geometryMeasurement, rules);
         

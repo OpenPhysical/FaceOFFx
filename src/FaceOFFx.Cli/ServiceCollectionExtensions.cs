@@ -51,6 +51,7 @@ public static class ServiceCollectionExtensions
             return new QualityAssessor(assessorLogger);
         });
 
+        services.AddScoped<StandardPortraitProcessorService>();
         services.AddScoped<StandardPortraitProcessor>();
 
         // Register CLI commands

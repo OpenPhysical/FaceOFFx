@@ -1,7 +1,7 @@
-using FaceOFFx.Cli.Services;
 using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Transformations;
+using FaceOFFx.Infrastructure.Services;
 using FluentAssertions;
 using NUnit.Framework;
 
@@ -27,7 +27,7 @@ public class StandardPortraitProcessorTests
         var faceBox = FaceBox.Create(100, 120, 220, 260).Value;
         var landmarks = CreateLandmarks();
 
-        var crop = StandardPortraitProcessor.CalculateCropRectangle(
+        var crop = StandardPortraitProcessorService.CalculateCropRectangle(
             faceBox,
             landmarks,
             800,

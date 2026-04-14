@@ -174,7 +174,8 @@ public record SymmetryCompliance(
     float IlluminationAsymmetryPercent,
     float PoseAsymmetryPercent,
     float RequiredThreshold,
-    RejectionReason? Rejection = null);
+    RejectionReason? Rejection = null,
+    bool CountsTowardsCompliance = true);
 
 /// <summary>
 /// Sharpness compliance assessment with specific pass/fail criteria
@@ -245,7 +246,10 @@ public record ComplianceAssessment(
     /// <summary>
     /// True if all metrics pass compliance requirements
     /// </summary>
-    public bool IsCompliant => Symmetry.Passed && Sharpness.Passed && Geometry.Passed;
+    public bool IsCompliant =>
+        (!Symmetry.CountsTowardsCompliance || Symmetry.Passed)
+        && Sharpness.Passed
+        && Geometry.Passed;
     
     /// <summary>
     /// Summary of compliance status

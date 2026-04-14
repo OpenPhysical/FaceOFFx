@@ -614,7 +614,9 @@ internal sealed class ValidateCommand(
                 detailsTable.AddColumn("Details");
 
                 // Symmetry
-                var symStatus = assessment.Symmetry.Passed ? "[green]✅ PASS[/]" : "[red]❌ FAIL[/]";
+                var symStatus = assessment.Symmetry.CountsTowardsCompliance
+                    ? assessment.Symmetry.Passed ? "[green]✅ PASS[/]" : "[red]❌ FAIL[/]"
+                    : "[yellow]ℹ ADVISORY[/]";
                 var symDetails = $"Illumination: {assessment.Symmetry.IlluminationAsymmetryPercent:F1}%, Pose: {assessment.Symmetry.PoseAsymmetryPercent:F1}%";
                 detailsTable.AddRow("Symmetry", symStatus, symDetails);
 

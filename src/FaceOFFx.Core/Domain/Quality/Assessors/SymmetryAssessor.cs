@@ -73,11 +73,24 @@ public static class SymmetryAssessor
         Image<Rgba32> image,
         FaceLandmarks68 landmarks)
     {
-        return ExtractFaceRegion(image, landmarks)
-            .Bind(faceRegion => ExtractFaceHalves(faceRegion, landmarks))
-            .Bind(halves => ApplyGaborFilters(halves.left, halves.right))
-            .Map(responses => CalculateAsymmetry(responses))
-            .Bind(asymmetry => CreateSymmetryScore(asymmetry));
+        var faceRegionResult = ExtractFaceRegion(image, landmarks);
+        if (faceRegionResult.IsFailure)
+        {
+            return Result.Failure<FacialSymmetryScore>(faceRegionResult.Error);
+        }
+
+        using var faceRegion = faceRegionResult.Value;
+        var halvesResult = ExtractFaceHalves(faceRegion, landmarks);
+        if (halvesResult.IsFailure)
+        {
+            return Result.Failure<FacialSymmetryScore>(halvesResult.Error);
+        }
+
+        using var leftHalf = halvesResult.Value.left;
+        using var rightHalf = halvesResult.Value.right;
+        return ApplyGaborFilters(leftHalf, rightHalf)
+            .Map(CalculateAsymmetry)
+            .Bind(CreateSymmetryScore);
     }
 
     /// <summary>
@@ -87,10 +100,23 @@ public static class SymmetryAssessor
         Image<Rgba32> image,
         FaceLandmarks68 landmarks)
     {
-        return ExtractFaceRegion(image, landmarks)
-            .Bind(faceRegion => ExtractFaceHalves(faceRegion, landmarks))
-            .Bind(halves => ApplyGaborFilters(halves.left, halves.right))
-            .Map(responses => CalculateAsymmetry(responses))
+        var faceRegionResult = ExtractFaceRegion(image, landmarks);
+        if (faceRegionResult.IsFailure)
+        {
+            return Result.Failure<SymmetryMeasurement>(faceRegionResult.Error);
+        }
+
+        using var faceRegion = faceRegionResult.Value;
+        var halvesResult = ExtractFaceHalves(faceRegion, landmarks);
+        if (halvesResult.IsFailure)
+        {
+            return Result.Failure<SymmetryMeasurement>(halvesResult.Error);
+        }
+
+        using var leftHalf = halvesResult.Value.left;
+        using var rightHalf = halvesResult.Value.right;
+        return ApplyGaborFilters(leftHalf, rightHalf)
+            .Map(CalculateAsymmetry)
             .Map(asymmetry => new SymmetryMeasurement(
                 IlluminationAsymmetryPercent: ConvertAsymmetryToPercentage(asymmetry.IlluminationAsymmetry),
                 PoseAsymmetryPercent: ConvertAsymmetryToPercentage(asymmetry.PoseAsymmetry),
@@ -192,7 +218,7 @@ public static class SymmetryAssessor
         var leftResponses = new float[Filters.Length][,];
         var rightResponses = new float[Filters.Length][,];
         
-        // Process with functional approach - halves are disposed by caller
+        // Halves are owned and disposed by the caller.
         for (int i = 0; i < Filters.Length; i++)
         {
             leftResponses[i] = ApplyGaborFilter(leftHalf, Filters[i]);
@@ -322,20 +348,10 @@ public static class SymmetryAssessor
     
     private static Result<FacialSymmetryScore> CreateSymmetryScore(AsymmetryResult asymmetry)
     {
-        // Convert asymmetry measures to quality scores using sigmoid function
-        // This provides more realistic scoring that reflects perceptual quality
-        
-        // Sigmoid parameters tuned for facial symmetry (based on literature)
-        const float sigmoidSteepness = 8f; // Controls curve steepness
-        const float sigmoidMidpoint = 0.2f; // Asymmetry level for 50% quality score
-        
-        // Apply sigmoid transformation: quality = 1 / (1 + exp(steepness * (asymmetry - midpoint)))
-        var illuminationQuality = SigmoidQualityTransform(asymmetry.IlluminationAsymmetry, sigmoidSteepness, sigmoidMidpoint);
-        var poseQuality = SigmoidQualityTransform(asymmetry.PoseAsymmetry, sigmoidSteepness, sigmoidMidpoint);
-        
+        // FacialSymmetryScore expects raw asymmetry values and applies the final inversion itself.
         return FacialSymmetryScore.FromAsymmetryValues(
-            illuminationQuality,
-            poseQuality,
+            asymmetry.IlluminationAsymmetry,
+            asymmetry.PoseAsymmetry,
             asymmetry.GaborResponses);
     }
     
