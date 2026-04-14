@@ -1,19 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
     <Description>ONNX models for FaceOFFx facial recognition library</Description>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\*.onnx" />
-  </ItemGroup>
-  <ItemGroup>
-    <None
-      Include="..\..\icon.png"
-      Pack="true"
-      PackagePath="\"
-      Condition="Exists('..\..\icon.png')"
-    />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.0" />

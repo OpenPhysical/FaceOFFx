@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
     <Description>Infrastructure implementation for FaceOFFx facial recognition library</Description>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IsPackable>false</IsPackable>
@@ -14,15 +14,12 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.7" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.7" />
     <PackageReference Include="MetadataExtractor" Version="2.8.1" />
-    <PackageReference Update="PolySharp" Version="1.15.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="CoreJ2K" Version="1.1.2.50" />
     <PackageReference Include="CoreJ2K.ImageSharp" Version="1.0.1" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="FaceOFFx.Tests" />
+    <InternalsVisibleTo Include="FaceOFFx.Cli.Tests" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
     <Description>Core domain models and abstractions for FaceOFFx facial recognition library</Description>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -9,12 +9,9 @@
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.7" />
-    <PackageReference Update="PolySharp" Version="1.15.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="FaceOFFx.Core.Tests" />
+    <InternalsVisibleTo Include="FaceOFFx.Cli.Tests" />
   </ItemGroup>
 </Project>

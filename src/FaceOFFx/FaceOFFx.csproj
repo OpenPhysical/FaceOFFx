@@ -1,24 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
     <PackageId>FaceOFFx</PackageId>
     <IsPackable>true</IsPackable>
     <IncludeBuildOutput>true</IncludeBuildOutput>
-    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <Description>PIV-compliant facial processing library for .NET with FIPS 201-3 compliance and JPEG 2000 ROI encoding</Description>
-    <Version>2.1.0</Version>
-    <Authors>FaceOFFx Contributors</Authors>
-    <Company>FaceOFFx</Company>
-    <Product>FaceOFFx</Product>
-    <Copyright>Copyright © 2025 FaceOFFx Contributors</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/mistial-dev/FaceOFFx</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/mistial-dev/FaceOFFx</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
     <PackageTags>face-recognition;face-detection;facial-landmarks;piv;jpeg2000;fips201;onnx;machine-learning;computer-vision</PackageTags>
-    <PackageIcon>icon.png</PackageIcon>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <!-- Reference all projects that should be included in the package -->
   <ItemGroup>
@@ -58,21 +45,6 @@
       PackagePath="contentFiles\any\any\Resources\"
       CopyToOutputDirectory="PreserveNewest"
       BuildAction="Content"
-    />
-  </ItemGroup>
-  <!-- Include icon and readme -->
-  <ItemGroup>
-    <None
-      Include="..\..\icon.png"
-      Pack="true"
-      PackagePath=""
-      Condition="Exists('..\..\icon.png')"
-    />
-    <None
-      Include="..\..\README.md"
-      Pack="true"
-      PackagePath=""
-      Condition="Exists('..\..\README.md')"
     />
   </ItemGroup>
 </Project>

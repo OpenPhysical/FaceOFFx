@@ -1,0 +1,24 @@
+root = true
+
+[*.{cs,csx}]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+csharp_new_line_before_open_brace = all
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_prefer_braces = true:suggestion
+dotnet_sort_system_directives_first = true
+
+[*.{csproj,props,targets,sln,md,json,xml,yml,yaml,sh}]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false

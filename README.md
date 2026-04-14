@@ -24,14 +24,15 @@ FaceOFFx extends its capabilities with PIV-specific transformations, FIPS 201-3 
 - **JPEG 2000 ROI Encoding** - Smart compression with exact target size limits
 - **68-Point Landmark Detection** - Precise facial feature mapping
 - **High Performance** - Direct ONNX Runtime integration
-- **Cross-Platform** - Windows, Linux, macOS via .NET 8
+- **Cross-Platform** - Windows, Linux, macOS via .NET 8, 9, and 10
 - **Self-Contained** - Embedded models, no external dependencies
+- **Pre-trained Models Only** - Uses existing RetinaFace and PFLD models, no training performed
 
 ## Quick Start
 
-### v2.0 Simplified API
+### v3.0 Simplified API
 
-The new v2.0 API provides automatic service management with standard .NET error handling:
+The v3.0 API provides automatic service management with standard .NET error handling:
 
 ```csharp
 using FaceOFFx.Infrastructure.Services;
@@ -114,7 +115,7 @@ Install-Package FaceOFFx
 
 ### Requirements
 
-- .NET 8.0 or later
+- .NET 8.0, 9.0, or 10.0
 - Windows, Linux, or macOS
 - No GPU required (CPU inference supported)
 
@@ -647,7 +648,7 @@ Each transformation maintains mathematical precision to ensure accurate facial f
 
 ## Requirements
 
-- **.NET 8.0** or later
+- **.NET 8.0, 9.0, or 10.0**
 - **Dependencies**:
   - Microsoft.ML.OnnxRuntime (CPU inference)
   - SixLabors.ImageSharp (Image processing)
