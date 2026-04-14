@@ -34,7 +34,7 @@ process_person "bush" "tests/sample_images/bush_photo.jpg"
 process_person "generic_guy" "tests/sample_images/generic_guy.jpg"
 process_person "johnson" "tests/sample_images/johnson_photo.jpg"
 process_person "starmer" "tests/sample_images/starmer_photo.jpg"
-process_person "trump" "tests/sample_images/trump_photo.jpg"
+process_person "carter" "tests/sample_images/carter_photo.jpg"
 
 # Special cases for Starmer
 echo "Processing special presets..."
