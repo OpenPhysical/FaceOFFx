@@ -13,9 +13,11 @@ namespace FaceOFFx.Cli.Commands;
 /// <summary>
 /// Command for assessing facial image quality according to ISO/IEC 19794-5
 /// </summary>
-public class QualityCommand : AsyncCommand<QualityCommand.Settings>
+internal sealed class QualityCommand(IAnsiConsole console) : AsyncCommand<QualityCommand.Settings>
 {
-    public class Settings : CommandSettings
+    private readonly IAnsiConsole _console = console ?? throw new ArgumentNullException(nameof(console));
+
+    internal sealed class Settings : CommandSettings
     {
         [Description("Path to the input image file")]
         [CommandOption("-i|--input <PATH>")]
@@ -37,8 +39,7 @@ public class QualityCommand : AsyncCommand<QualityCommand.Settings>
 
         [Description("Minimum quality threshold (0.0-1.0)")]
         [CommandOption("-t|--threshold <THRESHOLD>")]
-        [DefaultValue(0.7f)]
-        public float Threshold { get; set; } = 0.7f;
+        public float? Threshold { get; set; }
 
         [Description("Enforce strict compliance")]
         [CommandOption("--strict")]
@@ -49,80 +50,87 @@ public class QualityCommand : AsyncCommand<QualityCommand.Settings>
         public bool Visual { get; set; }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         // Validate input
         if (!File.Exists(settings.InputPath))
         {
-            AnsiConsole.MarkupLine($"[red]Error: Input file not found: {settings.InputPath}[/]");
+            _console.MarkupLine($"[red]Error: Input file not found: {settings.InputPath}[/]");
             return 1;
         }
 
         // Create quality assessment options
         var options = settings.Strict
-            ? QualityAssessmentOptions.Strict
+            ? QualityAssessmentOptions.StrictForStandard(settings.Standard, settings.Threshold)
             : QualityAssessmentOptions.ForStandard(settings.Standard) with
             {
-                MinQualityThreshold = settings.Threshold,
+                MinQualityThreshold = settings.Threshold ?? 0.7f,
                 EnforceCompliance = false
             };
 
-        // Load and assess image
-        await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Star)
-            .SpinnerStyle(Style.Parse("green"))
-            .StartAsync($"Assessing quality of {Path.GetFileName(settings.InputPath)}...", async ctx =>
+        try
+        {
+            var imageData = await File.ReadAllBytesAsync(settings.InputPath);
+            var result = await imageData.AssessQualityAsync(options);
+
+            if (result.IsFailure)
             {
-                try
-                {
-                    var imageData = await File.ReadAllBytesAsync(settings.InputPath);
-                    var result = await imageData.AssessQualityAsync(options);
+                _console.MarkupLine($"[red]Quality assessment failed: {result.Error}[/]");
+                return 1;
+            }
 
-                    if (result.IsFailure)
-                    {
-                        AnsiConsole.MarkupLine($"[red]Quality assessment failed: {result.Error}[/]");
-                        return;
-                    }
+            var assessment = result.Value;
+            var acceptance = QualityAcceptanceEvaluator.Evaluate(assessment, options);
 
-                    var assessment = result.Value;
+            switch (settings.OutputFormat.ToLowerInvariant())
+            {
+                case "json":
+                    await OutputJson(_console, assessment, acceptance, settings.OutputPath);
+                    break;
+                case "detailed":
+                    OutputDetailed(_console, assessment, acceptance);
+                    break;
+                default:
+                    OutputText(_console, assessment, acceptance);
+                    break;
+            }
 
-                    // Output results based on format
-                    switch (settings.OutputFormat.ToLower())
-                    {
-                        case "json":
-                            await OutputJson(assessment, settings.OutputPath);
-                            break;
-                        case "detailed":
-                            OutputDetailed(assessment);
-                            break;
-                        default:
-                            OutputText(assessment);
-                            break;
-                    }
+            if (settings.Visual)
+            {
+                await GenerateVisualOverlay(settings.InputPath, assessment);
+            }
 
-                    // Generate visual overlay if requested
-                    if (settings.Visual)
-                    {
-                        await GenerateVisualOverlay(settings.InputPath, assessment);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    AnsiConsole.MarkupLine($"[red]Error: {ex.Message}[/]");
-                }
-            });
-
-        return 0;
+            return acceptance.Accepted ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            _console.MarkupLine($"[red]Error: {ex.Message}[/]");
+            return 1;
+        }
     }
 
-    private static void OutputText(Iso19794Assessment assessment)
+    private static void OutputText(
+        IAnsiConsole console,
+        Iso19794Assessment assessment,
+        QualityAcceptanceResult acceptance)
     {
-        AnsiConsole.WriteLine();
+        console.WriteLine();
         
         // Overall result
-        var status = assessment.IsCompliant ? "[green]COMPLIANT[/]" : "[red]NON-COMPLIANT[/]";
-        AnsiConsole.MarkupLine($"Status: {status}");
-        AnsiConsole.MarkupLine($"Overall Quality: [yellow]{assessment.Overall}[/]");
+        var status = acceptance.Accepted ? "[green]COMPLIANT[/]" : "[red]NON-COMPLIANT[/]";
+        console.MarkupLine($"Status: {status}");
+        console.MarkupLine($"Overall Quality: [yellow]{assessment.Overall}[/]");
+        console.MarkupLine(
+            $"Native Compliance: {(assessment.IsCompliant ? "[green]Pass[/]" : "[red]Fail[/]")}");
+
+        if (!acceptance.Accepted && !string.IsNullOrWhiteSpace(acceptance.FailureReason))
+        {
+            console.MarkupLine($"Requested Gate: [red]{acceptance.FailureReason}[/]");
+        }
         
         // Component scores
         var table = new Table()
@@ -171,13 +179,13 @@ public class QualityCommand : AsyncCommand<QualityCommand.Settings>
             assessment.Geometry.InterPupillaryDistance.ToString(),
             GetStatusEmoji(assessment.Geometry.InterPupillaryDistance.Value));
 
-        AnsiConsole.Write(table);
+        console.Write(table);
 
         // Violations
         if (assessment.Violations.Any())
         {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[yellow]Violations:[/]");
+            console.WriteLine();
+            console.MarkupLine("[yellow]Violations:[/]");
             
             foreach (var violation in assessment.Violations.OrderByDescending(v => v.Severity))
             {
@@ -188,44 +196,53 @@ public class QualityCommand : AsyncCommand<QualityCommand.Settings>
                     _ => "gray"
                 };
                 
-                AnsiConsole.MarkupLine($"  [{severityColor}]• {violation.Category}: {violation.Description}[/]");
+                console.MarkupLine($"  [{severityColor}]• {violation.Category}: {violation.Description}[/]");
             }
         }
     }
 
-    private static void OutputDetailed(Iso19794Assessment assessment)
+    private static void OutputDetailed(
+        IAnsiConsole console,
+        Iso19794Assessment assessment,
+        QualityAcceptanceResult acceptance)
     {
-        OutputText(assessment); // Start with basic output
+        OutputText(console, assessment, acceptance); // Start with basic output
         
-        AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule("[blue]Detailed Analysis[/]"));
+        console.WriteLine();
+        console.Write(new Rule("[blue]Detailed Analysis[/]"));
         
         // Sharpness regional scores
         if (assessment.Sharpness.RegionalScores.Any())
         {
-            AnsiConsole.MarkupLine("[green]Regional Sharpness:[/]");
+            console.MarkupLine("[green]Regional Sharpness:[/]");
             foreach (var (region, score) in assessment.Sharpness.RegionalScores)
             {
-                AnsiConsole.MarkupLine($"  {region}: {score:F3} {GetStatusEmoji(score)}");
+                console.MarkupLine($"  {region}: {score:F3} {GetStatusEmoji(score)}");
             }
         }
         
         // Image dimensions
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[green]Image Dimensions:[/]");
-        AnsiConsole.MarkupLine($"  Actual: {assessment.Geometry.ActualDimensions.Width}×{assessment.Geometry.ActualDimensions.Height}");
-        AnsiConsole.MarkupLine($"  Expected: {assessment.Geometry.ExpectedDimensions.Width}×{assessment.Geometry.ExpectedDimensions.Height}");
+        console.WriteLine();
+        console.MarkupLine("[green]Image Dimensions:[/]");
+        console.MarkupLine($"  Actual: {assessment.Geometry.ActualDimensions.Width}×{assessment.Geometry.ActualDimensions.Height}");
+        console.MarkupLine($"  Expected: {assessment.Geometry.ExpectedDimensions.Width}×{assessment.Geometry.ExpectedDimensions.Height}");
         
         // Processing time
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[gray]Assessment completed at: {assessment.AssessmentTime:yyyy-MM-dd HH:mm:ss} UTC[/]");
+        console.WriteLine();
+        console.MarkupLine($"[gray]Assessment completed at: {assessment.AssessmentTime:yyyy-MM-dd HH:mm:ss} UTC[/]");
     }
 
-    private static async Task OutputJson(Iso19794Assessment assessment, string? outputPath)
+    private static async Task OutputJson(
+        IAnsiConsole console,
+        Iso19794Assessment assessment,
+        QualityAcceptanceResult acceptance,
+        string? outputPath)
     {
         var json = JsonSerializer.Serialize(new
         {
+            Accepted = acceptance.Accepted,
             assessment.IsCompliant,
+            RequestedGateFailureReason = acceptance.FailureReason,
             OverallScore = assessment.Overall.Value,
             assessment.Summary,
             Scores = new
@@ -261,12 +278,12 @@ public class QualityCommand : AsyncCommand<QualityCommand.Settings>
 
         if (string.IsNullOrEmpty(outputPath))
         {
-            AnsiConsole.WriteLine(json);
+            console.WriteLine(json);
         }
         else
         {
             await File.WriteAllTextAsync(outputPath, json);
-            AnsiConsole.MarkupLine($"[green]Report saved to: {outputPath}[/]");
+            console.MarkupLine($"[green]Report saved to: {outputPath}[/]");
         }
     }
 
@@ -277,7 +294,7 @@ public class QualityCommand : AsyncCommand<QualityCommand.Settings>
         _ => "❌"
     };
 
-    private static async Task GenerateVisualOverlay(string inputPath, Iso19794Assessment assessment)
+    private async Task GenerateVisualOverlay(string inputPath, Iso19794Assessment assessment)
     {
         var outputPath = Path.Combine(
             Path.GetDirectoryName(inputPath) ?? ".",
@@ -299,16 +316,16 @@ public class QualityCommand : AsyncCommand<QualityCommand.Settings>
             {
                 // Save the annotated image
                 await overlayResult.Value.SaveAsPngAsync(outputPath);
-                AnsiConsole.MarkupLine($"[green]Visual overlay saved to: {outputPath}[/]");
+                _console.MarkupLine($"[green]Visual overlay saved to: {outputPath}[/]");
             }
             else
             {
-                AnsiConsole.MarkupLine($"[red]Failed to create visual overlay: {overlayResult.Error}[/]");
+                _console.MarkupLine($"[red]Failed to create visual overlay: {overlayResult.Error}[/]");
             }
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"[red]Error generating visual overlay: {ex.Message}[/]");
+            _console.MarkupLine($"[red]Error generating visual overlay: {ex.Message}[/]");
         }
     }
 }

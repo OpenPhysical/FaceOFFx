@@ -67,6 +67,21 @@ public record QualityAssessmentOptions
         MinQualityThreshold = 0.85f,
         Standard = Iso19794Standard.Piv
     };
+
+    /// <summary>
+    /// Strict compliance preset for a specific standard.
+    /// </summary>
+    public static QualityAssessmentOptions StrictForStandard(
+        string standard,
+        float? thresholdOverride = null)
+    {
+        var standardOptions = ForStandard(standard);
+        return standardOptions with
+        {
+            EnforceCompliance = true,
+            MinQualityThreshold = thresholdOverride ?? 0.85f
+        };
+    }
     
     /// <summary>
     /// Lenient compliance preset - lower threshold without enforcement
