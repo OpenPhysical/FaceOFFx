@@ -20,15 +20,9 @@ public static class DiagnosticsCliAppConfiguration
 
         config
             .AddCommand<DetectCommand>("detect")
-            .WithDescription("Run face detection and write original-image feature overlays over files or a named corpus")
+            .WithDescription("Run staged human-detection visualization and write ordered PNG outputs per subject")
             .WithExample("detect", "--corpus", "people", "--output", "artifacts/diagnostics/detect")
-            .WithExample("detect", "tests/test-images/people/generic-guy/source.png", "--output", "artifacts/diagnostics/detect", "--profiles", "piv,canada-passport", "--save-chips");
-
-        config
-            .AddCommand<CropCommand>("crop")
-            .WithDescription("Render document workflow crops in batch for engineering review")
-            .WithExample("crop", "--corpus", "people", "--profile", "piv", "--variant", "digital", "--output", "artifacts/diagnostics/crop")
-            .WithExample("crop", "--corpus", "people", "--profile", "canada-passport", "--variant", "print", "--output", "artifacts/diagnostics/crop");
+            .WithExample("detect", "tests/test-images/people/generic-guy/source.png", "--output", "artifacts/diagnostics/detect");
 
         config.AddBranch("sharpness", sharpness =>
         {

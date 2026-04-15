@@ -1,10 +1,8 @@
 using System.ComponentModel;
 using FaceOFFx.Core.Domain.Common;
-using FaceOFFx.Core.Domain.Documents;
 using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Diagnostics.Cli.Services;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -26,38 +24,19 @@ internal sealed class DetectCommand(
         public string? CorpusId { get; init; }
 
         [CommandOption("-o|--output <DIR>")]
-        [Description("Output directory for manifest and overlays")]
+        [Description("Output directory for the staged visualization folders and manifest")]
         public string OutputDirectory { get; init; } = Path.Combine("artifacts", "diagnostics", "detect");
 
-        [CommandOption("--save-chips")]
-        [Description("Save the primary detected face crop for each image")]
-        public bool SaveChips { get; init; }
-
         [CommandOption("--verify")]
-        [Description("Fail if the corpus expectations do not match actual detection/landmarks results")]
+        [Description("Fail if the corpus expectations do not match actual detection or landmark results")]
         public bool Verify { get; init; }
-
-        [CommandOption("--profiles <LIST>")]
-        [Description("Comma-separated document ids to project, or 'all' for every shipped document")]
-        public string Profiles { get; init; } = "all";
-
-        [CommandOption("--gross-only")]
-        [Description("Write only coarse detection overlays: detector box, RetinaFace 5-point landmarks, and the chip polygon")]
-        public bool GrossOnly { get; init; }
-
-        [CommandOption("--fine-only")]
-        [Description("Write only reverse-projected fine 68-point landmarks on the original image")]
-        public bool FineOnly { get; init; }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
+    public override async Task<int> ExecuteAsync(
+        CommandContext context,
+        Settings settings,
+        CancellationToken cancellationToken)
     {
-        if (settings.GrossOnly && settings.FineOnly)
-        {
-            console.MarkupLine("[red]--gross-only and --fine-only cannot be used together.[/]");
-            return 1;
-        }
-
         var subjectsResult = corpusService.ResolveInputs(settings.InputPath, settings.CorpusId);
         if (subjectsResult.IsFailure)
         {
@@ -66,13 +45,7 @@ internal sealed class DetectCommand(
         }
 
         var subjects = subjectsResult.Value;
-        var profiles = settings.GrossOnly || settings.FineOnly ? Array.Empty<string>() : ResolveProfiles(settings.Profiles);
         Directory.CreateDirectory(settings.OutputDirectory);
-        var chipDir = Path.Combine(settings.OutputDirectory, "chips");
-        if (settings.SaveChips)
-        {
-            Directory.CreateDirectory(chipDir);
-        }
 
         var failures = new List<string>();
         var records = new List<object>();
@@ -83,154 +56,126 @@ internal sealed class DetectCommand(
 
             foreach (var subject in subjects)
             {
-                var result = await diagnostics.DetectAsync(subject.InputPath, cancellationToken);
+                var result = await diagnostics.DetectAsync(subject.InputPath, cancellationToken)
+                    .ConfigureAwait(false);
                 if (result.IsFailure)
                 {
                     failures.Add($"{subject.Id}: {result.Error.Message}");
-                    records.Add(new { subject.Id, subject.InputPath, Error = result.Error.Message });
+                    records.Add(new
+                    {
+                        Id = subject.Id,
+                        InputPath = subject.InputPath,
+                        Error = result.Error.Message
+                    });
                     task.Increment(1);
                     continue;
                 }
 
                 if (settings.Verify)
                 {
-                    if (subject.ExpectedFaceCount.HasValue && result.Value.Faces.Count != subject.ExpectedFaceCount.Value)
+                    if (subject.ExpectedFaceCount.HasValue
+                        && result.Value.Faces.Count != subject.ExpectedFaceCount.Value)
                     {
-                        failures.Add($"{subject.Id}: expected {subject.ExpectedFaceCount.Value} faces, got {result.Value.Faces.Count}");
+                        failures.Add(
+                            $"{subject.Id}: expected {subject.ExpectedFaceCount.Value} faces, got {result.Value.Faces.Count}");
                     }
 
-                    if (!settings.GrossOnly && subject.ExpectLandmarks.HasValue)
+                    if (subject.ExpectLandmarks.HasValue)
                     {
-                        var landmarksMatched = (result.Value.RawLandmarks.Count == 68) == subject.ExpectLandmarks.Value;
+                        var landmarksMatched =
+                            (result.Value.RawLandmarks.Count == 68) == subject.ExpectLandmarks.Value;
                         if (!landmarksMatched)
                         {
-                            failures.Add($"{subject.Id}: expected landmarks={subject.ExpectLandmarks.Value}, got {result.Value.RawLandmarks.Count == 68}");
+                            failures.Add(
+                                $"{subject.Id}: expected landmarks={subject.ExpectLandmarks.Value}, got {result.Value.RawLandmarks.Count == 68}");
                         }
                     }
                 }
 
-                string? rawOverlayPath = null;
-                string? fineOverlayPath = null;
-                var primaryOverlayPath = settings.GrossOnly
-                    ? $"{subject.Id}.gross.overlay.jpg"
-                    : settings.FineOnly
-                        ? $"{subject.Id}.fine.overlay.jpg"
-                        : $"{subject.Id}.raw.overlay.jpg";
-                using (var image = await Image.LoadAsync<SixLabors.ImageSharp.PixelFormats.Rgba32>(subject.InputPath, cancellationToken))
-                using (var rendered = settings.GrossOnly
-                           ? OverlayRenderer.RenderGross(
-                               image,
-                               result.Value,
-                               showBoundingBox: true)
-                           : settings.FineOnly
-                               ? OverlayRenderer.RenderFineOnly(
-                                   image,
-                                   result.Value)
-                           : OverlayRenderer.RenderFull(
-                               image,
-                               result.Value,
-                               null,
-                               showBoundingBox: true,
-                               showGuides: false))
+                var subjectDirectory = Path.Combine(settings.OutputDirectory, subject.Id);
+                Directory.CreateDirectory(subjectDirectory);
+
+                string? originalPath = null;
+                string? coarsePath = null;
+                string? chipLocatePath = null;
+                string? chipPath = null;
+                string? fineChipPath = null;
+                string? fineSourcePath = null;
+                string? error = null;
+
+                using var sourceImage = await Image.LoadAsync<SixLabors.ImageSharp.PixelFormats.Rgba32>(
+                    subject.InputPath,
+                    cancellationToken);
+
+                originalPath = "00-original.png";
+                using (var rendered = OverlayRenderer.RenderOriginal(sourceImage))
                 {
-                    await rendered.SaveAsJpegAsync(
-                        Path.Combine(settings.OutputDirectory, primaryOverlayPath),
-                        cancellationToken);
+                    await rendered.SaveAsPngAsync(Path.Combine(subjectDirectory, originalPath), cancellationToken);
                 }
 
-                if (settings.FineOnly)
+                coarsePath = "10-coarse.png";
+                using (var rendered = OverlayRenderer.RenderCoarse(sourceImage, result.Value))
                 {
-                    fineOverlayPath = primaryOverlayPath;
+                    await rendered.SaveAsPngAsync(Path.Combine(subjectDirectory, coarsePath), cancellationToken);
+                }
+
+                var geometryResult = result.Value.CanonicalGeometry.ToPipelineResult(
+                    new GeometryError(result.Value.GeometryError ?? "Canonical geometry was not available."));
+                if (geometryResult.IsFailure)
+                {
+                    error = geometryResult.Error.Message;
+                    failures.Add($"{subject.Id}: {error}");
                 }
                 else
                 {
-                    rawOverlayPath = primaryOverlayPath;
-                }
-
-                var overlayResults = new List<object>();
-                foreach (var profileId in profiles)
-                {
-                    var overlay = await diagnostics.AnalyzeOverlayAsync(
-                        subject.InputPath,
-                        result.Value,
-                        profileId,
-                        cancellationToken);
-                    var overlayPath = $"{subject.Id}.{profileId}.overlay.jpg";
-
-                    if (overlay.IsFailure)
+                    chipLocatePath = "20-chip-locate.png";
+                    using (var rendered = OverlayRenderer.RenderChipLocate(sourceImage, result.Value))
                     {
-                        failures.Add($"{subject.Id}/{profileId}: {overlay.Error.Message}");
-                        overlayResults.Add(new
-                        {
-                            ProfileId = profileId,
-                            OverlayPath = (string?)null,
-                            Error = overlay.Error.Message
-                        });
-                        continue;
+                        await rendered.SaveAsPngAsync(
+                            Path.Combine(subjectDirectory, chipLocatePath),
+                            cancellationToken);
                     }
 
-                    using var sourceImage = await Image.LoadAsync<SixLabors.ImageSharp.PixelFormats.Rgba32>(subject.InputPath, cancellationToken);
-                    using var projected = OverlayRenderer.RenderFull(
-                        sourceImage,
-                        result.Value,
-                        overlay.Value,
-                        showBoundingBox: true,
-                        showGuides: true);
-                    await projected.SaveAsJpegAsync(
-                        Path.Combine(settings.OutputDirectory, overlayPath),
-                        cancellationToken);
+                    chipPath = "30-chip.png";
+                    using var chip = CanonicalFaceGeometryPipeline.RenderChip(sourceImage, geometryResult.Value);
+                    await chip.SaveAsPngAsync(Path.Combine(subjectDirectory, chipPath), cancellationToken);
 
-                    overlayResults.Add(new
+                    fineChipPath = "40-fine-chip.png";
+                    using (var rendered = OverlayRenderer.RenderFineChip(chip, geometryResult.Value.ChipLandmarks))
                     {
-                        ProfileId = profileId,
-                        OverlayPath = overlayPath,
-                        Error = (string?)null
-                    });
-                }
-
-                string? chipPath = null;
-                string? chipReviewPath = null;
-                if (settings.SaveChips && result.Value.CanonicalGeometry.HasValue)
-                {
-                    var geometryResult = result.Value.CanonicalGeometry.ToPipelineResult(
-                        new GeometryError("Canonical geometry is required to save the normalized chip."));
-                    if (geometryResult.IsFailure)
-                    {
-                        failures.Add($"{subject.Id}: {geometryResult.Error.Message}");
-                        task.Increment(1);
-                        continue;
+                        await rendered.SaveAsPngAsync(
+                            Path.Combine(subjectDirectory, fineChipPath),
+                            cancellationToken);
                     }
 
-                    using var image = await Image.LoadAsync<SixLabors.ImageSharp.PixelFormats.Rgba32>(subject.InputPath, cancellationToken);
-                    using var chip = CanonicalFaceGeometryPipeline.RenderChip(
-                        image,
-                        geometryResult.Value);
-                    chipPath = Path.Combine("chips", $"{subject.Id}.png");
-                    await chip.SaveAsPngAsync(Path.Combine(settings.OutputDirectory, chipPath), cancellationToken);
-
-                    using var chipReview = OverlayRenderer.RenderChipReview(
-                        chip,
-                        geometryResult.Value.ChipLandmarks);
-                    chipReviewPath = Path.Combine("chips", $"{subject.Id}.review.png");
-                    await chipReview.SaveAsPngAsync(Path.Combine(settings.OutputDirectory, chipReviewPath), cancellationToken);
+                    fineSourcePath = "50-fine-source.png";
+                    using (var rendered = OverlayRenderer.RenderFineSource(sourceImage, result.Value))
+                    {
+                        await rendered.SaveAsPngAsync(
+                            Path.Combine(subjectDirectory, fineSourcePath),
+                            cancellationToken);
+                    }
                 }
 
                 records.Add(new
                 {
-                    subject.Id,
+                    Id = subject.Id,
                     result.Value.InputPath,
                     result.Value.Width,
                     result.Value.Height,
                     FaceCount = result.Value.Faces.Count,
                     result.Value.Faces,
-                    LandmarksExtracted = !settings.GrossOnly && result.Value.RawLandmarks.Count == 68,
-                    RawOverlayPath = rawOverlayPath,
-                    FineOverlayPath = fineOverlayPath,
+                    LandmarksExtracted = result.Value.RawLandmarks.Count == 68,
+                    OriginalPath = originalPath,
+                    CoarsePath = coarsePath,
+                    ChipLocatePath = chipLocatePath,
                     ChipPath = chipPath,
-                    ChipReviewPath = chipReviewPath,
+                    FineChipPath = fineChipPath,
+                    FineSourcePath = fineSourcePath,
                     ChipPolygon = result.Value.ChipPolygon,
-                    Profiles = settings.GrossOnly || settings.FineOnly ? null : overlayResults
+                    Error = error
                 });
+
                 task.Increment(1);
             }
         });
@@ -240,30 +185,11 @@ internal sealed class DetectCommand(
             new { Corpus = settings.CorpusId, GeneratedAt = DateTimeOffset.UtcNow, Subjects = records },
             cancellationToken);
 
-        if (failures.Count > 0)
+        foreach (var failure in failures)
         {
-            foreach (var failure in failures)
-            {
-                console.MarkupLine($"[red]{Markup.Escape(failure)}[/]");
-            }
+            console.MarkupLine($"[red]{Markup.Escape(failure)}[/]");
         }
 
         return failures.Count == 0 ? 0 : 1;
-    }
-
-    private static IReadOnlyList<string> ResolveProfiles(string value)
-    {
-        if (string.Equals(value, "all", StringComparison.OrdinalIgnoreCase))
-        {
-            return DocumentCatalog.GetAll()
-                .Select(document => document.Id)
-                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
-
-        return value
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
     }
 }

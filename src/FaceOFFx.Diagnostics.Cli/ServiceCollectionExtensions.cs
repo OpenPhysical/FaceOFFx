@@ -1,4 +1,3 @@
-using FaceOFFx.Core.Abstractions;
 using FaceOFFx.Diagnostics.Cli.Commands;
 using FaceOFFx.Diagnostics.Cli.Services;
 using FaceOFFx.Infrastructure.Services;
@@ -25,27 +24,11 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IFacialProcessingServiceFactory, OnnxFacialProcessingServiceFactory>();
 
-        services.AddTransient<IJpeg2000Encoder>(sp =>
-        {
-            var encoderLogger = sp.GetRequiredService<ILogger<Jpeg2000EncoderService>>();
-            return new Jpeg2000EncoderService(encoderLogger);
-        });
-
-        services.AddScoped<IQualityAssessor>(sp =>
-        {
-            var assessorLogger = sp.GetRequiredService<ILogger<QualityAssessor>>();
-            return new QualityAssessor(assessorLogger);
-        });
-
-        services.AddScoped<PassportPhotoRenderService>();
         services.AddScoped<FaceGeometryPipeline>();
-        services.AddScoped<DocumentRenderService>();
-        services.AddScoped<DocumentJobRunner>();
         services.AddScoped<DiagnosticsCorpusService>();
         services.AddScoped<DiagnosticsBatchService>();
 
         services.AddTransient<DetectCommand>();
-        services.AddTransient<CropCommand>();
         services.AddTransient<SharpnessBlurCommand>();
         services.AddTransient<SharpnessMeasureCommand>();
         services.AddTransient<SharpnessCleanCommand>();

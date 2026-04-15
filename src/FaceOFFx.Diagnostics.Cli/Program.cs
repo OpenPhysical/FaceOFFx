@@ -26,7 +26,7 @@ services.AddFaceOffxDiagnosticsCli();
 
 console.MarkupLine(" [grey]╭───╮[/]   [bold blue]Face[/][bold]OFF[/][bold yellow]x[/] [bold white]Diagnostics[/]");
 console.MarkupLine(" [grey]│[/][bold cyan]◉ ◉[/][grey]│[/]   [grey]──────────────────────────[/]");
-console.MarkupLine(" [grey]│[/][white]╰─╯[/][grey]│[/]   [grey]Detect · Overlay · Crop[/]");
+console.MarkupLine(" [grey]│[/][white]╰─╯[/][grey]│[/]   [grey]Detect · Stages · Chip[/]");
 console.MarkupLine(" [grey]╰───╯[/]   [dim]Engineering corpus and transform inspection[/]");
 console.WriteLine();
 

@@ -7,7 +7,7 @@
     <ToolCommandName>faceoffx-diagnostics</ToolCommandName>
     <PackageId>FaceOFFx.Diagnostics.Cli</PackageId>
     <Product>FaceOFFx Diagnostics CLI</Product>
-    <Description>Engineering and diagnostics CLI for FaceOFFx facial detection, overlays, crops, and corpus verification.</Description>
+    <Description>Engineering and diagnostics CLI for FaceOFFx staged human-detection visualization and corpus verification.</Description>
     <PackageTags>face-detection;diagnostics;biometrics;onnx;cli;dotnet-tool</PackageTags>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>

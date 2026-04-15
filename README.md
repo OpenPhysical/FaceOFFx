@@ -107,7 +107,6 @@ Engineering diagnostics now live in a separate tool so the release CLI stays doc
 ```bash
 faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
 faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
-faceoffx-diagnostics crop --corpus people --profile canada-passport --variant print --output artifacts/diagnostics/crop
 ```
 
 #### Available Presets
