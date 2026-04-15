@@ -105,9 +105,10 @@ public static class FacialImageEncoder
     /// </summary>
     /// <param name="imageData">Input image data</param>
     /// <param name="logger">Optional logger for processing information. Uses NullLogger if not provided.</param>
-    /// <returns>Processing result optimized for TWIC requirements</returns>
-    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
-    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
+    /// <returns>
+    /// Result containing the TWIC-optimized processed image on success, or a
+    /// <see cref="PipelineError"/> when validation or processing fails.
+    /// </returns>
     /// <remarks>
     /// TWIC cards have strict size constraints. This method targets 14KB maximum
     /// to fit within the card storage limits.
@@ -122,9 +123,10 @@ public static class FacialImageEncoder
     /// </summary>
     /// <param name="imageData">Input image data</param>
     /// <param name="logger">Optional logger for processing information. Uses NullLogger if not provided.</param>
-    /// <returns>Processing result optimized for PIV requirements</returns>
-    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
-    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
+    /// <returns>
+    /// Result containing the PIV-optimized processed image on success, or a
+    /// <see cref="PipelineError"/> when validation or processing fails.
+    /// </returns>
     /// <remarks>
     /// Standard PIV processing that balances file size with image quality.
     /// Suitable for most government ID card applications.
@@ -140,10 +142,11 @@ public static class FacialImageEncoder
     /// <param name="imageData">Input image data</param>
     /// <param name="targetSizeBytes">Target file size in bytes</param>
     /// <param name="logger">Optional logger for processing information. Uses NullLogger if not provided.</param>
-    /// <returns>Processing result targeting specified file size</returns>
-    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when targetSizeBytes is invalid</exception>
-    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
+    /// <returns>
+    /// Result containing the processed image targeting the requested file size on success, or a
+    /// <see cref="PipelineError"/> when input validation or processing fails.
+    /// Invalid target sizes are returned as <see cref="ValidationError"/>.
+    /// </returns>
     /// <remarks>
     /// Uses stepped compression rates to achieve the target file size.
     /// May not achieve exact size due to the discrete nature of JPEG 2000 compression.
@@ -174,10 +177,11 @@ public static class FacialImageEncoder
     /// <param name="imageData">Input image data</param>
     /// <param name="compressionRate">Compression rate in bits per pixel</param>
     /// <param name="logger">Optional logger for processing information. Uses NullLogger if not provided.</param>
-    /// <returns>Processing result using specified compression rate</returns>
-    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when compressionRate is invalid</exception>
-    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
+    /// <returns>
+    /// Result containing the processed image using the requested compression rate on success, or a
+    /// <see cref="PipelineError"/> when input validation or processing fails.
+    /// Invalid compression rates are returned as <see cref="ValidationError"/>.
+    /// </returns>
     /// <remarks>
     /// Provides predictable compression behavior when file size constraints are flexible.
     /// Higher rates produce larger files with better quality.
@@ -203,12 +207,15 @@ public static class FacialImageEncoder
     }
 
     /// <summary>
-    /// Try to process image bytes, returning success status and result
+    /// Try to process image bytes using the standard result-based processing contract
     /// </summary>
     /// <param name="imageData">Input image data</param>
     /// <param name="options">Processing options. Uses PIV standard if not specified.</param>
     /// <param name="logger">Optional logger for processing information</param>
-    /// <returns>Tuple containing success status, result if successful, and error message if failed</returns>
+    /// <returns>
+    /// A task that resolves to the same <see cref="Result{T,E}"/> returned by <see cref="ProcessAsync(byte[],ProcessingOptions?,ILogger?)"/>.
+    /// Successful results contain <see cref="ProcessingResultDto"/>; failures contain a <see cref="PipelineError"/>.
+    /// </returns>
     public static Task<Result<ProcessingResultDto, PipelineError>> TryProcessAsync(
         byte[] imageData,
         ProcessingOptions? options = null,
@@ -223,10 +230,10 @@ public static class FacialImageEncoder
     /// <param name="outputFormat">Output format: "jp2" or "jpeg"</param>
     /// <param name="jpegQuality">JPEG quality (1-100) when outputFormat is "jpeg"</param>
     /// <param name="logger">Optional logger for processing information</param>
-    /// <returns>Processing result with encoded image data and metadata</returns>
-    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
-    /// <exception cref="ArgumentException">Thrown when processing options are invalid</exception>
-    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
+    /// <returns>
+    /// Result containing the encoded image data and metadata on success, or a
+    /// <see cref="PipelineError"/> when validation or processing fails.
+    /// </returns>
     /// <remarks>
     /// This method skips face detection and PIV transformation, using the image in its original dimensions.
     /// For JPEG 2000 output, it applies the Appendix C.6 ROI formula dynamically based on image dimensions.
