@@ -1,6 +1,9 @@
 using AwesomeAssertions;
 using FaceOFFx.Tests.Common;
 using NUnit.Framework;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using System.Text.Json;
 
 namespace FaceOFFx.Diagnostics.Cli.Tests.Commands;
 
@@ -90,5 +93,40 @@ public class DiagnosticsCommandTests : IntegrationTestBase
         File.Exists(Path.Combine(outputDir, "source.raw.overlay.jpg")).Should().BeFalse();
         File.Exists(Path.Combine(outputDir, "source.piv.overlay.jpg")).Should().BeFalse();
         File.Exists(Path.Combine(outputDir, "source.canada-passport.overlay.jpg")).Should().BeFalse();
+    }
+
+    [Test]
+    public async Task Detect_WithSaveChips_WritesExactChipAndReviewPngs()
+    {
+        var app = DiagnosticsCliTestHarness.Create();
+        var outputDir = Path.Combine(TempDirectory, "detect-chips");
+
+        var result = await app.RunAsync(new[]
+        {
+            "detect",
+            PeopleCorpus.SubjectSource("generic-guy", "png"),
+            "--gross-only",
+            "--save-chips",
+            "--output", outputDir
+        });
+
+        result.ExitCode.Should().Be(0, result.Output);
+
+        var chipPath = Path.Combine(outputDir, "chips", "source.png");
+        var reviewPath = Path.Combine(outputDir, "chips", "source.review.png");
+        File.Exists(chipPath).Should().BeTrue();
+        File.Exists(reviewPath).Should().BeTrue();
+
+        using var chip = await Image.LoadAsync<Rgba32>(chipPath);
+        using var review = await Image.LoadAsync<Rgba32>(reviewPath);
+        chip.Width.Should().Be(112);
+        chip.Height.Should().Be(112);
+        review.Width.Should().Be(448);
+        review.Height.Should().Be(448);
+
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(outputDir, "manifest.json")));
+        var subject = manifest.RootElement.GetProperty("Subjects")[0];
+        subject.GetProperty("ChipPath").GetString().Should().Be(Path.Combine("chips", "source.png"));
+        subject.GetProperty("ChipReviewPath").GetString().Should().Be(Path.Combine("chips", "source.review.png"));
     }
 }

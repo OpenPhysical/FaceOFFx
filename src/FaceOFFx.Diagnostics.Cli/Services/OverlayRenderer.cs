@@ -1,4 +1,5 @@
 using FaceOFFx.Core.Domain.Detection;
+using FaceOFFx.Core.Domain.Transformations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing;
 using SixLabors.ImageSharp.Drawing.Processing;
@@ -9,6 +10,8 @@ namespace FaceOFFx.Diagnostics.Cli.Services;
 
 internal static class OverlayRenderer
 {
+    private const int ChipReviewScale = 4;
+
     public static Image<Rgba32> RenderGross(
         Image<Rgba32> sourceImage,
         DetectionAnalysisResult detection,
@@ -76,6 +79,32 @@ internal static class OverlayRenderer
             {
                 var centerX = sourceImage.Width / 2f;
                 ctx.DrawLine(Color.MediumPurple, 2f, new PointF(centerX, 0), new PointF(centerX, sourceImage.Height));
+            }
+        });
+    }
+
+    public static Image<Rgba32> RenderChipReview(
+        Image<Rgba32> chipImage,
+        FaceLandmarks68 chipLandmarks)
+    {
+        var reviewWidth = chipImage.Width * ChipReviewScale;
+        var reviewHeight = chipImage.Height * ChipReviewScale;
+        return chipImage.Clone(ctx =>
+        {
+            ctx.Resize(new ResizeOptions
+            {
+                Size = new Size(reviewWidth, reviewHeight),
+                Sampler = KnownResamplers.NearestNeighbor
+            });
+
+            foreach (var point in chipLandmarks.Points)
+            {
+                ctx.Fill(
+                    Color.DeepSkyBlue,
+                    new EllipsePolygon(
+                        point.X * ChipReviewScale,
+                        point.Y * ChipReviewScale,
+                        3f));
             }
         });
     }

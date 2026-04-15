@@ -154,6 +154,7 @@ internal sealed class DetectCommand(
                 }
 
                 string? chipPath = null;
+                string? chipReviewPath = null;
                 if (settings.SaveChips && result.Value.CanonicalGeometry.HasValue)
                 {
                     using var image = await Image.LoadAsync<SixLabors.ImageSharp.PixelFormats.Rgba32>(subject.InputPath, cancellationToken);
@@ -162,6 +163,12 @@ internal sealed class DetectCommand(
                         result.Value.CanonicalGeometry.GetValueOrThrow("Canonical geometry is required to save the normalized chip."));
                     chipPath = Path.Combine("chips", $"{subject.Id}.png");
                     await chip.SaveAsPngAsync(Path.Combine(settings.OutputDirectory, chipPath), cancellationToken);
+
+                    using var chipReview = OverlayRenderer.RenderChipReview(
+                        chip,
+                        result.Value.CanonicalGeometry.GetValueOrThrow("Canonical geometry is required to render the chip review overlay.").ChipLandmarks);
+                    chipReviewPath = Path.Combine("chips", $"{subject.Id}.review.png");
+                    await chipReview.SaveAsPngAsync(Path.Combine(settings.OutputDirectory, chipReviewPath), cancellationToken);
                 }
 
                 records.Add(new
@@ -175,6 +182,7 @@ internal sealed class DetectCommand(
                     LandmarksExtracted = !settings.GrossOnly && result.Value.RawLandmarks.Count == 68,
                     RawOverlayPath = rawOverlayPath,
                     ChipPath = chipPath,
+                    ChipReviewPath = chipReviewPath,
                     ChipPolygon = result.Value.ChipPolygon,
                     Profiles = settings.GrossOnly ? null : overlayResults
                 });
