@@ -43,12 +43,22 @@ internal sealed class DetectCommand(
         [CommandOption("--gross-only")]
         [Description("Write only coarse detection overlays: detector box, RetinaFace 5-point landmarks, and the chip polygon")]
         public bool GrossOnly { get; init; }
+
+        [CommandOption("--fine-only")]
+        [Description("Write only reverse-projected fine 68-point landmarks on the original image")]
+        public bool FineOnly { get; init; }
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
+        if (settings.GrossOnly && settings.FineOnly)
+        {
+            console.MarkupLine("[red]--gross-only and --fine-only cannot be used together.[/]");
+            return 1;
+        }
+
         var subjects = corpusService.ResolveInputs(settings.InputPath, settings.CorpusId);
-        var profiles = settings.GrossOnly ? Array.Empty<string>() : ResolveProfiles(settings.Profiles);
+        var profiles = settings.GrossOnly || settings.FineOnly ? Array.Empty<string>() : ResolveProfiles(settings.Profiles);
         Directory.CreateDirectory(settings.OutputDirectory);
         var chipDir = Path.Combine(settings.OutputDirectory, "chips");
         if (settings.SaveChips)
@@ -91,15 +101,23 @@ internal sealed class DetectCommand(
                     }
                 }
 
-                var rawOverlayPath = settings.GrossOnly
+                string? rawOverlayPath = null;
+                string? fineOverlayPath = null;
+                var primaryOverlayPath = settings.GrossOnly
                     ? $"{subject.Id}.gross.overlay.jpg"
-                    : $"{subject.Id}.raw.overlay.jpg";
+                    : settings.FineOnly
+                        ? $"{subject.Id}.fine.overlay.jpg"
+                        : $"{subject.Id}.raw.overlay.jpg";
                 using (var image = await Image.LoadAsync<SixLabors.ImageSharp.PixelFormats.Rgba32>(subject.InputPath, cancellationToken))
                 using (var rendered = settings.GrossOnly
                            ? OverlayRenderer.RenderGross(
                                image,
                                result.Value,
                                showBoundingBox: true)
+                           : settings.FineOnly
+                               ? OverlayRenderer.RenderFineOnly(
+                                   image,
+                                   result.Value)
                            : OverlayRenderer.RenderFull(
                                image,
                                result.Value,
@@ -108,8 +126,17 @@ internal sealed class DetectCommand(
                                showGuides: false))
                 {
                     await rendered.SaveAsJpegAsync(
-                        Path.Combine(settings.OutputDirectory, rawOverlayPath),
+                        Path.Combine(settings.OutputDirectory, primaryOverlayPath),
                         cancellationToken);
+                }
+
+                if (settings.FineOnly)
+                {
+                    fineOverlayPath = primaryOverlayPath;
+                }
+                else
+                {
+                    rawOverlayPath = primaryOverlayPath;
                 }
 
                 var overlayResults = new List<object>();
@@ -181,10 +208,11 @@ internal sealed class DetectCommand(
                     result.Value.Faces,
                     LandmarksExtracted = !settings.GrossOnly && result.Value.RawLandmarks.Count == 68,
                     RawOverlayPath = rawOverlayPath,
+                    FineOverlayPath = fineOverlayPath,
                     ChipPath = chipPath,
                     ChipReviewPath = chipReviewPath,
                     ChipPolygon = result.Value.ChipPolygon,
-                    Profiles = settings.GrossOnly ? null : overlayResults
+                    Profiles = settings.GrossOnly || settings.FineOnly ? null : overlayResults
                 });
                 task.Increment(1);
             }

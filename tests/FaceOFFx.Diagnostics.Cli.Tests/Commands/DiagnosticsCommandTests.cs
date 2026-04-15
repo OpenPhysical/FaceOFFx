@@ -96,6 +96,39 @@ public class DiagnosticsCommandTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task Detect_WithFineOnly_WritesOnlyFineOverlay()
+    {
+        var app = DiagnosticsCliTestHarness.Create();
+        var outputDir = Path.Combine(TempDirectory, "detect-fine");
+
+        var result = await app.RunAsync(new[]
+        {
+            "detect",
+            PeopleCorpus.SubjectSource("generic-guy", "png"),
+            "--fine-only",
+            "--output", outputDir
+        });
+
+        result.ExitCode.Should().Be(0, result.Output);
+        File.Exists(Path.Combine(outputDir, "manifest.json")).Should().BeTrue();
+        File.Exists(Path.Combine(outputDir, "source.fine.overlay.jpg")).Should().BeTrue();
+        File.Exists(Path.Combine(outputDir, "source.raw.overlay.jpg")).Should().BeFalse();
+        File.Exists(Path.Combine(outputDir, "source.gross.overlay.jpg")).Should().BeFalse();
+        File.Exists(Path.Combine(outputDir, "source.piv.overlay.jpg")).Should().BeFalse();
+        File.Exists(Path.Combine(outputDir, "source.canada-passport.overlay.jpg")).Should().BeFalse();
+
+        using var fineOverlay = await Image.LoadAsync<Rgba32>(Path.Combine(outputDir, "source.fine.overlay.jpg"));
+        fineOverlay.Width.Should().Be(1024);
+        fineOverlay.Height.Should().Be(1536);
+
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(outputDir, "manifest.json")));
+        var subject = manifest.RootElement.GetProperty("Subjects")[0];
+        subject.GetProperty("RawOverlayPath").ValueKind.Should().Be(JsonValueKind.Null);
+        subject.GetProperty("FineOverlayPath").GetString().Should().Be("source.fine.overlay.jpg");
+        subject.GetProperty("Profiles").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Test]
     public async Task Detect_WithSaveChips_WritesExactChipAndReviewPngs()
     {
         var app = DiagnosticsCliTestHarness.Create();
@@ -128,5 +161,24 @@ public class DiagnosticsCommandTests : IntegrationTestBase
         var subject = manifest.RootElement.GetProperty("Subjects")[0];
         subject.GetProperty("ChipPath").GetString().Should().Be(Path.Combine("chips", "source.png"));
         subject.GetProperty("ChipReviewPath").GetString().Should().Be(Path.Combine("chips", "source.review.png"));
+    }
+
+    [Test]
+    public async Task Detect_WithGrossOnlyAndFineOnly_ReturnsArgumentError()
+    {
+        var app = DiagnosticsCliTestHarness.Create();
+        var outputDir = Path.Combine(TempDirectory, "detect-invalid");
+
+        var result = await app.RunAsync(new[]
+        {
+            "detect",
+            PeopleCorpus.SubjectSource("generic-guy", "png"),
+            "--gross-only",
+            "--fine-only",
+            "--output", outputDir
+        });
+
+        result.ExitCode.Should().NotBe(0);
+        result.Output.Should().Contain("--gross-only and --fine-only cannot be used together.");
     }
 }
