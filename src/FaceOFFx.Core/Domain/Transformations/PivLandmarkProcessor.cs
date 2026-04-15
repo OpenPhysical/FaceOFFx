@@ -30,20 +30,32 @@ public static class PivLandmarkProcessor
             "Starting PIV landmark processing for face: {Face}",
             detectedFace.BoundingBox
         );
-        // Step 1: Extract landmarks from the original face region (what the model expects)
-        logger?.LogDebug("Step 1: Extracting landmarks from face region");
-        var landmarksResult = await landmarkExtractor
-            .ExtractLandmarksAsync(sourceImage, detectedFace.BoundingBox)
+        // Step 1: Build canonical face geometry using the coarse chip plus one fine solve.
+        logger?.LogDebug("Step 1: Building canonical face geometry from normalized chip");
+        var geometryResult = await CanonicalFaceGeometryPipeline
+            .ExtractAsync(sourceImage, detectedFace, landmarkExtractor)
             .ConfigureAwait(false);
-        if (landmarksResult.IsFailure)
+        if (geometryResult.IsFailure)
         {
-            logger?.LogWarning("Landmark extraction failed: {Error}", landmarksResult.Error);
+            logger?.LogWarning("Canonical face geometry failed: {Error}", geometryResult.Error);
             return Result.Failure<PivLandmarkResult>(
-                $"Landmark extraction failed: {landmarksResult.Error}"
+                $"Canonical face geometry failed: {geometryResult.Error}"
             );
         }
 
-        var originalLandmarks = landmarksResult.Value;
+        return ProcessAsync(sourceImage, geometryResult.Value, options, logger);
+    }
+
+    /// <summary>
+    /// Processes a PIV portrait from canonical original-space face geometry without performing any additional landmark inference.
+    /// </summary>
+    public static Result<PivLandmarkResult> ProcessAsync(
+        Image<Rgba32> sourceImage,
+        CanonicalFaceGeometry geometry,
+        PivProcessingOptions options,
+        ILogger? logger = null)
+    {
+        var originalLandmarks = geometry.SourceLandmarks;
         logger?.LogDebug(
             "Successfully extracted {Count} landmarks",
             originalLandmarks.Points.Count
@@ -280,23 +292,10 @@ public static class PivLandmarkProcessor
             newHeight
         );
 
-        var rotatedPoints = new List<Point2D>();
-
-        foreach (var point in landmarks.Points)
-        {
-            // Translate to origin
-            var x = point.X - oldCenterX;
-            var y = point.Y - oldCenterY;
-
-            // Rotate
-            var rotX = x * cos - y * sin;
-            var rotY = x * sin + y * cos;
-
-            // Translate to new center
-            rotatedPoints.Add(new Point2D((float)(rotX + newCenterX), (float)(rotY + newCenterY)));
-        }
-
-        return new FaceLandmarks68(rotatedPoints);
+        return FaceGeometryTransformations.RotateLandmarks(
+            landmarks,
+            rotationDegrees,
+            new ImageDimensions(imageWidth, imageHeight));
     }
 
     /// <summary>
@@ -561,16 +560,14 @@ public static class PivLandmarkProcessor
         var offsetX = (pivWidth - scaledWidth) / 2f;
         var offsetY = (pivHeight - scaledHeight) / 2f;
 
-        var transformedPoints = (
+        return new FaceLandmarks68((
             from point in rotatedLandmarks.Points
             let cropX = point.X - faceCrop.X
             let cropY = point.Y - faceCrop.Y
             let finalX = cropX * scale + offsetX
             let finalY = cropY * scale + offsetY
             select new Point2D(finalX, finalY)
-        ).ToList();
-
-        return new FaceLandmarks68(transformedPoints);
+        ).ToList());
     }
 
     /// <summary>

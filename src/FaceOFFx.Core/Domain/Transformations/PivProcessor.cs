@@ -163,6 +163,12 @@ public static class PivProcessor
             ["PivImage"] = pivData.PivImage.Clone(), // Clone for visualization purposes to avoid disposal issues
             ["PivLines"] = pivData.PivLines, // PIV compliance lines (AA, BB, CC)
             ["ComplianceValidation"] = pivData.ComplianceValidation, // PIV compliance validation results
+            ["RenderTransformMap"] = RenderTransformMapBuilder.CreateRotateCropResize(
+                sourceDimensions,
+                pivData.AppliedRotation,
+                RenderTransformMapBuilder.ComputeExpandedRotationDimensions(sourceDimensions, pivData.AppliedRotation),
+                pivData.FaceCrop,
+                pivData.Dimensions),
         };
 
         // Step 4: Create PIV transform for compatibility (derived from unified processor results)

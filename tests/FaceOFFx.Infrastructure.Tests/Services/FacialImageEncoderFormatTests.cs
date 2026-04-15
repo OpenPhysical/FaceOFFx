@@ -13,16 +13,6 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 [NonParallelizable]
 public class FacialImageEncoderFormatTests : IntegrationTestBase
 {
-    private static readonly string TestImagesPath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory,
-        "..",
-        "..",
-        "..",
-        "..",
-        "..",
-        "tests",
-        "sample_images"
-    );
 
     /// <summary>
     /// Tests that JPEG format is processed correctly
@@ -30,7 +20,7 @@ public class FacialImageEncoderFormatTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithJpegInput_ProcessesSuccessfully()
     {
-        var jpegPath = Path.Combine(TestImagesPath, "generic_guy.jpg");
+        var jpegPath = PeopleCorpus.SubjectSource("generic-guy", "jpg");
         var imageData = await File.ReadAllBytesAsync(jpegPath);
 
         var result = await FacialImageEncoder.ProcessAsync(imageData);
@@ -47,7 +37,7 @@ public class FacialImageEncoderFormatTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithPngInput_ProcessesSuccessfully()
     {
-        var pngPath = Path.Combine(TestImagesPath, "generic_guy.png");
+        var pngPath = PeopleCorpus.SubjectSource("generic-guy", "png");
         var imageData = await File.ReadAllBytesAsync(pngPath);
 
         var result = await FacialImageEncoder.ProcessAsync(imageData);
@@ -64,7 +54,7 @@ public class FacialImageEncoderFormatTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithTiffInput_ProcessesSuccessfully()
     {
-        var tiffPath = Path.Combine(TestImagesPath, "generic_guy.tif");
+        var tiffPath = PeopleCorpus.SubjectSource("generic-guy", "tif");
         var imageData = await File.ReadAllBytesAsync(tiffPath);
 
         var result = await FacialImageEncoder.ProcessAsync(imageData);
@@ -81,7 +71,7 @@ public class FacialImageEncoderFormatTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithJpeg2000Input_ThrowsException()
     {
-        var jp2Path = Path.Combine(TestImagesPath, "generic_guy.jp2");
+        var jp2Path = PeopleCorpus.SubjectSource("generic-guy", "jp2");
         var imageData = await File.ReadAllBytesAsync(jp2Path);
 
         // ImageSharp doesn't support JP2 as input, only as output through our encoder
@@ -101,7 +91,7 @@ public class FacialImageEncoderFormatTests : IntegrationTestBase
 
         foreach (var format in formats)
         {
-            var imagePath = Path.Combine(TestImagesPath, $"generic_guy.{format}");
+            var imagePath = PeopleCorpus.SubjectSource("generic-guy", format);
             var imageData = await File.ReadAllBytesAsync(imagePath);
 
             var result = await FacialImageEncoder.ProcessAsync(imageData);
@@ -130,7 +120,7 @@ public class FacialImageEncoderFormatTests : IntegrationTestBase
 
         foreach (var format in formats)
         {
-            var imagePath = Path.Combine(TestImagesPath, $"generic_guy.{format}");
+            var imagePath = PeopleCorpus.SubjectSource("generic-guy", format);
             var imageData = await File.ReadAllBytesAsync(imagePath);
 
             var (success, result, error) = await FacialImageEncoder.TryProcessAsync(imageData);
@@ -152,7 +142,7 @@ public class FacialImageEncoderFormatTests : IntegrationTestBase
 
         foreach (var format in formats)
         {
-            var imagePath = Path.Combine(TestImagesPath, $"generic_guy.{format}");
+            var imagePath = PeopleCorpus.SubjectSource("generic-guy", format);
             var imageData = await File.ReadAllBytesAsync(imagePath);
 
             results[format] = await FacialImageEncoder.ProcessAsync(imageData);

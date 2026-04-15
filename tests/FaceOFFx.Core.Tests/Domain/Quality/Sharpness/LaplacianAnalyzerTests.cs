@@ -22,6 +22,7 @@
 
 using FaceOFFx.Core.Domain.Quality.Sharpness;
 using AwesomeAssertions;
+using FaceOFFx.Tests.Common;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using SixLabors.ImageSharp;
@@ -44,10 +45,11 @@ public class LaplacianAnalyzerTests
     }
 
     private static string SampleImagePath(string fileName) =>
-        Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            "..", "..", "..", "..", "..", "tests", "sample_images", fileName
-        );
+        fileName switch
+        {
+            "johnson_photo.jpg" => PeopleCorpus.SubjectSource("johnson", "jpg"),
+            _ => throw new InvalidOperationException($"Unsupported sample image '{fileName}'.")
+        };
 
     private static Image<Rgba32> CreateBlurredVariant(string fileName, float sigma)
     {

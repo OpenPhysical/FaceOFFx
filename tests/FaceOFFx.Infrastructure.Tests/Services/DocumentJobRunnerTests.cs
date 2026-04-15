@@ -15,6 +15,9 @@ public class DocumentJobRunnerTests : IntegrationTestBase
     private RetinaFaceDetector _faceDetector = null!;
     private OnnxLandmarkExtractor _landmarkExtractor = null!;
     private Jpeg2000EncoderService _jpeg2000Encoder = null!;
+    private PassportPhotoRenderService _passportPhotoRenderService = null!;
+    private FaceGeometryPipeline _faceGeometryPipeline = null!;
+    private DocumentRenderService _documentRenderService = null!;
     private DocumentJobRunner _runner = null!;
 
     private string _genericGuyPath = null!;
@@ -26,14 +29,24 @@ public class DocumentJobRunnerTests : IntegrationTestBase
         _faceDetector = new RetinaFaceDetector(Substitute.For<ILogger<RetinaFaceDetector>>());
         _landmarkExtractor = new OnnxLandmarkExtractor(Substitute.For<ILogger<OnnxLandmarkExtractor>>());
         _jpeg2000Encoder = new Jpeg2000EncoderService(Substitute.For<ILogger<Jpeg2000EncoderService>>());
-        _runner = new DocumentJobRunner(
+        _passportPhotoRenderService = new PassportPhotoRenderService(
             _faceDetector,
             _landmarkExtractor,
+            Substitute.For<ILogger<PassportPhotoRenderService>>());
+        _faceGeometryPipeline = new FaceGeometryPipeline(
+            _faceDetector,
+            _landmarkExtractor,
+            Substitute.For<ILogger<FaceGeometryPipeline>>());
+        _documentRenderService = new DocumentRenderService(
+            _faceGeometryPipeline,
+            _passportPhotoRenderService,
             _jpeg2000Encoder,
+            Substitute.For<ILogger<DocumentRenderService>>());
+        _runner = new DocumentJobRunner(
+            _documentRenderService,
             Substitute.For<ILogger<DocumentJobRunner>>());
 
-        var solutionRoot = FindSolutionRoot();
-        _genericGuyPath = Path.Combine(solutionRoot, "tests", "sample_images", "generic_guy.png");
+        _genericGuyPath = PeopleCorpus.SubjectSource("generic-guy", "png");
     }
 
     [OneTimeTearDown]
@@ -122,25 +135,10 @@ public class DocumentJobRunnerTests : IntegrationTestBase
         }
     }
 
-    private static string FindSolutionRoot()
-    {
-        var currentDir = AppDomain.CurrentDomain.BaseDirectory;
-        var searchDir = new DirectoryInfo(currentDir);
-
-        while (searchDir != null && !File.Exists(Path.Combine(searchDir.FullName, "FaceOFFx.sln")))
-        {
-            searchDir = searchDir.Parent;
-        }
-
-        return searchDir?.FullName
-            ?? throw new InvalidOperationException("Could not find solution root.");
-    }
-
     private static IEnumerable<string> RepresentativePortraitInputs()
     {
-        var root = FindSolutionRoot();
-        yield return Path.Combine(root, "tests", "test-images", "facial-detection", "person_1.jpg");
-        yield return Path.Combine(root, "tests", "test-images", "facial-detection", "person_2.jpg");
-        yield return Path.Combine(root, "tests", "test-images", "facial-detection", "person_3.jpg");
+        yield return PeopleCorpus.SubjectSource("person-01", "jpg");
+        yield return PeopleCorpus.SubjectSource("person-02", "jpg");
+        yield return PeopleCorpus.SubjectSource("person-03", "jpg");
     }
 }

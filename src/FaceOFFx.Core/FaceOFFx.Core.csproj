@@ -10,10 +10,4 @@
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.7" />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="FaceOFFx.Infrastructure" />
-    <InternalsVisibleTo Include="FaceOFFx.Cli" />
-    <InternalsVisibleTo Include="FaceOFFx.Core.Tests" />
-    <InternalsVisibleTo Include="FaceOFFx.Cli.Tests" />
-  </ItemGroup>
 </Project>

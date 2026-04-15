@@ -1,4 +1,5 @@
 using System.Numerics;
+using FaceOFFx.Core.Domain.Common;
 
 namespace FaceOFFx.Core.Domain.Transformations;
 
@@ -24,6 +25,16 @@ public sealed class TransformationMatrix
     {
         _matrix = matrix;
     }
+
+    /// <summary>
+    /// Creates a transformation matrix from a raw <see cref="Matrix3x2"/>.
+    /// </summary>
+    internal static TransformationMatrix FromMatrix(Matrix3x2 matrix) => new(matrix);
+
+    /// <summary>
+    /// Gets the raw matrix value.
+    /// </summary>
+    internal Matrix3x2 ToMatrix() => _matrix;
 
     /// <summary>
     /// Gets the identity transformation (no transformation)
@@ -67,6 +78,15 @@ public sealed class TransformationMatrix
     }
 
     /// <summary>
+    /// Applies a non-uniform scale transformation.
+    /// </summary>
+    public TransformationMatrix Scale(float scaleX, float scaleY, float centerX = 0, float centerY = 0)
+    {
+        var scaleMatrix = Matrix3x2.CreateScale(scaleX, scaleY, new Vector2(centerX, centerY));
+        return new TransformationMatrix(Matrix3x2.Multiply(scaleMatrix, _matrix));
+    }
+
+    /// <summary>
     /// Transforms a point using this transformation matrix
     /// </summary>
     public (float X, float Y) TransformPoint(float x, float y)
@@ -74,6 +94,15 @@ public sealed class TransformationMatrix
         var point = new Vector2(x, y);
         var transformed = Vector2.Transform(point, _matrix);
         return (transformed.X, transformed.Y);
+    }
+
+    /// <summary>
+    /// Transforms a domain point.
+    /// </summary>
+    public Point2D TransformPoint(Point2D point)
+    {
+        var transformed = TransformPoint(point.X, point.Y);
+        return new Point2D(transformed.X, transformed.Y);
     }
 
     /// <summary>

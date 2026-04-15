@@ -22,6 +22,7 @@
 
 using FaceOFFx.Core.Domain.Quality.Assessors;
 using AwesomeAssertions;
+using FaceOFFx.Tests.Common;
 using NUnit.Framework;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -33,10 +34,12 @@ namespace FaceOFFx.Core.Tests.Quality;
 public class SharpnessAssessorTests
 {
     private static string SampleImagePath(string fileName) =>
-        Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            "..", "..", "..", "..", "..", "tests", "sample_images", fileName
-        );
+        fileName switch
+        {
+            "johnson_photo.jpg" => PeopleCorpus.SubjectSource("johnson", "jpg"),
+            "bush_photo.jpg" => PeopleCorpus.SubjectSource("bush", "jpg"),
+            _ => throw new InvalidOperationException($"Unsupported sample image '{fileName}'.")
+        };
 
     private static Image<Rgba32> LoadSampleImage(string fileName) =>
         Image.Load<Rgba32>(SampleImagePath(fileName));

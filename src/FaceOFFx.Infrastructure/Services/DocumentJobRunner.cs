@@ -1,8 +1,6 @@
 using System.Text.Json;
 using CSharpFunctionalExtensions;
-using FaceOFFx.Core.Abstractions;
 using FaceOFFx.Core.Domain.Common;
-using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Documents;
 using FaceOFFx.Core.Domain.Quality;
 using FaceOFFx.Core.Domain.Standards;
@@ -21,16 +19,12 @@ namespace FaceOFFx.Infrastructure.Services;
 /// Executes shipped document issuance jobs and writes both artifacts and provenance.
 /// </summary>
 public sealed class DocumentJobRunner(
-    IFaceDetector faceDetector,
-    ILandmarkExtractor landmarkExtractor,
-    IJpeg2000Encoder jpeg2000Encoder,
+    DocumentRenderService documentRenderService,
     ILogger<DocumentJobRunner> logger)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    private readonly IFaceDetector _faceDetector = faceDetector;
-    private readonly ILandmarkExtractor _landmarkExtractor = landmarkExtractor;
-    private readonly IJpeg2000Encoder _jpeg2000Encoder = jpeg2000Encoder;
+    private readonly DocumentRenderService _documentRenderService = documentRenderService;
     private readonly ILogger<DocumentJobRunner> _logger = logger;
 
     /// <summary>
@@ -69,7 +63,42 @@ public sealed class DocumentJobRunner(
         Directory.CreateDirectory(outputDirectory);
 
         var inputBytes = await File.ReadAllBytesAsync(request.InputPath, cancellationToken).ConfigureAwait(false);
-        var inputCheckResult = await EvaluateInputAsync(document, inputBytes).ConfigureAwait(false);
+        using var sourceImage = Image.Load<Rgba32>(inputBytes);
+
+        Maybe<CanonicalFaceGeometry> canonicalGeometry = Maybe<CanonicalFaceGeometry>.None;
+        Result<AutomatedDocumentInputResult> inputCheckResult;
+
+        if (document.WorkflowFamily == DocumentWorkflowFamily.Piv)
+        {
+            inputCheckResult = await EvaluateInputAsync(document, inputBytes).ConfigureAwait(false);
+        }
+        else
+        {
+            var profile = DocumentCatalog.GetInputProfileOrThrow(document.InputProfileId);
+            var geometryResult = await _documentRenderService
+                .AnalyzeSingleFaceAsync(sourceImage, profile, cancellationToken)
+                .ConfigureAwait(false);
+            if (geometryResult.IsFailure)
+            {
+                inputCheckResult = Result.Success(new AutomatedDocumentInputResult(false, geometryResult.Error));
+            }
+            else
+            {
+                canonicalGeometry = Maybe<CanonicalFaceGeometry>.From(geometryResult.Value);
+                var rollDegrees = Math.Abs(FaceGeometryTransformations.CalculateEyeRotation(
+                    geometryResult.Value.SourceLandmarks.LeftEyeCenter,
+                    geometryResult.Value.SourceLandmarks.RightEyeCenter));
+
+                inputCheckResult = rollDegrees > profile.MaxRollDegrees
+                    ? Result.Success(new AutomatedDocumentInputResult(
+                        false,
+                        $"{profile.DisplayName} rejected: eye-line rotation {rollDegrees:F1}° exceeds the capture limit of {profile.MaxRollDegrees:F1}°."))
+                    : Result.Success(new AutomatedDocumentInputResult(
+                        true,
+                        $"{profile.DisplayName} accepted: one usable face was detected with a level eye line."));
+            }
+        }
+
         if (inputCheckResult.IsFailure)
         {
             return Result.Failure<DocumentJobResult>(inputCheckResult.Error);
@@ -113,7 +142,6 @@ public sealed class DocumentJobRunner(
             return Result.Success(failedResult);
         }
 
-        using var sourceImage = Image.Load<Rgba32>(inputBytes);
         var deliverables = new List<DeliverableResult>();
 
         foreach (var deliverable in variant.Deliverables)
@@ -126,7 +154,8 @@ public sealed class DocumentJobRunner(
                 request.InputPath,
                 inputBytes,
                 sourceImage,
-                outputDirectory).ConfigureAwait(false);
+                outputDirectory,
+                canonicalGeometry).ConfigureAwait(false);
             if (renderResult.IsFailure)
             {
                 return Result.Failure<DocumentJobResult>(renderResult.Error);
@@ -167,23 +196,17 @@ public sealed class DocumentJobRunner(
 
         using var image = Image.Load<Rgba32>(inputBytes);
         var profile = DocumentCatalog.GetInputProfileOrThrow(document.InputProfileId);
-        var faceResult = await SelectSingleFaceAsync(image, profile).ConfigureAwait(false);
-        if (faceResult.IsFailure)
-        {
-            return Result.Success(new AutomatedDocumentInputResult(false, faceResult.Error));
-        }
-
-        var landmarksResult = await _landmarkExtractor
-            .ExtractLandmarksAsync(image, faceResult.Value.BoundingBox)
+        var geometryResult = await _documentRenderService
+            .AnalyzeSingleFaceAsync(image, profile)
             .ConfigureAwait(false);
-        if (landmarksResult.IsFailure)
+        if (geometryResult.IsFailure)
         {
-            return Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {landmarksResult.Error}");
+            return Result.Success(new AutomatedDocumentInputResult(false, geometryResult.Error));
         }
 
-        var rollDegrees = Math.Abs(StandardPortraitProcessorService.CalculateRotation(
-            landmarksResult.Value.LeftEyeCenter,
-            landmarksResult.Value.RightEyeCenter));
+        var rollDegrees = Math.Abs(FaceGeometryTransformations.CalculateEyeRotation(
+            geometryResult.Value.SourceLandmarks.LeftEyeCenter,
+            geometryResult.Value.SourceLandmarks.RightEyeCenter));
         if (rollDegrees > profile.MaxRollDegrees)
         {
             return Result.Success(new AutomatedDocumentInputResult(
@@ -196,50 +219,21 @@ public sealed class DocumentJobRunner(
             $"{profile.DisplayName} accepted: one usable face was detected with a level eye line."));
     }
 
-    private async Task<Result<DetectedFace>> SelectSingleFaceAsync(
-        Image<Rgba32> image,
-        InputProfileDefinition profile)
-    {
-        var facesResult = await _faceDetector.DetectFacesAsync(image).ConfigureAwait(false);
-        if (facesResult.IsFailure)
-        {
-            return Result.Failure<DetectedFace>($"Input analysis failed: {facesResult.Error}");
-        }
-
-        var faces = facesResult.Value
-            .Where(face => face.Confidence >= profile.MinimumFaceConfidence)
-            .OrderByDescending(face => face.Confidence)
-            .ToArray();
-
-        if (faces.Length == 0)
-        {
-            return Result.Failure<DetectedFace>(
-                $"{profile.DisplayName} rejected: no suitable face was detected.");
-        }
-
-        if (profile.RequireSingleFace && faces.Length > 1)
-        {
-            return Result.Failure<DetectedFace>(
-                $"{profile.DisplayName} rejected: multiple faces were detected.");
-        }
-
-        return Result.Success(faces[0]);
-    }
-
     private async Task<Result<DeliverableResult>> RenderDeliverableAsync(
         DocumentDefinition document,
         DeliverableDefinition deliverable,
         string inputPath,
         byte[] inputBytes,
         Image<Rgba32> sourceImage,
-        string outputDirectory)
+        string outputDirectory,
+        Maybe<CanonicalFaceGeometry> canonicalGeometry)
     {
         return (document.WorkflowFamily, deliverable.Kind) switch
         {
             (DocumentWorkflowFamily.Piv, DeliverableKind.PivCardImage) => await RenderPivCardAsync(deliverable, inputPath, sourceImage, outputDirectory),
             (DocumentWorkflowFamily.Piv, DeliverableKind.PivPrintedPhoto) => await RenderPivPrintAsync(deliverable, inputPath, sourceImage, outputDirectory),
-            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.PaperPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory),
-            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.DigitalUploadPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory),
+            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.PaperPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory, canonicalGeometry),
+            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.DigitalUploadPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory, canonicalGeometry),
             _ => Result.Failure<DeliverableResult>($"Deliverable kind '{deliverable.Kind}' is not implemented for '{document.WorkflowFamily}'.")
         };
     }
@@ -250,13 +244,20 @@ public sealed class DocumentJobRunner(
         Image<Rgba32> sourceImage,
         string outputDirectory)
     {
-        using var pivSource = sourceImage.Clone();
-        var pivResult = await PivProcessor.ProcessAsync(
-            pivSource,
-            _faceDetector,
-            _landmarkExtractor,
-            _jpeg2000Encoder,
-            logger: _logger).ConfigureAwait(false);
+        var profile = DocumentCatalog.GetInputProfileOrThrow("piv-capture");
+        var geometryResult = await _documentRenderService
+            .AnalyzeSingleFaceAsync(sourceImage, profile)
+            .ConfigureAwait(false);
+        if (geometryResult.IsFailure)
+        {
+            return Result.Failure<DeliverableResult>(
+                $"Failed to render deliverable '{deliverable.Id}': {geometryResult.Error}");
+        }
+
+        var pivResult = _documentRenderService.RenderPivCard(
+            sourceImage,
+            geometryResult.Value,
+            PivProcessingOptions.Default);
         if (pivResult.IsFailure)
         {
             return Result.Failure<DeliverableResult>(
@@ -265,12 +266,7 @@ public sealed class DocumentJobRunner(
 
         var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
         await File.WriteAllBytesAsync(outputPath, pivResult.Value.ImageData).ConfigureAwait(false);
-
-        if (!pivResult.Value.Metadata.TryGetValue("ComplianceValidation", out var validationObject)
-            || validationObject is not PivComplianceValidation validation)
-        {
-            return Result.Failure<DeliverableResult>("PIV processing did not expose compliance validation.");
-        }
+        var validation = pivResult.Value.Geometry.ComplianceValidation;
 
         var checks = deliverable.OutputChecks
             .Select(check => new AutomatedCheckResult(
@@ -300,32 +296,28 @@ public sealed class DocumentJobRunner(
         Image<Rgba32> sourceImage,
         string outputDirectory)
     {
-        using var pivSource = sourceImage.Clone();
-        var pivResult = await PivProcessor.ProcessAsync(
-            pivSource,
-            _faceDetector,
-            _landmarkExtractor,
-            _jpeg2000Encoder,
-            logger: _logger).ConfigureAwait(false);
+        var profile = DocumentCatalog.GetInputProfileOrThrow("piv-capture");
+        var geometryResult = await _documentRenderService
+            .AnalyzeSingleFaceAsync(sourceImage, profile)
+            .ConfigureAwait(false);
+        if (geometryResult.IsFailure)
+        {
+            return Result.Failure<DeliverableResult>(
+                $"Failed to render deliverable '{deliverable.Id}': {geometryResult.Error}");
+        }
+
+        var pivResult = _documentRenderService.RenderPiv(
+            sourceImage,
+            geometryResult.Value,
+            PivProcessingOptions.Default);
         if (pivResult.IsFailure)
         {
             return Result.Failure<DeliverableResult>(
                 $"Failed to render deliverable '{deliverable.Id}': {pivResult.Error}");
         }
 
-        if (!pivResult.Value.Metadata.TryGetValue("ComplianceValidation", out var validationObject)
-            || validationObject is not PivComplianceValidation validation)
-        {
-            return Result.Failure<DeliverableResult>("PIV processing did not expose compliance validation.");
-        }
-
-        if (!pivResult.Value.Metadata.TryGetValue("PivImage", out var pivImageObject)
-            || pivImageObject is not Image<Rgba32> pivImage)
-        {
-            return Result.Failure<DeliverableResult>("PIV processing did not expose the rendered PIV image.");
-        }
-
-        using var printableImage = pivImage.Clone();
+        var validation = pivResult.Value.ComplianceValidation;
+        using var printableImage = pivResult.Value.PivImage.Clone();
         var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
         var fileBytes = await EncodeJpegAsync(printableImage, 92, 300).ConfigureAwait(false);
         await File.WriteAllBytesAsync(outputPath, fileBytes).ConfigureAwait(false);
@@ -377,7 +369,8 @@ public sealed class DocumentJobRunner(
         string inputPath,
         byte[] inputBytes,
         Image<Rgba32> sourceImage,
-        string outputDirectory)
+        string outputDirectory,
+        Maybe<CanonicalFaceGeometry> canonicalGeometry)
     {
         if (!deliverable.ProductionDefaults.TryGetValue("spec", out var specId))
         {
@@ -400,12 +393,16 @@ public sealed class DocumentJobRunner(
             }
         }
 
-        var alignment = await AlignPortraitAsync(
+        if (canonicalGeometry.HasNoValue)
+        {
+            return Result.Failure<DeliverableResult>(
+                $"Failed to render deliverable '{deliverable.Id}': canonical face geometry was not available.");
+        }
+
+        var alignment = _documentRenderService.RenderPassport(
             sourceImage,
-            spec.TargetWidth,
-            spec.TargetHeight,
-            spec.TargetHeadHeightRatio,
-            spec.TargetEyeFromBottomRatio).ConfigureAwait(false);
+            canonicalGeometry.GetValueOrThrow("Canonical face geometry is required."),
+            spec);
         if (alignment.IsFailure)
         {
             return Result.Failure<DeliverableResult>(
@@ -569,139 +566,13 @@ public sealed class DocumentJobRunner(
 
     private async Task<Result<FaceLandmarks68>> DetectLandmarksAsync(Image<Rgba32> image)
     {
-        var detectionResult = await _faceDetector.DetectFacesAsync(image).ConfigureAwait(false);
-        if (detectionResult.IsFailure || detectionResult.Value.Count == 0)
-        {
-            return Result.Failure<FaceLandmarks68>("No suitable face found.");
-        }
-
-        var face = detectionResult.Value
-            .OrderByDescending(candidate => candidate.Confidence)
-            .First();
-
-        return await _landmarkExtractor.ExtractLandmarksAsync(image, face.BoundingBox).ConfigureAwait(false);
-    }
-
-    private async Task<Result<AlignedPortrait>> AlignPortraitAsync(
-        Image<Rgba32> sourceImage,
-        int targetWidth,
-        int targetHeight,
-        float targetHeadHeightRatio,
-        float targetEyeFromBottomRatio)
-    {
-        var detection = await _faceDetector.DetectFacesAsync(sourceImage).ConfigureAwait(false);
-        if (detection.IsFailure || detection.Value.Count == 0)
-        {
-            return Result.Failure<AlignedPortrait>("No suitable faces found for portrait rendering.");
-        }
-
-        var face = detection.Value
-            .OrderByDescending(candidate => candidate.Confidence)
-            .First();
-
-        var landmarksResult = await _landmarkExtractor
-            .ExtractLandmarksAsync(sourceImage, face.BoundingBox)
+        var profile = DocumentCatalog.GetInputProfileOrThrow("us-portrait-capture");
+        var geometryResult = await _documentRenderService
+            .AnalyzeSingleFaceAsync(image, profile)
             .ConfigureAwait(false);
-        if (landmarksResult.IsFailure)
-        {
-            return Result.Failure<AlignedPortrait>($"Landmark extraction failed: {landmarksResult.Error}");
-        }
-
-        var rotation = StandardPortraitProcessorService.CalculateRotation(
-            landmarksResult.Value.LeftEyeCenter,
-            landmarksResult.Value.RightEyeCenter);
-
-        using var rotated = Math.Abs(rotation) > 0.1f
-            ? sourceImage.Clone(ctx => ctx.Rotate(rotation))
-            : sourceImage.Clone();
-
-        var rotatedDetection = await _faceDetector.DetectFacesAsync(rotated).ConfigureAwait(false);
-        if (rotatedDetection.IsFailure || rotatedDetection.Value.Count == 0)
-        {
-            return Result.Failure<AlignedPortrait>("Failed to detect a suitable face after leveling the portrait.");
-        }
-
-        var rotatedFace = rotatedDetection.Value
-            .OrderByDescending(candidate => candidate.Confidence)
-            .First();
-
-        var rotatedLandmarksResult = await _landmarkExtractor
-            .ExtractLandmarksAsync(rotated, rotatedFace.BoundingBox)
-            .ConfigureAwait(false);
-        if (rotatedLandmarksResult.IsFailure)
-        {
-            return Result.Failure<AlignedPortrait>($"Landmark extraction failed after rotation: {rotatedLandmarksResult.Error}");
-        }
-
-        var crop = CalculatePortraitCrop(
-            rotatedLandmarksResult.Value,
-            rotated.Width,
-            rotated.Height,
-            targetWidth,
-            targetHeight,
-            targetHeadHeightRatio,
-            targetEyeFromBottomRatio);
-
-        var outputImage = rotated.Clone(ctx =>
-        {
-            ctx.Crop(crop);
-            ctx.Resize(targetWidth, targetHeight);
-        });
-
-        var transformedLandmarks = TransformLandmarks(rotatedLandmarksResult.Value, crop, targetWidth, targetHeight);
-        return Result.Success(new AlignedPortrait(outputImage, transformedLandmarks));
-    }
-
-    private static Rectangle CalculatePortraitCrop(
-        FaceLandmarks68 landmarks,
-        int imageWidth,
-        int imageHeight,
-        int targetWidth,
-        int targetHeight,
-        float targetHeadHeightRatio,
-        float targetEyeFromBottomRatio)
-    {
-        var imageAspect = (float)targetWidth / targetHeight;
-        var browY = landmarks.Points.Take(17).Min(point => point.Y);
-        var chinY = landmarks.Points[8].Y;
-        var faceHeight = chinY - browY;
-        var estimatedHeadTop = browY - (faceHeight * 0.3f);
-        var headHeight = chinY - estimatedHeadTop;
-        var desiredCropHeight = headHeight / targetHeadHeightRatio;
-        var desiredCropWidth = desiredCropHeight * imageAspect;
-        var eyeCenterY = (landmarks.LeftEyeCenter.Y + landmarks.RightEyeCenter.Y) / 2f;
-        var desiredEyeFromTopRatio = 1f - targetEyeFromBottomRatio;
-        var cropY = eyeCenterY - (desiredCropHeight * desiredEyeFromTopRatio);
-
-        var faceCenterX = landmarks.Points.Average(point => point.X);
-        var cropX = faceCenterX - (desiredCropWidth / 2f);
-
-        desiredCropWidth = Math.Min(desiredCropWidth, imageWidth);
-        desiredCropHeight = Math.Min(desiredCropHeight, imageHeight);
-        cropX = Math.Clamp(cropX, 0f, Math.Max(0f, imageWidth - desiredCropWidth));
-        cropY = Math.Clamp(cropY, 0f, Math.Max(0f, imageHeight - desiredCropHeight));
-
-        var width = Math.Clamp((int)Math.Round(desiredCropWidth), 1, imageWidth);
-        var height = Math.Clamp((int)Math.Round(desiredCropHeight), 1, imageHeight);
-        var x = Math.Clamp((int)Math.Round(cropX), 0, Math.Max(0, imageWidth - width));
-        var y = Math.Clamp((int)Math.Round(cropY), 0, Math.Max(0, imageHeight - height));
-
-        return new Rectangle(x, y, width, height);
-    }
-
-    private static FaceLandmarks68 TransformLandmarks(
-        FaceLandmarks68 landmarks,
-        Rectangle crop,
-        int targetWidth,
-        int targetHeight)
-    {
-        var scaleX = (float)targetWidth / crop.Width;
-        var scaleY = (float)targetHeight / crop.Height;
-        return new FaceLandmarks68(landmarks.Points
-            .Select(point => new Point2D(
-                (point.X - crop.X) * scaleX,
-                (point.Y - crop.Y) * scaleY))
-            .ToList());
+        return geometryResult.IsFailure
+            ? Result.Failure<FaceLandmarks68>(geometryResult.Error)
+            : Result.Success(geometryResult.Value.SourceLandmarks);
     }
 
     private static PortraitMeasurements MeasurePortraitComposition(FaceLandmarks68 landmarks, int imageHeight)
@@ -829,8 +700,6 @@ public sealed class DocumentJobRunner(
         var json = JsonSerializer.Serialize(provenance, JsonOptions);
         await File.WriteAllTextAsync(jobResult.ProvenancePath, json, cancellationToken).ConfigureAwait(false);
     }
-
-    private sealed record AlignedPortrait(Image<Rgba32> Image, FaceLandmarks68 Landmarks);
 
     private readonly record struct PortraitMeasurements(float HeadHeightRatio, float EyeFromBottomRatio);
 

@@ -13,16 +13,6 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 [NonParallelizable]
 public class FacialImageEncoderParameterTests : IntegrationTestBase
 {
-    private static readonly string TestImagesPath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory,
-        "..",
-        "..",
-        "..",
-        "..",
-        "..",
-        "tests",
-        "sample_images"
-    );
 
     /// <summary>
     /// Tests processing with default 15 degree rotation limit
@@ -30,7 +20,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithDefaultRotationLimit_Processes15DegreeRotation()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy_rotated_15.png");
+        var imagePath = PeopleCorpus.SubjectVariant("generic-guy", "rotated_15.png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         var result = await FacialImageEncoder.ProcessAsync(imageData);
@@ -48,7 +38,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_With20DegreeRotation_ClampsToDefault15()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy_rotated_20.png");
+        var imagePath = PeopleCorpus.SubjectVariant("generic-guy", "rotated_20.png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         var result = await FacialImageEncoder.ProcessAsync(imageData);
@@ -64,7 +54,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithCustomRotationLimit_RespectsLimit()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy_rotated_10.png");
+        var imagePath = PeopleCorpus.SubjectVariant("generic-guy", "rotated_10.png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         // Set custom 5 degree limit
@@ -85,7 +75,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithNegativeRotation_HandlesCorrectly()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy_rotated_neg10.png");
+        var imagePath = PeopleCorpus.SubjectVariant("generic-guy", "rotated_neg10.png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         var result = await FacialImageEncoder.ProcessAsync(imageData);
@@ -108,11 +98,11 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
 
         foreach (var rotation in rotations)
         {
-            var filename =
+            var fileName =
                 rotation >= 0
-                    ? $"generic_guy_rotated_{rotation}.png"
-                    : $"generic_guy_rotated_neg{Math.Abs(rotation)}.png";
-            var imagePath = Path.Combine(TestImagesPath, filename);
+                    ? $"rotated_{rotation}.png"
+                    : $"rotated_neg{Math.Abs(rotation)}.png";
+            var imagePath = PeopleCorpus.SubjectVariant("generic-guy", fileName);
             var imageData = await File.ReadAllBytesAsync(imagePath);
 
             var result = await FacialImageEncoder.ProcessAsync(imageData);
@@ -136,7 +126,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithHighConfidenceThreshold_ProcessesHighConfidenceFaces()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy.png");
+        var imagePath = PeopleCorpus.SubjectSource("generic-guy", "png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         // Set high confidence threshold
@@ -156,7 +146,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithLowConfidenceThreshold_AcceptsLowerConfidenceFaces()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy.png");
+        var imagePath = PeopleCorpus.SubjectSource("generic-guy", "png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         // Set low confidence threshold
@@ -177,7 +167,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithCombinedParameters_RespectsAllSettings()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy_rotated_10.png");
+        var imagePath = PeopleCorpus.SubjectVariant("generic-guy", "rotated_10.png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         // Set custom parameters
@@ -202,7 +192,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithPresets_MaintainsPresetSettings()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy.png");
+        var imagePath = PeopleCorpus.SubjectSource("generic-guy", "png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         // Test archival preset (has high confidence requirement)
@@ -223,7 +213,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithEdgeCaseRotations_HandlesCorrectly()
     {
-        var imagePath = Path.Combine(TestImagesPath, "generic_guy.png");
+        var imagePath = PeopleCorpus.SubjectSource("generic-guy", "png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         // Test zero rotation limit (should disable rotation)

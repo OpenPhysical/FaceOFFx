@@ -18,9 +18,4 @@
     <PackageReference Include="CoreJ2K" Version="1.1.2.50" />
     <PackageReference Include="CoreJ2K.ImageSharp" Version="1.0.1" />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="FaceOFFx.Cli" />
-    <InternalsVisibleTo Include="FaceOFFx.Tests" />
-    <InternalsVisibleTo Include="FaceOFFx.Cli.Tests" />
-  </ItemGroup>
 </Project>
