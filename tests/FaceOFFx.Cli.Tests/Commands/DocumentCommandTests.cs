@@ -47,13 +47,17 @@ public class DocumentCommandTests : IntegrationTestBase
             "generic_guy.png");
     }
 
-    [TestCase("us-passport", null, "generic_guy.us-passport.jpg")]
-    [TestCase("us-pr-photo", null, "generic_guy.us-pr-photo.jpg")]
-    [TestCase("canada-passport", null, "generic_guy.canada-passport.jpg")]
-    [TestCase("canada-pr-card", null, "generic_guy.canada-pr-card.jpg")]
-    [TestCase("us-passport", "online-renewal-digital", "generic_guy.us-passport.digital.jpg")]
-    [TestCase("us-pr-photo", "digital-upload", "generic_guy.us-pr-photo.digital.jpg")]
-    [TestCase("canada-passport", "online-renewal-digital", "generic_guy.canada-passport.digital.jpg")]
+    [TestCase("us-passport", null, "generic_guy.us-passport.print.jpeg")]
+    [TestCase("us-permanent-resident", null, "generic_guy.us-permanent-resident.print.jpeg")]
+    [TestCase("canada-passport", null, "generic_guy.canada-passport.print.jpeg")]
+    [TestCase("canada-permanent-resident", null, "generic_guy.canada-permanent-resident.print.jpeg")]
+    [TestCase("canada-citizenship-grant", null, "generic_guy.canada-citizenship-grant.print.jpeg")]
+    [TestCase("canada-proof-of-citizenship", null, "generic_guy.canada-proof-of-citizenship.print.jpeg")]
+    [TestCase("us-passport", "digital", "generic_guy.us-passport.digital.jpeg")]
+    [TestCase("us-permanent-resident", "digital", "generic_guy.us-permanent-resident.digital.jpeg")]
+    [TestCase("canada-permanent-resident", "digital", "generic_guy.canada-permanent-resident.digital.jpeg")]
+    [TestCase("canada-citizenship-grant", "digital", "generic_guy.canada-citizenship-grant.digital.jpeg")]
+    [TestCase("canada-proof-of-citizenship", "digital", "generic_guy.canada-proof-of-citizenship.digital.jpeg")]
     public async Task DocumentCommand_WritesExpectedArtifactAndProvenance(
         string command,
         string? variant,
@@ -71,6 +75,11 @@ public class DocumentCommandTests : IntegrationTestBase
         exitCode.Should().Be(0);
         File.Exists(Path.Combine(outputDir, expectedArtifactName)).Should().BeTrue();
         File.Exists(Path.Combine(outputDir, $"generic_guy.{command}.provenance.json")).Should().BeTrue();
+
+        if (command.StartsWith("canada-", StringComparison.OrdinalIgnoreCase) && string.Equals(variant, "digital", StringComparison.OrdinalIgnoreCase))
+        {
+            File.Exists(Path.Combine(outputDir, Path.GetFileNameWithoutExtension(expectedArtifactName) + ".supporting-info.txt")).Should().BeTrue();
+        }
     }
 
     [Test]
@@ -79,26 +88,19 @@ public class DocumentCommandTests : IntegrationTestBase
         var result = await RunCliCapture("documents");
 
         result.ExitCode.Should().Be(0);
-        result.Stdout.Should().Contain("online-renewal-digi");
-        result.Stdout.Should().Contain("digital-upload");
-        result.Stdout.Should().Contain("card-only");
+        result.Stdout.Should().Contain("digital");
+        result.Stdout.Should().Contain("standard");
+        result.Stdout.Should().Contain("canada-proof-");
     }
 
-    [Test]
-    public async Task QualityCommand_HumanOutput_ShowsDeprecationNotice()
+    [TestCase("process")]
+    [TestCase("quality")]
+    [TestCase("validate")]
+    public async Task RemovedExpertCommands_AreNoLongerAvailable(string command)
     {
-        var result = await RunCliCapture($"quality --input \"{_testImagePath}\" --format text");
+        var result = await RunCliCapture(command);
 
-        result.ExitCode.Should().Be(0);
-        result.Stdout.Should().Contain("Deprecated:");
-    }
-
-    [Test]
-    public async Task ValidateCommand_HumanOutput_ShowsDeprecationNotice()
-    {
-        var result = await RunCliCapture($"validate \"{_testImagePath}\" --standard piv");
-
-        result.Stdout.Should().Contain("Deprecated:");
+        result.ExitCode.Should().NotBe(0);
     }
 
     private async Task<int> RunCliCommand(string arguments)

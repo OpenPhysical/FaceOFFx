@@ -9,6 +9,6 @@ internal sealed class CanadaPermanentResidentCardCommand(
     DocumentJobRunner jobRunner,
     IAnsiConsole console) : DocumentIssuanceCommandBase(jobRunner, console)
 {
-    protected override string DocumentId => "canada-pr-card";
-    protected override string DocumentDisplayName => "Canada Permanent Resident Card";
+    protected override string DocumentId => "canada-permanent-resident";
+    protected override string DocumentDisplayName => "Canada Permanent Resident";
 }

@@ -19,6 +19,22 @@ public enum DocumentCheckStage
 }
 
 /// <summary>
+/// Whether an automated check blocks compliance or is advisory only.
+/// </summary>
+public enum DocumentCheckDisposition
+{
+    /// <summary>
+    /// A failed check makes the result non-compliant.
+    /// </summary>
+    Blocking,
+
+    /// <summary>
+    /// A failed check is reported but does not make the result non-compliant.
+    /// </summary>
+    Advisory
+}
+
+/// <summary>
 /// Internal workflow family used to render and validate a document.
 /// </summary>
 public enum DocumentWorkflowFamily
@@ -80,12 +96,14 @@ public sealed record SpecificationCitation(
 /// </summary>
 /// <param name="Id">Stable check identifier.</param>
 /// <param name="Stage">Whether the check applies to input or output.</param>
+/// <param name="Disposition">Whether the check blocks compliance or is advisory.</param>
 /// <param name="Name">Human-readable check name.</param>
 /// <param name="Description">Short description of the enforced rule.</param>
 /// <param name="Citations">Normative citations backing the rule.</param>
 public sealed record AutomatedCheckDefinition(
     string Id,
     DocumentCheckStage Stage,
+    DocumentCheckDisposition Disposition,
     string Name,
     string Description,
     IReadOnlyList<SpecificationCitation> Citations);
@@ -163,15 +181,15 @@ public sealed record DocumentDefinition(
 /// </summary>
 /// <param name="Id">Stable profile identifier.</param>
 /// <param name="DisplayName">Human-readable profile name.</param>
-/// <param name="QualityStandard">Underlying quality standard used for scoring.</param>
-/// <param name="MinimumOverallScore">Minimum overall quality score required for automated acceptance.</param>
+/// <param name="MinimumFaceConfidence">Minimum acceptable face detection confidence.</param>
 /// <param name="RequireSingleFace">Whether multiple faces should fail the check.</param>
+/// <param name="MaxRollDegrees">Maximum acceptable eye-line rotation in degrees.</param>
 public sealed record InputProfileDefinition(
     string Id,
     string DisplayName,
-    string QualityStandard,
-    float MinimumOverallScore,
-    bool RequireSingleFace);
+    float MinimumFaceConfidence,
+    bool RequireSingleFace,
+    float MaxRollDegrees);
 
 /// <summary>
 /// Passport-style rendering and validation specification for paper or digital photo outputs.
@@ -180,6 +198,7 @@ public sealed record InputProfileDefinition(
 /// <param name="TargetHeight">Output height in pixels.</param>
 /// <param name="TargetHeadHeightRatio">Target chin-to-crown ratio used while cropping.</param>
 /// <param name="TargetEyeFromBottomRatio">Target eye-line placement from the bottom used while cropping.</param>
+/// <param name="OutputFormat">Output file format emitted by the workflow.</param>
 /// <param name="Dpi">Optional output DPI metadata.</param>
 /// <param name="MinHeadHeightRatio">Minimum allowed head-height ratio in the final output.</param>
 /// <param name="MaxHeadHeightRatio">Maximum allowed head-height ratio in the final output.</param>
@@ -191,11 +210,14 @@ public sealed record InputProfileDefinition(
 /// <param name="MinHeight">Minimum allowed output height in pixels.</param>
 /// <param name="MaxHeight">Maximum allowed output height in pixels.</param>
 /// <param name="MaxFileSizeBytes">Maximum file size in bytes, if any.</param>
+/// <param name="PreserveOriginalFileWhenValid">Whether a digital workflow should pass through an unchanged original JPEG when it already satisfies the measurable rules.</param>
+/// <param name="RequiresSupportingInfoSidecar">Whether the workflow should emit a supporting-info sidecar template.</param>
 public sealed record PassportPhotoSpec(
     int TargetWidth,
     int TargetHeight,
     float TargetHeadHeightRatio,
     float TargetEyeFromBottomRatio,
+    string OutputFormat,
     int? Dpi,
     float MinHeadHeightRatio,
     float MaxHeadHeightRatio,
@@ -206,7 +228,9 @@ public sealed record PassportPhotoSpec(
     int MaxWidth,
     int MinHeight,
     int MaxHeight,
-    int? MaxFileSizeBytes);
+    int? MaxFileSizeBytes,
+    bool PreserveOriginalFileWhenValid,
+    bool RequiresSupportingInfoSidecar);
 
 /// <summary>
 /// Request to execute a document workflow.
@@ -230,6 +254,7 @@ public sealed record DocumentJobRequest(
 /// </summary>
 /// <param name="Id">Stable check identifier.</param>
 /// <param name="Stage">Input or output stage.</param>
+/// <param name="Disposition">Whether the check is blocking or advisory.</param>
 /// <param name="Name">Human-readable check name.</param>
 /// <param name="Passed">Whether the check passed.</param>
 /// <param name="Summary">Short summary of the evaluation result.</param>
@@ -237,6 +262,7 @@ public sealed record DocumentJobRequest(
 public sealed record AutomatedCheckResult(
     string Id,
     DocumentCheckStage Stage,
+    DocumentCheckDisposition Disposition,
     string Name,
     bool Passed,
     string Summary,
@@ -264,6 +290,8 @@ public sealed record ManualChecklistResult(
 /// <param name="Passed">Whether all automated checks passed.</param>
 /// <param name="Summary">Short deliverable summary.</param>
 /// <param name="FileSizeBytes">Written artifact size in bytes.</param>
+/// <param name="SupportingInfoPath">Optional sidecar file path with supporting information or receipt fields.</param>
+/// <param name="OriginalFileRequirementSatisfied">Whether a workflow-specific unchanged-original requirement was satisfied.</param>
 /// <param name="ProductionDefaults">Recorded production defaults used to create the artifact.</param>
 /// <param name="Checks">Per-check results for the artifact.</param>
 public sealed record DeliverableResult(
@@ -273,6 +301,8 @@ public sealed record DeliverableResult(
     bool Passed,
     string Summary,
     int FileSizeBytes,
+    string? SupportingInfoPath,
+    bool? OriginalFileRequirementSatisfied,
     IReadOnlyDictionary<string, string> ProductionDefaults,
     IReadOnlyList<AutomatedCheckResult> Checks);
 

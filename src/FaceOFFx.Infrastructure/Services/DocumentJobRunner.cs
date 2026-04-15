@@ -5,7 +5,6 @@ using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Documents;
 using FaceOFFx.Core.Domain.Quality;
-using FaceOFFx.Core.Domain.Quality.Assessors;
 using FaceOFFx.Core.Domain.Standards;
 using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Infrastructure.Extensions;
@@ -13,7 +12,6 @@ using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Metadata;
-using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
@@ -70,7 +68,7 @@ public sealed class DocumentJobRunner(
             ?? Directory.GetCurrentDirectory();
         Directory.CreateDirectory(outputDirectory);
 
-        var inputBytes = await File.ReadAllBytesAsync(request.InputPath, cancellationToken);
+        var inputBytes = await File.ReadAllBytesAsync(request.InputPath, cancellationToken).ConfigureAwait(false);
         var inputCheckResult = await EvaluateInputAsync(document, inputBytes).ConfigureAwait(false);
         if (inputCheckResult.IsFailure)
         {
@@ -82,6 +80,7 @@ public sealed class DocumentJobRunner(
             new AutomatedCheckResult(
                 document.InputChecks[0].Id,
                 document.InputChecks[0].Stage,
+                document.InputChecks[0].Disposition,
                 document.InputChecks[0].Name,
                 inputCheckResult.Value.IsCompliant,
                 inputCheckResult.Value.Summary,
@@ -125,9 +124,9 @@ public sealed class DocumentJobRunner(
                 document,
                 deliverable,
                 request.InputPath,
+                inputBytes,
                 sourceImage,
-                outputDirectory,
-                cancellationToken).ConfigureAwait(false);
+                outputDirectory).ConfigureAwait(false);
             if (renderResult.IsFailure)
             {
                 return Result.Failure<DocumentJobResult>(renderResult.Error);
@@ -163,79 +162,84 @@ public sealed class DocumentJobRunner(
 
             return result.IsFailure
                 ? Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {result.Error}")
-                : Result.Success(new AutomatedDocumentInputResult(
-                    result.Value.IsCompliant,
-                    result.Value.Summary,
-                    1f));
+                : Result.Success(new AutomatedDocumentInputResult(result.Value.IsCompliant, result.Value.Summary));
         }
 
         using var image = Image.Load<Rgba32>(inputBytes);
         var profile = DocumentCatalog.GetInputProfileOrThrow(document.InputProfileId);
+        var faceResult = await SelectSingleFaceAsync(image, profile).ConfigureAwait(false);
+        if (faceResult.IsFailure)
+        {
+            return Result.Success(new AutomatedDocumentInputResult(false, faceResult.Error));
+        }
+
+        var landmarksResult = await _landmarkExtractor
+            .ExtractLandmarksAsync(image, faceResult.Value.BoundingBox)
+            .ConfigureAwait(false);
+        if (landmarksResult.IsFailure)
+        {
+            return Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {landmarksResult.Error}");
+        }
+
+        var rollDegrees = Math.Abs(StandardPortraitProcessorService.CalculateRotation(
+            landmarksResult.Value.LeftEyeCenter,
+            landmarksResult.Value.RightEyeCenter));
+        if (rollDegrees > profile.MaxRollDegrees)
+        {
+            return Result.Success(new AutomatedDocumentInputResult(
+                false,
+                $"{profile.DisplayName} rejected: eye-line rotation {rollDegrees:F1}° exceeds the capture limit of {profile.MaxRollDegrees:F1}°."));
+        }
+
+        return Result.Success(new AutomatedDocumentInputResult(
+            true,
+            $"{profile.DisplayName} accepted: one usable face was detected with a level eye line."));
+    }
+
+    private async Task<Result<DetectedFace>> SelectSingleFaceAsync(
+        Image<Rgba32> image,
+        InputProfileDefinition profile)
+    {
         var facesResult = await _faceDetector.DetectFacesAsync(image).ConfigureAwait(false);
         if (facesResult.IsFailure)
         {
-            return Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {facesResult.Error}");
+            return Result.Failure<DetectedFace>($"Input analysis failed: {facesResult.Error}");
         }
 
         var faces = facesResult.Value
-            .Where(face => face.Confidence >= 0.8f)
+            .Where(face => face.Confidence >= profile.MinimumFaceConfidence)
             .OrderByDescending(face => face.Confidence)
             .ToArray();
 
         if (faces.Length == 0)
         {
-            return Result.Success(new AutomatedDocumentInputResult(
-                false,
-                $"{profile.DisplayName} rejected: no suitable face was detected.",
-                0f));
+            return Result.Failure<DetectedFace>(
+                $"{profile.DisplayName} rejected: no suitable face was detected.");
         }
 
         if (profile.RequireSingleFace && faces.Length > 1)
         {
-            return Result.Success(new AutomatedDocumentInputResult(
-                false,
-                $"{profile.DisplayName} rejected: multiple faces were detected.",
-                faces[0].Confidence));
+            return Result.Failure<DetectedFace>(
+                $"{profile.DisplayName} rejected: multiple faces were detected.");
         }
 
-        var qualityOptions = QualityAssessmentOptions.ForStandard(profile.QualityStandard) with
-        {
-            EnforceCompliance = false,
-            MinQualityThreshold = profile.MinimumOverallScore
-        };
-
-        var qualityResult = await inputBytes.AssessQualityAsync(qualityOptions).ConfigureAwait(false);
-        if (qualityResult.IsFailure)
-        {
-            return Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {qualityResult.Error}");
-        }
-
-        var assessment = qualityResult.Value;
-        var accepted = assessment.Overall >= profile.MinimumOverallScore;
-        var summary = accepted
-            ? $"{profile.DisplayName} accepted: overall quality {assessment.Overall:F2} meets the automated suitability floor."
-            : $"{profile.DisplayName} rejected: overall quality {assessment.Overall:F2} is below the automated suitability floor of {profile.MinimumOverallScore:F2}.";
-
-        return Result.Success(new AutomatedDocumentInputResult(
-            accepted,
-            summary,
-            faces[0].Confidence));
+        return Result.Success(faces[0]);
     }
 
     private async Task<Result<DeliverableResult>> RenderDeliverableAsync(
         DocumentDefinition document,
         DeliverableDefinition deliverable,
         string inputPath,
+        byte[] inputBytes,
         Image<Rgba32> sourceImage,
-        string outputDirectory,
-        CancellationToken cancellationToken)
+        string outputDirectory)
     {
         return (document.WorkflowFamily, deliverable.Kind) switch
         {
             (DocumentWorkflowFamily.Piv, DeliverableKind.PivCardImage) => await RenderPivCardAsync(deliverable, inputPath, sourceImage, outputDirectory),
             (DocumentWorkflowFamily.Piv, DeliverableKind.PivPrintedPhoto) => await RenderPivPrintAsync(deliverable, inputPath, sourceImage, outputDirectory),
-            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.PaperPhoto) => await RenderPassportStyleJpegAsync(deliverable, inputPath, sourceImage, outputDirectory),
-            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.DigitalUploadPhoto) => await RenderPassportStyleJpegAsync(deliverable, inputPath, sourceImage, outputDirectory),
+            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.PaperPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory),
+            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.DigitalUploadPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory),
             _ => Result.Failure<DeliverableResult>($"Deliverable kind '{deliverable.Kind}' is not implemented for '{document.WorkflowFamily}'.")
         };
     }
@@ -268,21 +272,26 @@ public sealed class DocumentJobRunner(
             return Result.Failure<DeliverableResult>("PIV processing did not expose compliance validation.");
         }
 
-        var checks = new List<AutomatedCheckResult>();
-        foreach (var check in deliverable.OutputChecks)
-        {
-            checks.Add(new AutomatedCheckResult(
+        var checks = deliverable.OutputChecks
+            .Select(check => new AutomatedCheckResult(
                 check.Id,
                 check.Stage,
+                check.Disposition,
                 check.Name,
                 validation.IsFullyCompliant,
                 validation.IsFullyCompliant
                     ? "Rendered card image satisfies the cited PIV geometry rules."
                     : validation.Summary,
-                check.Citations));
-        }
+                check.Citations))
+            .ToArray();
 
-        return Result.Success(CreateDeliverableResult(deliverable, outputPath, pivResult.Value.ImageData.Length, checks));
+        return Result.Success(CreateDeliverableResult(
+            deliverable,
+            outputPath,
+            pivResult.Value.ImageData.Length,
+            checks,
+            null,
+            null));
     }
 
     private async Task<Result<DeliverableResult>> RenderPivPrintAsync(
@@ -324,8 +333,7 @@ public sealed class DocumentJobRunner(
         var dpiPassed = reloaded.Metadata.HorizontalResolution >= 300f
             && reloaded.Metadata.VerticalResolution >= 300f;
 
-        var checks = new List<AutomatedCheckResult>();
-        foreach (var check in deliverable.OutputChecks)
+        var checks = deliverable.OutputChecks.Select(check =>
         {
             var passed = check.Id switch
             {
@@ -337,7 +345,7 @@ public sealed class DocumentJobRunner(
             var summary = check.Id switch
             {
                 "piv-output-geometry" => passed
-                    ? "Rendered printed photo satisfies the cited PIV geometry rules."
+                    ? "Rendered print photo satisfies the cited PIV geometry rules."
                     : validation.Summary,
                 "piv-print-dpi" => passed
                     ? $"Rendered print artifact is tagged at {reloaded.Metadata.HorizontalResolution:F0} DPI."
@@ -345,24 +353,53 @@ public sealed class DocumentJobRunner(
                 _ => "Check not implemented."
             };
 
-            checks.Add(new AutomatedCheckResult(check.Id, check.Stage, check.Name, passed, summary, check.Citations));
-        }
+            return new AutomatedCheckResult(
+                check.Id,
+                check.Stage,
+                check.Disposition,
+                check.Name,
+                passed,
+                summary,
+                check.Citations);
+        }).ToArray();
 
-        return Result.Success(CreateDeliverableResult(deliverable, outputPath, fileBytes.Length, checks));
+        return Result.Success(CreateDeliverableResult(
+            deliverable,
+            outputPath,
+            fileBytes.Length,
+            checks,
+            null,
+            null));
     }
 
-    private async Task<Result<DeliverableResult>> RenderPassportStyleJpegAsync(
+    private async Task<Result<DeliverableResult>> RenderPortraitDeliverableAsync(
         DeliverableDefinition deliverable,
         string inputPath,
+        byte[] inputBytes,
         Image<Rgba32> sourceImage,
         string outputDirectory)
     {
         if (!deliverable.ProductionDefaults.TryGetValue("spec", out var specId))
         {
-            return Result.Failure<DeliverableResult>($"Deliverable '{deliverable.Id}' is missing a passport-style spec.");
+            return Result.Failure<DeliverableResult>($"Deliverable '{deliverable.Id}' is missing a portrait spec.");
         }
 
         var spec = DocumentCatalog.GetPassportPhotoSpecOrThrow(specId);
+        if (deliverable.Kind == DeliverableKind.DigitalUploadPhoto && spec.PreserveOriginalFileWhenValid)
+        {
+            var preserved = await TryPreserveOriginalDigitalAsync(
+                deliverable,
+                inputPath,
+                inputBytes,
+                sourceImage,
+                outputDirectory,
+                spec).ConfigureAwait(false);
+            if (preserved is not null)
+            {
+                return Result.Success(preserved);
+            }
+        }
+
         var alignment = await AlignPortraitAsync(
             sourceImage,
             spec.TargetWidth,
@@ -377,8 +414,7 @@ public sealed class DocumentJobRunner(
 
         using var alignedPortrait = alignment.Value.Image;
         var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
-
-        var quality = deliverable.Kind == DeliverableKind.DigitalUploadPhoto ? 88 : 94;
+        var quality = deliverable.Kind == DeliverableKind.DigitalUploadPhoto ? 92 : 95;
         var fileBytes = await EncodeJpegAsync(alignedPortrait, quality, spec.Dpi).ConfigureAwait(false);
         if (spec.MaxFileSizeBytes.HasValue)
         {
@@ -386,53 +422,164 @@ public sealed class DocumentJobRunner(
         }
 
         await File.WriteAllBytesAsync(outputPath, fileBytes).ConfigureAwait(false);
-
-        var measurements = MeasurePassportComposition(
-            alignment.Value.Landmarks,
-            spec.TargetWidth,
-            spec.TargetHeight);
-
         using var reloaded = Image.Load<Rgba32>(fileBytes);
-        var checks = new List<AutomatedCheckResult>();
-        foreach (var check in deliverable.OutputChecks)
+
+        var checks = BuildPortraitChecks(
+            deliverable,
+            spec,
+            outputPath,
+            fileBytes.Length,
+            reloaded.Width,
+            reloaded.Height,
+            MeasurePortraitComposition(alignment.Value.Landmarks, spec.TargetHeight),
+            originalFileRequirementSatisfied: false);
+
+        var supportingInfoPath = spec.RequiresSupportingInfoSidecar
+            ? await WriteSupportingInfoFileAsync(outputPath, sourceImage).ConfigureAwait(false)
+            : null;
+
+        return Result.Success(CreateDeliverableResult(
+            deliverable,
+            outputPath,
+            fileBytes.Length,
+            checks,
+            supportingInfoPath,
+            spec.RequiresSupportingInfoSidecar ? false : null));
+    }
+
+    private async Task<DeliverableResult?> TryPreserveOriginalDigitalAsync(
+        DeliverableDefinition deliverable,
+        string inputPath,
+        byte[] inputBytes,
+        Image<Rgba32> sourceImage,
+        string outputDirectory,
+        PassportPhotoSpec spec)
+    {
+        var extension = Path.GetExtension(inputPath);
+        if (!string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var landmarks = await DetectLandmarksAsync(sourceImage).ConfigureAwait(false);
+        if (landmarks.IsFailure)
+        {
+            return null;
+        }
+
+        var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
+        var measurements = MeasurePortraitComposition(landmarks.Value, sourceImage.Height);
+        var checks = BuildPortraitChecks(
+            deliverable,
+            spec,
+            outputPath,
+            inputBytes.Length,
+            sourceImage.Width,
+            sourceImage.Height,
+            measurements,
+            originalFileRequirementSatisfied: true);
+
+        var blockingPassed = checks
+            .Where(check => check.Disposition == DocumentCheckDisposition.Blocking)
+            .All(check => check.Passed);
+        if (!blockingPassed)
+        {
+            return null;
+        }
+
+        await File.WriteAllBytesAsync(outputPath, inputBytes).ConfigureAwait(false);
+        var supportingInfoPath = spec.RequiresSupportingInfoSidecar
+            ? await WriteSupportingInfoFileAsync(outputPath, sourceImage).ConfigureAwait(false)
+            : null;
+
+        return CreateDeliverableResult(
+            deliverable,
+            outputPath,
+            inputBytes.Length,
+            checks,
+            supportingInfoPath,
+            true);
+    }
+
+    private IReadOnlyList<AutomatedCheckResult> BuildPortraitChecks(
+        DeliverableDefinition deliverable,
+        PassportPhotoSpec spec,
+        string outputPath,
+        int fileSizeBytes,
+        int width,
+        int height,
+        PortraitMeasurements measurements,
+        bool originalFileRequirementSatisfied)
+    {
+        return deliverable.OutputChecks.Select(check =>
         {
             var passed = check.Id switch
             {
-                "us-paper-composition" or "canada-paper-composition" => measurements.HeadHeightRatio >= spec.MinHeadHeightRatio
+                "us-print-composition" or "canada-print-composition" =>
+                    measurements.HeadHeightRatio >= spec.MinHeadHeightRatio
                     && measurements.HeadHeightRatio <= spec.MaxHeadHeightRatio
                     && measurements.EyeFromBottomRatio >= spec.MinEyeFromBottomRatio
                     && measurements.EyeFromBottomRatio <= spec.MaxEyeFromBottomRatio,
-                "us-digital-technical" or "canada-digital-technical" => (!spec.RequireSquare || reloaded.Width == reloaded.Height)
-                    && reloaded.Width >= spec.MinWidth
-                    && reloaded.Width <= spec.MaxWidth
-                    && reloaded.Height >= spec.MinHeight
-                    && reloaded.Height <= spec.MaxHeight
-                    && (!spec.MaxFileSizeBytes.HasValue || fileBytes.Length <= spec.MaxFileSizeBytes.Value)
-                    && string.Equals(Path.GetExtension(outputPath), ".jpg", StringComparison.OrdinalIgnoreCase),
+                "us-digital-technical" or "canada-pr-digital-technical" or "canada-citizenship-digital-technical" =>
+                    width >= spec.MinWidth
+                    && width <= spec.MaxWidth
+                    && height >= spec.MinHeight
+                    && height <= spec.MaxHeight
+                    && (!spec.RequireSquare || width == height)
+                    && (!spec.MaxFileSizeBytes.HasValue || fileSizeBytes <= spec.MaxFileSizeBytes.Value)
+                    && string.Equals(Path.GetExtension(outputPath), ".jpeg", StringComparison.OrdinalIgnoreCase),
+                "canada-digital-originality" => originalFileRequirementSatisfied,
                 _ => false
             };
 
             var summary = check.Id switch
             {
-                "us-paper-composition" => passed
-                    ? $"Rendered paper photo keeps head height at {measurements.HeadHeightRatio:P0} and eye line at {measurements.EyeFromBottomRatio:P0} from the bottom."
-                    : $"Rendered paper photo is outside the cited composition range (head {measurements.HeadHeightRatio:P0}, eyes {measurements.EyeFromBottomRatio:P0} from bottom).",
+                "us-print-composition" => passed
+                    ? $"Rendered print photo keeps head height at {measurements.HeadHeightRatio:P0} and eye line at {measurements.EyeFromBottomRatio:P0} from the bottom."
+                    : $"Rendered print photo is outside the cited composition range (head {measurements.HeadHeightRatio:P0}, eyes {measurements.EyeFromBottomRatio:P0} from bottom).",
+                "canada-print-composition" => passed
+                    ? $"Rendered print photo keeps chin-to-crown height at {measurements.HeadHeightRatio:P0} and eye line at {measurements.EyeFromBottomRatio:P0} from the bottom."
+                    : $"Rendered print photo is outside the cited composition range (head {measurements.HeadHeightRatio:P0}, eyes {measurements.EyeFromBottomRatio:P0} from bottom).",
                 "us-digital-technical" => passed
-                    ? $"Rendered JPEG is {reloaded.Width}x{reloaded.Height} and {fileBytes.Length:N0} bytes."
-                    : $"Rendered digital file does not meet the cited square/JPEG/size limits ({reloaded.Width}x{reloaded.Height}, {fileBytes.Length:N0} bytes).",
-                "canada-paper-composition" => passed
-                    ? $"Rendered paper photo keeps chin-to-crown height at {measurements.HeadHeightRatio:P0} and eye line at {measurements.EyeFromBottomRatio:P0} from the bottom."
-                    : $"Rendered paper photo is outside the cited composition range (head {measurements.HeadHeightRatio:P0}, eyes {measurements.EyeFromBottomRatio:P0} from bottom).",
-                "canada-digital-technical" => passed
-                    ? $"Rendered digital file is {reloaded.Width}x{reloaded.Height} JPEG."
-                    : $"Rendered digital file does not meet the published Canada digital upload dimensions.",
+                    ? $"Rendered digital file is {width}x{height} and {fileSizeBytes:N0} bytes."
+                    : $"Rendered digital file does not meet the cited U.S. size requirements ({width}x{height}, {fileSizeBytes:N0} bytes).",
+                "canada-pr-digital-technical" => passed
+                    ? $"Rendered digital file is {width}x{height} and {fileSizeBytes:N0} bytes."
+                    : $"Rendered digital file does not meet the cited Canada permanent resident size requirements ({width}x{height}, {fileSizeBytes:N0} bytes).",
+                "canada-citizenship-digital-technical" => passed
+                    ? $"Rendered digital file is {width}x{height} and {fileSizeBytes:N0} bytes."
+                    : $"Rendered digital file does not meet the cited Canada citizenship size requirements ({width}x{height}, {fileSizeBytes:N0} bytes).",
+                "canada-digital-originality" => passed
+                    ? "The digital output could be preserved as the unchanged original JPEG file."
+                    : "The digital output required transformation, so the unchanged-original file requirement remains advisory.",
                 _ => "Check not implemented."
             };
 
-            checks.Add(new AutomatedCheckResult(check.Id, check.Stage, check.Name, passed, summary, check.Citations));
+            return new AutomatedCheckResult(
+                check.Id,
+                check.Stage,
+                check.Disposition,
+                check.Name,
+                passed,
+                summary,
+                check.Citations);
+        }).ToArray();
+    }
+
+    private async Task<Result<FaceLandmarks68>> DetectLandmarksAsync(Image<Rgba32> image)
+    {
+        var detectionResult = await _faceDetector.DetectFacesAsync(image).ConfigureAwait(false);
+        if (detectionResult.IsFailure || detectionResult.Value.Count == 0)
+        {
+            return Result.Failure<FaceLandmarks68>("No suitable face found.");
         }
 
-        return Result.Success(CreateDeliverableResult(deliverable, outputPath, fileBytes.Length, checks));
+        var face = detectionResult.Value
+            .OrderByDescending(candidate => candidate.Confidence)
+            .First();
+
+        return await _landmarkExtractor.ExtractLandmarksAsync(image, face.BoundingBox).ConfigureAwait(false);
     }
 
     private async Task<Result<AlignedPortrait>> AlignPortraitAsync(
@@ -486,7 +633,7 @@ public sealed class DocumentJobRunner(
             return Result.Failure<AlignedPortrait>($"Landmark extraction failed after rotation: {rotatedLandmarksResult.Error}");
         }
 
-        var crop = CalculatePassportCrop(
+        var crop = CalculatePortraitCrop(
             rotatedLandmarksResult.Value,
             rotated.Width,
             rotated.Height,
@@ -505,7 +652,7 @@ public sealed class DocumentJobRunner(
         return Result.Success(new AlignedPortrait(outputImage, transformedLandmarks));
     }
 
-    private static Rectangle CalculatePassportCrop(
+    private static Rectangle CalculatePortraitCrop(
         FaceLandmarks68 landmarks,
         int imageWidth,
         int imageHeight,
@@ -557,19 +704,16 @@ public sealed class DocumentJobRunner(
             .ToList());
     }
 
-    private static PassportCompositionMeasurements MeasurePassportComposition(
-        FaceLandmarks68 landmarks,
-        int width,
-        int height)
+    private static PortraitMeasurements MeasurePortraitComposition(FaceLandmarks68 landmarks, int imageHeight)
     {
         var browY = landmarks.Points.Take(17).Min(point => point.Y);
         var chinY = landmarks.Points[8].Y;
         var faceHeight = chinY - browY;
         var estimatedHeadTop = browY - (faceHeight * 0.3f);
-        var headHeightRatio = (chinY - estimatedHeadTop) / height;
+        var headHeightRatio = (chinY - estimatedHeadTop) / imageHeight;
         var eyeCenterY = (landmarks.LeftEyeCenter.Y + landmarks.RightEyeCenter.Y) / 2f;
-        var eyeFromBottomRatio = (height - eyeCenterY) / height;
-        return new PassportCompositionMeasurements(headHeightRatio, eyeFromBottomRatio);
+        var eyeFromBottomRatio = (imageHeight - eyeCenterY) / imageHeight;
+        return new PortraitMeasurements(headHeightRatio, eyeFromBottomRatio);
     }
 
     private static async Task<byte[]> EncodeJpegAsync(Image<Rgba32> image, int quality, int? dpi)
@@ -581,8 +725,6 @@ public sealed class DocumentJobRunner(
             image.Metadata.ResolutionUnits = PixelResolutionUnit.PixelsPerInch;
         }
 
-        image.Metadata.ExifProfile ??= new ExifProfile();
-
         await using var stream = new MemoryStream();
         await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = quality }).ConfigureAwait(false);
         return stream.ToArray();
@@ -590,7 +732,7 @@ public sealed class DocumentJobRunner(
 
     private static async Task<byte[]> ShrinkJpegToMaxBytesAsync(Image<Rgba32> image, int maxBytes, int? dpi)
     {
-        for (var quality = 90; quality >= 40; quality -= 5)
+        for (var quality = 95; quality >= 40; quality -= 5)
         {
             var encoded = await EncodeJpegAsync(image, quality, dpi).ConfigureAwait(false);
             if (encoded.Length <= maxBytes)
@@ -602,16 +744,50 @@ public sealed class DocumentJobRunner(
         return await EncodeJpegAsync(image, 40, dpi).ConfigureAwait(false);
     }
 
+    private static async Task<string> WriteSupportingInfoFileAsync(string outputPath, Image<Rgba32> sourceImage)
+    {
+        var supportingInfoPath = $"{Path.ChangeExtension(outputPath, null)}.supporting-info.txt";
+        var dateTaken = TryGetPhotoTakenDate(sourceImage) ?? "[enter date photo was taken]";
+
+        var contents = string.Join(Environment.NewLine, new[]
+        {
+            "Subject first name: ",
+            "Subject last name: ",
+            "Photographer or studio name: ",
+            "Photographer or studio address: ",
+            $"Date photo taken: {dateTaken}"
+        });
+
+        await File.WriteAllTextAsync(supportingInfoPath, contents).ConfigureAwait(false);
+        return supportingInfoPath;
+    }
+
+    private static string? TryGetPhotoTakenDate(Image<Rgba32> image)
+    {
+        return null;
+    }
+
     private static DeliverableResult CreateDeliverableResult(
         DeliverableDefinition deliverable,
         string outputPath,
         int fileSizeBytes,
-        IReadOnlyList<AutomatedCheckResult> checks)
+        IReadOnlyList<AutomatedCheckResult> checks,
+        string? supportingInfoPath,
+        bool? originalFileRequirementSatisfied)
     {
-        var passed = checks.All(check => check.Passed);
+        var blockingFailures = checks
+            .Where(check => check.Disposition == DocumentCheckDisposition.Blocking && !check.Passed)
+            .ToArray();
+        var advisoryFailures = checks
+            .Where(check => check.Disposition == DocumentCheckDisposition.Advisory && !check.Passed)
+            .ToArray();
+
+        var passed = blockingFailures.Length == 0;
         var summary = passed
-            ? $"{deliverable.DisplayName} produced and validated."
-            : $"{deliverable.DisplayName} produced but failed one or more cited output checks.";
+            ? advisoryFailures.Length == 0
+                ? $"{deliverable.DisplayName} produced and validated."
+                : $"{deliverable.DisplayName} produced and validated with advisory notes."
+            : $"{deliverable.DisplayName} produced but failed one or more blocking output checks.";
 
         return new DeliverableResult(
             deliverable.Id,
@@ -620,6 +796,8 @@ public sealed class DocumentJobRunner(
             passed,
             summary,
             fileSizeBytes,
+            supportingInfoPath,
+            originalFileRequirementSatisfied,
             deliverable.ProductionDefaults,
             checks);
     }
@@ -654,12 +832,7 @@ public sealed class DocumentJobRunner(
 
     private sealed record AlignedPortrait(Image<Rgba32> Image, FaceLandmarks68 Landmarks);
 
-    private readonly record struct PassportCompositionMeasurements(
-        float HeadHeightRatio,
-        float EyeFromBottomRatio);
+    private readonly record struct PortraitMeasurements(float HeadHeightRatio, float EyeFromBottomRatio);
 
-    private readonly record struct AutomatedDocumentInputResult(
-        bool IsCompliant,
-        string Summary,
-        float Confidence);
+    private readonly record struct AutomatedDocumentInputResult(bool IsCompliant, string Summary);
 }

@@ -9,6 +9,6 @@ internal sealed class UsPermanentResidentPhotoCommand(
     DocumentJobRunner jobRunner,
     IAnsiConsole console) : DocumentIssuanceCommandBase(jobRunner, console)
 {
-    protected override string DocumentId => "us-pr-photo";
-    protected override string DocumentDisplayName => "U.S. Permanent Resident Photo";
+    protected override string DocumentId => "us-permanent-resident";
+    protected override string DocumentDisplayName => "U.S. Permanent Resident";
 }

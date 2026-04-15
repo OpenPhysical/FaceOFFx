@@ -61,11 +61,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<UsPermanentResidentPhotoCommand>();
         services.AddTransient<CanadaPassportCommand>();
         services.AddTransient<CanadaPermanentResidentCardCommand>();
+        services.AddTransient<CanadaCitizenshipGrantCommand>();
+        services.AddTransient<CanadaProofOfCitizenshipCommand>();
         services.AddTransient<DocumentsCommand>();
-        services.AddTransient<ProcessCommand>();
+#if DEBUG
         services.AddTransient<RoiCommand>();
-        services.AddTransient<QualityCommand>();
-        services.AddTransient<ValidateCommand>();
         services.AddTransient<InteractiveCommand>();
         services.AddTransient<DatasetCommand>();
         services.AddTransient<DatasetValidateCommand>();
@@ -75,6 +75,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<TestSharpnessCommand>();
         services.AddTransient<TestReportCommand>();
         services.AddTransient<TestCleanCommand>();
+#endif
 
         return services;
     }

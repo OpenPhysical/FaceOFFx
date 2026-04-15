@@ -17,7 +17,7 @@ internal static class CliAppConfiguration
             .AddCommand<PivCommand>("piv")
             .WithDescription("Run the spec-backed PIV document workflow")
             .WithExample("piv", "photo.jpg")
-            .WithExample("piv", "photo.jpg", "--variant", "card-only")
+            .WithExample("piv", "photo.jpg", "--variant", "digital")
             .WithExample("piv", "photo.jpg", "--json")
             .WithExample("piv", "photo.jpg", "--explain");
 
@@ -25,71 +25,54 @@ internal static class CliAppConfiguration
             .AddCommand<UsPassportCommand>("us-passport")
             .WithDescription("Run the U.S. passport document workflow")
             .WithExample("us-passport", "photo.jpg")
-            .WithExample("us-passport", "photo.jpg", "--variant", "online-renewal-digital");
+            .WithExample("us-passport", "photo.jpg", "--variant", "digital");
 
         config
-            .AddCommand<UsPermanentResidentPhotoCommand>("us-pr-photo")
+            .AddCommand<UsPermanentResidentPhotoCommand>("us-permanent-resident")
             .WithDescription("Run the U.S. permanent resident application photo workflow")
-            .WithExample("us-pr-photo", "photo.jpg")
-            .WithExample("us-pr-photo", "photo.jpg", "--variant", "digital-upload");
+            .WithExample("us-permanent-resident", "photo.jpg")
+            .WithExample("us-permanent-resident", "photo.jpg", "--variant", "digital");
 
         config
             .AddCommand<CanadaPassportCommand>("canada-passport")
             .WithDescription("Run the Canada passport document workflow")
-            .WithExample("canada-passport", "photo.jpg")
-            .WithExample("canada-passport", "photo.jpg", "--variant", "online-renewal-digital");
+            .WithExample("canada-passport", "photo.jpg");
 
         config
-            .AddCommand<CanadaPermanentResidentCardCommand>("canada-pr-card")
+            .AddCommand<CanadaPermanentResidentCardCommand>("canada-permanent-resident")
             .WithDescription("Run the Canada permanent resident card photo workflow")
-            .WithExample("canada-pr-card", "photo.jpg");
+            .WithExample("canada-permanent-resident", "photo.jpg")
+            .WithExample("canada-permanent-resident", "photo.jpg", "--variant", "digital");
+
+        config
+            .AddCommand<CanadaCitizenshipGrantCommand>("canada-citizenship-grant")
+            .WithDescription("Run the Canada citizenship grant photo workflow")
+            .WithExample("canada-citizenship-grant", "photo.jpg")
+            .WithExample("canada-citizenship-grant", "photo.jpg", "--variant", "digital");
+
+        config
+            .AddCommand<CanadaProofOfCitizenshipCommand>("canada-proof-of-citizenship")
+            .WithDescription("Run the Canada proof of citizenship photo workflow")
+            .WithExample("canada-proof-of-citizenship", "photo.jpg")
+            .WithExample("canada-proof-of-citizenship", "photo.jpg", "--variant", "digital");
 
         config
             .AddCommand<DocumentsCommand>("documents")
             .WithDescription("List the supported spec-backed document workflows")
             .WithExample("documents");
 
-        config
-            .AddCommand<ProcessCommand>("process")
-            .WithDescription("Deprecated expert command. Use document commands such as piv or us-passport for user-facing workflows.")
-            .WithExample("process", "photo.jpg")
-            .WithExample("process", "photo.jpg", "--output", "result.jp2")
-            .WithExample("process", "photo.jpg", "--verbose")
-            .WithExample("process", "photo.jpg", "--no-resize", "--format", "jpeg", "--no-roi")
-            .WithExample("process", "photo.jpg", "--no-resize", "--format", "jp2", "--no-roi")
-            .WithExample("process", "photo.jpg", "--format", "png", "--no-roi")
-            .WithExample("process", "photo.jpg", "--format", "tiff", "--no-roi")
-            .WithExample("process", "photo.jpg", "--quality-gate", "0.8")
-            .WithExample("process", "photo.jpg", "--quality-gate", "0.7", "--quality-report");
-
+#if DEBUG
         config
             .AddCommand<RoiCommand>("roi")
-            .WithDescription("Visualize facial ROI Inner Region for JPEG 2000 encoding")
+            .WithDescription("Visualize facial ROI Inner Region for engineering validation")
             .WithExample("roi", "photo.jpg")
-            .WithExample("roi", "photo.jpg", "--output", "roi_visual.jpg", "--show-landmarks")
-            .WithExample("roi", "photo.jpg", "--stroke-width", "5", "--verbose");
-
-        config
-            .AddCommand<QualityCommand>("quality")
-            .WithDescription("Deprecated expert command. Use document commands for user-facing workflows.")
-            .WithExample("quality", "--input", "photo.jpg")
-            .WithExample("quality", "--input", "photo.jpg", "--standard", "piv", "--format", "json")
-            .WithExample("quality", "--input", "photo.jpg", "--threshold", "0.8", "--strict")
-            .WithExample("quality", "--input", "photo.jpg", "--format", "detailed", "--visual");
+            .WithExample("roi", "photo.jpg", "--output", "roi_visual.jpg", "--show-landmarks");
 
         config
             .AddCommand<InteractiveCommand>("interactive")
-            .WithDescription("Interactive validation mode with step-by-step guidance")
+            .WithDescription("Interactive engineering validation mode")
             .WithExample("interactive")
             .WithExample("interactive", "--directory", "./images");
-
-        config
-            .AddCommand<ValidateCommand>("validate")
-            .WithDescription("Deprecated expert command. Use document commands for user-facing workflows.")
-            .WithExample("validate", "photo.jpg")
-            .WithExample("validate", "photo.jpg", "--standard", "icao")
-            .WithExample("validate", "photo.jpg", "--standard", "piv", "--detailed")
-            .WithExample("validate", "photo.jpg", "--min-confidence", "0.9");
 
         config.AddBranch("dataset", dataset =>
         {
@@ -138,5 +121,6 @@ internal static class CliAppConfiguration
                 .WithExample("test", "clean", "--all")
                 .WithExample("test", "clean", "--blur", "--results", "--force");
         });
+#endif
     }
 }

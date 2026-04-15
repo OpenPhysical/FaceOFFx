@@ -29,7 +29,7 @@ internal abstract class DocumentIssuanceCommandBase(
         public string? OutputDirectory { get; set; }
 
         [CommandOption("-v|--variant <VARIANT>")]
-        [Description("Named document variant, such as paper or digital-upload")]
+        [Description("Named document variant, such as print or digital")]
         public string? Variant { get; set; }
 
         [CommandOption("--json")]
@@ -98,6 +98,8 @@ internal abstract class DocumentIssuanceCommandBase(
                         deliverable.Passed,
                         deliverable.Summary,
                         deliverable.FileSizeBytes,
+                        deliverable.SupportingInfoPath,
+                        deliverable.OriginalFileRequirementSatisfied,
                         deliverable.ProductionDefaults
                     }),
                     ManualChecklist = result.Value.ManualChecklist
@@ -114,6 +116,16 @@ internal abstract class DocumentIssuanceCommandBase(
                 var status = deliverable.Passed ? "[green]PASS[/]" : "[red]FAIL[/]";
                 Console.MarkupLine($"{status} {deliverable.DisplayName}: {deliverable.OutputPath}");
                 Console.MarkupLine($"[grey]{deliverable.Summary}[/]");
+
+                foreach (var check in deliverable.Checks.Where(check => check.Disposition == DocumentCheckDisposition.Advisory && !check.Passed))
+                {
+                    Console.MarkupLine($"[yellow]ADVISORY[/] {check.Name}: {check.Summary}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(deliverable.SupportingInfoPath))
+                {
+                    Console.MarkupLine($"[blue]Supporting Info:[/] {deliverable.SupportingInfoPath}");
+                }
             }
 
             if (result.Value.ManualChecklist.Count > 0)

@@ -13,7 +13,8 @@ internal sealed class DocumentsCommand(IAnsiConsole console) : Command
         var table = new Table().Border(TableBorder.Rounded).Title("[bold]Supported Documents[/]");
         table.AddColumn("Document");
         table.AddColumn("Default Variant");
-        table.AddColumn("Other Variants");
+        table.AddColumn("Variants");
+        table.AddColumn("Notes");
         table.AddColumn("Normative Sources");
 
         foreach (var document in DocumentCatalog.GetAll().OrderBy(doc => doc.Id, StringComparer.OrdinalIgnoreCase))
@@ -23,11 +24,20 @@ internal sealed class DocumentsCommand(IAnsiConsole console) : Command
                 document.Citations.Select(citation => $"{citation.DocumentTitle} {citation.Clause}"));
             var variants = string.Join(
                 ", ",
-                document.Variants.Keys
-                    .Where(variant => !string.Equals(variant, document.PrimaryVariantId, StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(variant => variant, StringComparer.OrdinalIgnoreCase));
+                document.Variants.Keys.OrderBy(variant => variant, StringComparer.OrdinalIgnoreCase));
+            var hasAdvisory = document.Variants.Values
+                .SelectMany(variant => variant.Deliverables)
+                .SelectMany(deliverable => deliverable.OutputChecks)
+                .Any(check => check.Disposition == DocumentCheckDisposition.Advisory);
+            var notes = hasAdvisory || document.ManualChecklist.Count > 0
+                ? string.Join(", ", new[]
+                    {
+                        hasAdvisory ? "advisory checks" : null,
+                        document.ManualChecklist.Count > 0 ? "manual checklist" : null
+                    }.Where(note => note is not null))
+                : "-";
 
-            table.AddRow(document.Id, document.PrimaryVariantId, string.IsNullOrEmpty(variants) ? "-" : variants, sources);
+            table.AddRow(document.Id, document.PrimaryVariantId, string.IsNullOrEmpty(variants) ? "-" : variants, notes, sources);
         }
 
         _console.Write(table);

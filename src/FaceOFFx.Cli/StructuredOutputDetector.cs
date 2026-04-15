@@ -22,33 +22,15 @@ internal static class StructuredOutputDetector
                 .Any(arg => string.Equals(arg, "--json", StringComparison.OrdinalIgnoreCase));
         }
 
-        if (!string.Equals(command, "quality", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        for (var i = commandIndex + 1; i < args.Length; i++)
-        {
-            var arg = args[i];
-            if (string.Equals(arg, "--format", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-            {
-                return string.Equals(args[i + 1], "json", StringComparison.OrdinalIgnoreCase);
-            }
-
-            if (arg.StartsWith("--format=", StringComparison.OrdinalIgnoreCase))
-            {
-                var format = arg["--format=".Length..];
-                return string.Equals(format, "json", StringComparison.OrdinalIgnoreCase);
-            }
-        }
-
         return false;
     }
 
     private static bool IsDocumentCommand(string command) =>
         string.Equals(command, "piv", StringComparison.OrdinalIgnoreCase)
         || string.Equals(command, "us-passport", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(command, "us-pr-photo", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(command, "us-permanent-resident", StringComparison.OrdinalIgnoreCase)
         || string.Equals(command, "canada-passport", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(command, "canada-pr-card", StringComparison.OrdinalIgnoreCase);
+        || string.Equals(command, "canada-permanent-resident", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(command, "canada-citizenship-grant", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(command, "canada-proof-of-citizenship", StringComparison.OrdinalIgnoreCase);
 }

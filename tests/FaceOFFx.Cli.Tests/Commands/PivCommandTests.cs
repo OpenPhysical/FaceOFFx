@@ -109,7 +109,8 @@ public class PivCommandTests : IntegrationTestBase
         result.ExitCode.Should().Be(0);
         result.Output.Should().Contain("piv");
         result.Output.Should().Contain("us-passport");
-        result.Output.Should().Contain("canada-pr-card");
+        result.Output.Should().Contain("canada-perman");
+        result.Output.Should().Contain("canada-proof-");
     }
 
     private async Task<int> RunCliCommand(string arguments)

@@ -76,23 +76,24 @@ faceoffx piv photo.jpg
 # U.S. passport paper photo
 faceoffx us-passport photo.jpg
 
-# U.S. passport online-renewal digital photo
-faceoffx us-passport photo.jpg --variant online-renewal-digital
+# U.S. passport digital photo
+faceoffx us-passport photo.jpg --variant digital
 
 # U.S. permanent resident photo
-faceoffx us-pr-photo photo.jpg
+faceoffx us-permanent-resident photo.jpg
 
 # Canadian passport paper photo
 faceoffx canada-passport photo.jpg
 
 # Canadian permanent resident card photo
-faceoffx canada-pr-card photo.jpg
+faceoffx canada-permanent-resident photo.jpg
+
+# Canadian proof of citizenship digital photo
+faceoffx canada-proof-of-citizenship photo.jpg --variant digital
 
 # Discover shipped document workflows and variants
 faceoffx documents
 ```
-
-Human-facing workflows should use the document commands above. The legacy `process`, `quality`, and `validate` commands still exist as deprecated expert tools for engineering and diagnostics.
 
 #### Available Presets
 
@@ -328,9 +329,11 @@ var fastOptions = PivProcessingOptions.Fast;
 ```bash
 faceoffx piv photo.jpg
 faceoffx us-passport photo.jpg
-faceoffx us-pr-photo photo.jpg
+faceoffx us-permanent-resident photo.jpg
 faceoffx canada-passport photo.jpg
-faceoffx canada-pr-card photo.jpg
+faceoffx canada-permanent-resident photo.jpg
+faceoffx canada-citizenship-grant photo.jpg
+faceoffx canada-proof-of-citizenship photo.jpg
 faceoffx documents
 ```
 
@@ -338,19 +341,22 @@ faceoffx documents
 
 ```bash
 # PIV card image only
-faceoffx piv photo.jpg --variant card-only
+faceoffx piv photo.jpg --variant digital
 
 # PIV printed Zone 1F photo only
-faceoffx piv photo.jpg --variant print-only
+faceoffx piv photo.jpg --variant print
 
-# U.S. passport online-renewal digital upload
-faceoffx us-passport photo.jpg --variant online-renewal-digital
+# U.S. passport digital upload
+faceoffx us-passport photo.jpg --variant digital
 
 # U.S. permanent resident digital upload
-faceoffx us-pr-photo photo.jpg --variant digital-upload
+faceoffx us-permanent-resident photo.jpg --variant digital
 
-# Canadian passport online-renewal digital upload
-faceoffx canada-passport photo.jpg --variant online-renewal-digital
+# Canadian permanent resident digital upload
+faceoffx canada-permanent-resident photo.jpg --variant digital
+
+# Canadian proof of citizenship digital upload
+faceoffx canada-proof-of-citizenship photo.jpg --variant digital
 ```
 
 ### Machine-Readable Output
@@ -374,10 +380,6 @@ faceoffx piv photo.jpg --explain
 ```
 
 Each document command writes a provenance JSON file alongside the outputs. The provenance file records the selected document, variant, automated checks, manual checklist items, production defaults, and exact citations used by the workflow.
-
-### Deprecated Expert Commands
-
-`process`, `quality`, and `validate` remain available for diagnostics and engineering work. They are no longer the primary user-facing workflow and may emit deprecation guidance in human-readable mode.
 
 ### Error Handling
 

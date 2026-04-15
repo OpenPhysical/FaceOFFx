@@ -48,32 +48,6 @@ public class ProgramOutputTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task QualityCommand_WithJsonFormat_WritesPureJsonToStdout()
-    {
-        var processInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = $"\"{_cliAssemblyPath}\" quality --input \"{_testImagePath}\" --format json",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(processInfo)
-            ?? throw new InvalidOperationException("Failed to start process");
-
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        stdout.Should().NotContain("FaceOFFx");
-        stdout.Should().NotContain("PIV · ICAO · TWIC Biometrics");
-
-        using var json = JsonDocument.Parse(stdout);
-        json.RootElement.GetProperty("OverallScore").Should().NotBeNull();
-    }
-
-    [Test]
     public async Task PivCommand_WithJsonFormat_WritesPureJsonToStdout()
     {
         var outputDir = Path.Combine(TempDirectory, "piv-program-output");
@@ -125,5 +99,32 @@ public class ProgramOutputTests : IntegrationTestBase
         stdout.Should().NotContain("PIV · ICAO · TWIC Biometrics");
         using var json = JsonDocument.Parse(stdout);
         json.RootElement.GetProperty("Document").GetString().Should().Be("us-passport");
+    }
+
+    [Test]
+    public async Task CanadaProofOfCitizenship_WithJsonFormat_WritesPureJsonToStdout()
+    {
+        var outputDir = Path.Combine(TempDirectory, "canada-proof-program-output");
+        Directory.CreateDirectory(outputDir);
+
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = $"\"{_cliAssemblyPath}\" canada-proof-of-citizenship \"{_testImagePath}\" --output-dir \"{outputDir}\" --json",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(processInfo)
+            ?? throw new InvalidOperationException("Failed to start process");
+
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        stdout.Should().NotContain("PIV · ICAO · TWIC Biometrics");
+        using var json = JsonDocument.Parse(stdout);
+        json.RootElement.GetProperty("Document").GetString().Should().Be("canada-proof-of-citizenship");
     }
 }

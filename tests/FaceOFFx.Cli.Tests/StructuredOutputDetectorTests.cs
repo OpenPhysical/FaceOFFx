@@ -8,19 +8,18 @@ namespace FaceOFFx.Cli.Tests;
 public class StructuredOutputDetectorTests
 {
     [Test]
-    public void RequiresCleanStdout_ReturnsTrueForQualityJson()
+    public void RequiresCleanStdout_ReturnsTrueForDocumentJson()
     {
-        StructuredOutputDetector.RequiresCleanStdout(new[] { "quality", "--format", "json" }).Should().BeTrue();
-        StructuredOutputDetector.RequiresCleanStdout(new[] { "--debug", "quality", "--format", "json" }).Should().BeTrue();
-        StructuredOutputDetector.RequiresCleanStdout(new[] { "quality", "--format=json" }).Should().BeTrue();
         StructuredOutputDetector.RequiresCleanStdout(new[] { "piv", "photo.jpg", "--json" }).Should().BeTrue();
         StructuredOutputDetector.RequiresCleanStdout(new[] { "us-passport", "photo.jpg", "--json" }).Should().BeTrue();
+        StructuredOutputDetector.RequiresCleanStdout(new[] { "us-permanent-resident", "photo.jpg", "--json" }).Should().BeTrue();
+        StructuredOutputDetector.RequiresCleanStdout(new[] { "canada-proof-of-citizenship", "photo.jpg", "--json" }).Should().BeTrue();
     }
 
     [Test]
     public void RequiresCleanStdout_ReturnsFalseForHumanReadableCommands()
     {
-        StructuredOutputDetector.RequiresCleanStdout(new[] { "quality", "--format", "detailed" }).Should().BeFalse();
-        StructuredOutputDetector.RequiresCleanStdout(new[] { "validate", "--format", "json" }).Should().BeFalse();
+        StructuredOutputDetector.RequiresCleanStdout(new[] { "piv", "photo.jpg" }).Should().BeFalse();
+        StructuredOutputDetector.RequiresCleanStdout(new[] { "documents" }).Should().BeFalse();
     }
 }
