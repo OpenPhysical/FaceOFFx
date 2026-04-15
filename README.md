@@ -95,6 +95,16 @@ faceoffx canada-proof-of-citizenship photo.jpg --variant digital
 faceoffx documents
 ```
 
+### Diagnostics Workflow
+
+Engineering diagnostics now live in a separate tool so the release CLI stays document-focused:
+
+```bash
+faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
+faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
+faceoffx-diagnostics crop --corpus people --profile canada-passport --variant print --output artifacts/diagnostics/crop
+```
+
 #### Available Presets
 
 | Preset                          | Target Size | Use Case                   |
@@ -151,7 +161,7 @@ Install-Package FaceOFFx
 
 ## Sample Gallery
 
-See the power of FaceOFFx with these real-world examples demonstrating our four quality presets. Additional samples for all images and presets are available in the `docs/samples/` directory.
+See the low-level PIV processing capabilities of FaceOFFx with these reference examples. Additional samples are available in the `docs/samples/` directory.
 
 | Quality Preset            | Original                                                                                                                          | PIV Processed                                                                                                                          | ROI Visualization                                                                                                      |
 |---------------------------|-----------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|

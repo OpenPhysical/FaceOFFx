@@ -32,8 +32,11 @@ dotnet build
 # Run tests
 dotnet test
 
-# Run the CLI
-dotnet run --project src/FaceOFFx.Cli -- process sample.jpg
+# Run the release CLI
+dotnet run --project src/FaceOFFx.Cli -- us-passport sample.jpg --variant digital
+
+# Run the diagnostics CLI
+dotnet run --project src/FaceOFFx.Diagnostics.Cli -- detect --corpus people --output artifacts/diagnostics/detect
 ```
 
 ## Code Style Guidelines

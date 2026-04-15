@@ -1,27 +1,19 @@
-# FaceOFFx v2.1 Quality Validation Summary
+# FaceOFFx Diagnostics Validation Summary
 
 ## Overview
 
-This document summarizes the comprehensive quality validation improvements implemented in FaceOFFx v2.1, providing human-in-the-loop validation capabilities for the ISO/IEC 19794-5 quality assessment system.
+This document summarizes the current diagnostics-oriented validation approach in FaceOFFx. The normal release CLI is document-only; engineering validation now runs through `faceoffx-diagnostics` and the tracked people corpus.
 
 ## Completed Features
 
-### 1. Visual Quality Overlay System ✅
+### 1. Corpus-Based Detection and Overlay ✅
 
-**Implementation**: `QualityVisualizationService`
-
-The `--visual` flag on the quality command now generates overlay images showing:
-- **Quality Score Panel**: Real-time scores with color-coded bars
-- **Violation Indicators**: Visual highlighting of quality issues
-  - Sharpness: Edge blur indicators
-  - Illumination: Gradient overlays
-  - Geometry: Center crosshair and expected regions
-  - Pose: Rotation arc indicators
-- **Compliance Badge**: Green checkmark or red X
+The diagnostics CLI now supports batch face detection, landmark extraction, reverse-projected overlays, and profile-specific crop rendering over the canonical people corpus.
 
 **Usage**:
 ```bash
-faceoffx quality -i photo.jpg --visual
+faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
+faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
 ```
 
 ### 2. Test Image Infrastructure ✅
@@ -38,22 +30,14 @@ faceoffx quality -i photo.jpg --visual
   - Size and position variations
   - Illumination and contrast changes
 
-### 3. Batch Quality Assessment ✅
+### 3. Batch Crop Rendering ✅
 
-**Script**: `batch-quality-test.sh`
-
-Features:
-- Processes entire directories of images
-- Generates multiple output formats:
-  - CSV with all quality scores
-  - HTML report with interactive tables
-  - Individual JSON results
-  - Visual overlay images
-- Summary statistics and compliance rates
+The diagnostics CLI can render the same crops used by the release workflows, but in batch, against a corpus or a path.
 
 **Usage**:
 ```bash
-./scripts/batch-quality-test.sh ./test-images ./test-results
+faceoffx-diagnostics crop --corpus people --profile piv --variant digital --output artifacts/diagnostics/crop
+faceoffx-diagnostics crop --corpus people --profile canada-passport --variant print --output artifacts/diagnostics/crop
 ```
 
 ### 4. Human Review Dashboard ✅
@@ -72,20 +56,10 @@ Interactive features:
 ./scripts/quality-review-dashboard.sh
 ```
 
-### 5. Interactive CLI Mode ✅
-
-**Command**: `faceoffx interactive`
-
-Provides guided workflows for:
-- Single image processing with step-by-step options
-- Quality assessment with visual feedback
-- Batch processing with progress tracking
-- Settings configuration
-
 ### 6. Comprehensive Documentation ✅
 
 **Documents Created**:
-- `QUALITY_VALIDATION_PLAN.md`: Complete validation strategy
+- `QUALITY_VALIDATION_PLAN.md`: Current diagnostics validation strategy
 - `CHANGELOG.md`: Updated with all v2.1 features
 - `VALIDATION_SUMMARY.md`: This summary document
 
@@ -108,28 +82,24 @@ Provides guided workflows for:
 
 ### Recommended Process
 
-1. **Setup Test Images**
+1. **Use the canonical people corpus**
    ```bash
-   ./scripts/setup-test-images.sh
-   cd test-images/quality-validation
-   python download_synthetic_faces.py
+   ls tests/test-images/people
    ```
 
-2. **Apply Variations**
+2. **Run detection verification**
    ```bash
-   ./apply-quality-variations.sh synthetic_faces variations
+   faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
    ```
 
-3. **Run Batch Assessment**
+3. **Generate overlays**
    ```bash
-   ./scripts/batch-quality-test.sh variations ../test-results
+   faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
    ```
 
-4. **Review Results**
+4. **Render workflow crops**
    ```bash
-   ./scripts/quality-review-dashboard.sh
-   # Or open HTML report directly
-   open test-results/quality_report.html
+   faceoffx-diagnostics crop --corpus people --profile canada-passport --variant print --output artifacts/diagnostics/crop
    ```
 
 5. **Export Reports**
@@ -139,34 +109,23 @@ Provides guided workflows for:
 
 ## Key Benefits
 
-1. **Transparency**: Visual overlays make quality issues immediately apparent
-2. **Efficiency**: Batch processing handles large datasets automatically
-3. **Accuracy**: Human review catches edge cases and validates assessments
-4. **Traceability**: All reviews are tracked with timestamps and reviewer info
-5. **Flexibility**: Multiple validation approaches for different use cases
+1. **Transparency**: Overlays and manifests make detection and crop behavior visible
+2. **Efficiency**: Corpus-wide batch commands handle review quickly
+3. **Traceability**: Verification output is written to manifests and generated artifacts
+4. **Parity**: Diagnostics crop rendering reuses the same workflow logic as the release CLI
 
 ## Performance Metrics
 
-- Visual overlay generation: ~50-100ms per image
-- Batch processing: ~10-20 images per second
-- HTML report generation: <1 second for 100 images
-- Memory usage: <50MB per concurrent assessment
+- Batch detection and crop runs are bounded by model load and image processing cost
+- Performance tuning should focus on reuse of detection and render logic, not on duplicated CLI paths
 
 ## Future Enhancements
 
-While not implemented in v2.1, potential improvements include:
-- Machine learning feedback loop from human reviews
-- Automated threshold adjustment based on validation data
-- Integration with cloud storage for distributed review
-- Real-time collaborative review features
-- Advanced analytics dashboard
+Potential improvements:
+- richer overlay guides per document workflow
+- stronger corpus expectation metadata in `corpus.json`
+- automated golden-image diffs for diagnostics overlays
 
 ## Conclusion
 
-The FaceOFFx v2.1 validation system provides a complete solution for ensuring quality assessment accuracy through:
-- Automated testing with comprehensive coverage
-- Visual feedback for immediate understanding
-- Human-in-the-loop validation for edge cases
-- Detailed tracking and reporting capabilities
-
-This combination ensures that the ISO/IEC 19794-5 quality assessments are both accurate and trustworthy for production use.
+The current validation path is simpler: release behavior is document-only, and engineering validation lives in `faceoffx-diagnostics` plus behavior-heavy core/infrastructure tests.

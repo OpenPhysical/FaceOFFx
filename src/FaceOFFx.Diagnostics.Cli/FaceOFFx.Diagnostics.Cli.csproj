@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>faceoffx-diagnostics</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>faceoffx-diagnostics</ToolCommandName>
+    <PackageId>FaceOFFx.Diagnostics.Cli</PackageId>
+    <Product>FaceOFFx Diagnostics CLI</Product>
+    <Description>Engineering and diagnostics CLI for FaceOFFx facial detection, overlays, crops, and corpus verification.</Description>
+    <PackageTags>face-detection;diagnostics;biometrics;onnx;cli;dotnet-tool</PackageTags>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FaceOFFx.Core\FaceOFFx.Core.csproj" />
+    <ProjectReference Include="..\FaceOFFx.Infrastructure\FaceOFFx.Infrastructure.csproj" />
+    <ProjectReference Include="..\FaceOFFx.Models\FaceOFFx.Models.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="JetBrains.Annotations" Version="2025.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.7" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
+    <PackageReference Include="Spectre.Console" Version="0.53.1" />
+    <PackageReference Include="Spectre.Console.Cli" Version="0.53.1" />
+    <PackageReference Include="Spectre.Console.Cli.Extensions.DependencyInjection" Version="0.10.1-preview.0.1" />
+  </ItemGroup>
+</Project>

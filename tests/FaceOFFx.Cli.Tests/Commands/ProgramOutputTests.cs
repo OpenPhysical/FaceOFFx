@@ -40,11 +40,7 @@ public class ProgramOutputTests : IntegrationTestBase
             "net8.0",
             "faceoffx.dll");
 
-        _testImagePath = Path.Combine(
-            searchDir.FullName,
-            "tests",
-            "sample_images",
-            "generic_guy.png");
+        _testImagePath = PeopleCorpus.SubjectSource("generic-guy", "png");
     }
 
     [Test]

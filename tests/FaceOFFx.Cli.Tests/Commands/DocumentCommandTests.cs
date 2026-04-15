@@ -40,24 +40,20 @@ public class DocumentCommandTests : IntegrationTestBase
             "net8.0",
             "faceoffx.dll");
 
-        _testImagePath = Path.Combine(
-            searchDir.FullName,
-            "tests",
-            "sample_images",
-            "generic_guy.png");
+        _testImagePath = PeopleCorpus.SubjectSource("generic-guy", "png");
     }
 
-    [TestCase("us-passport", null, "generic_guy.us-passport.print.jpeg")]
-    [TestCase("us-permanent-resident", null, "generic_guy.us-permanent-resident.print.jpeg")]
-    [TestCase("canada-passport", null, "generic_guy.canada-passport.print.jpeg")]
-    [TestCase("canada-permanent-resident", null, "generic_guy.canada-permanent-resident.print.jpeg")]
-    [TestCase("canada-citizenship-grant", null, "generic_guy.canada-citizenship-grant.print.jpeg")]
-    [TestCase("canada-proof-of-citizenship", null, "generic_guy.canada-proof-of-citizenship.print.jpeg")]
-    [TestCase("us-passport", "digital", "generic_guy.us-passport.digital.jpeg")]
-    [TestCase("us-permanent-resident", "digital", "generic_guy.us-permanent-resident.digital.jpeg")]
-    [TestCase("canada-permanent-resident", "digital", "generic_guy.canada-permanent-resident.digital.jpeg")]
-    [TestCase("canada-citizenship-grant", "digital", "generic_guy.canada-citizenship-grant.digital.jpeg")]
-    [TestCase("canada-proof-of-citizenship", "digital", "generic_guy.canada-proof-of-citizenship.digital.jpeg")]
+    [TestCase("us-passport", null, "source.us-passport.print.jpeg")]
+    [TestCase("us-permanent-resident", null, "source.us-permanent-resident.print.jpeg")]
+    [TestCase("canada-passport", null, "source.canada-passport.print.jpeg")]
+    [TestCase("canada-permanent-resident", null, "source.canada-permanent-resident.print.jpeg")]
+    [TestCase("canada-citizenship-grant", null, "source.canada-citizenship-grant.print.jpeg")]
+    [TestCase("canada-proof-of-citizenship", null, "source.canada-proof-of-citizenship.print.jpeg")]
+    [TestCase("us-passport", "digital", "source.us-passport.digital.jpeg")]
+    [TestCase("us-permanent-resident", "digital", "source.us-permanent-resident.digital.jpeg")]
+    [TestCase("canada-permanent-resident", "digital", "source.canada-permanent-resident.digital.jpeg")]
+    [TestCase("canada-citizenship-grant", "digital", "source.canada-citizenship-grant.digital.jpeg")]
+    [TestCase("canada-proof-of-citizenship", "digital", "source.canada-proof-of-citizenship.digital.jpeg")]
     public async Task DocumentCommand_WritesExpectedArtifactAndProvenance(
         string command,
         string? variant,
@@ -74,7 +70,7 @@ public class DocumentCommandTests : IntegrationTestBase
 
         exitCode.Should().Be(0);
         File.Exists(Path.Combine(outputDir, expectedArtifactName)).Should().BeTrue();
-        File.Exists(Path.Combine(outputDir, $"generic_guy.{command}.provenance.json")).Should().BeTrue();
+        File.Exists(Path.Combine(outputDir, $"source.{command}.provenance.json")).Should().BeTrue();
 
         if (command.StartsWith("canada-", StringComparison.OrdinalIgnoreCase) && string.Equals(variant, "digital", StringComparison.OrdinalIgnoreCase))
         {

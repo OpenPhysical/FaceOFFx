@@ -40,11 +40,7 @@ public class PivCommandTests : IntegrationTestBase
             "net8.0",
             "faceoffx.dll");
 
-        _testImagePath = Path.Combine(
-            searchDir.FullName,
-            "tests",
-            "sample_images",
-            "generic_guy.png");
+        _testImagePath = PeopleCorpus.SubjectSource("generic-guy", "png");
     }
 
     [Test]
@@ -57,12 +53,12 @@ public class PivCommandTests : IntegrationTestBase
             $"piv \"{_testImagePath}\" --output-dir \"{outputDir}\"");
 
         exitCode.Should().Be(0);
-        File.Exists(Path.Combine(outputDir, "generic_guy.piv.jp2")).Should().BeTrue();
-        File.Exists(Path.Combine(outputDir, "generic_guy.piv.print.jpg")).Should().BeTrue();
-        File.Exists(Path.Combine(outputDir, "generic_guy.piv.provenance.json")).Should().BeTrue();
+        File.Exists(Path.Combine(outputDir, "source.piv.jp2")).Should().BeTrue();
+        File.Exists(Path.Combine(outputDir, "source.piv.print.jpg")).Should().BeTrue();
+        File.Exists(Path.Combine(outputDir, "source.piv.provenance.json")).Should().BeTrue();
 
         var provenance = await File.ReadAllTextAsync(
-            Path.Combine(outputDir, "generic_guy.piv.provenance.json"));
+            Path.Combine(outputDir, "source.piv.provenance.json"));
 
         provenance.Should().Contain("sp800-76-2-table12-note4");
         provenance.Should().Contain("fips201-3-4.2.3.1");

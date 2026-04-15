@@ -1,0 +1,24 @@
+{
+  "id": "people",
+  "subjects": [
+    { "id": "generic-guy", "source": "generic-guy/source.png", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "bush", "source": "bush/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "johnson", "source": "johnson/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "starmer", "source": "starmer/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "carter", "source": "carter/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-01", "source": "person-01/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-02", "source": "person-02/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-03", "source": "person-03/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-04", "source": "person-04/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-05", "source": "person-05/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-06", "source": "person-06/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-07", "source": "person-07/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-08", "source": "person-08/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-09", "source": "person-09/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-10", "source": "person-10/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-11", "source": "person-11/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-12", "source": "person-12/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-13", "source": "person-13/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "person-14", "source": "person-14/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true }
+  ]
+}

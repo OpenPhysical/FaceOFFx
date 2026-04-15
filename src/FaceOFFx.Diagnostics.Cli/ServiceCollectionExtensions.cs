@@ -1,5 +1,6 @@
-using FaceOFFx.Cli.Commands;
 using FaceOFFx.Core.Abstractions;
+using FaceOFFx.Diagnostics.Cli.Commands;
+using FaceOFFx.Diagnostics.Cli.Services;
 using FaceOFFx.Infrastructure.Services;
 using JetBrains.Annotations;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,23 +8,21 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
 
-namespace FaceOFFx.Cli;
+namespace FaceOFFx.Diagnostics.Cli;
 
 /// <summary>
-/// Extension methods for registering FaceOFFx CLI services
+/// Registers FaceOFFx diagnostics CLI services and commands.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers all FaceOFFx services.
+    /// Adds runtime services and diagnostics command registrations.
     /// </summary>
     [UsedImplicitly]
-    public static IServiceCollection AddFaceOffxCli(this IServiceCollection services)
+    public static IServiceCollection AddFaceOffxDiagnosticsCli(this IServiceCollection services)
     {
-        // Note: Cannot log during service registration as services aren't built yet
         services.TryAddSingleton<IAnsiConsole>(AnsiConsole.Console);
 
-        // Register core services as Scoped to avoid early instantiation
         services.AddScoped<IFaceDetector>(sp =>
         {
             var detectorLogger = sp.GetRequiredService<ILogger<RetinaFaceDetector>>();
@@ -36,14 +35,12 @@ public static class ServiceCollectionExtensions
             return new OnnxLandmarkExtractor(extractorLogger);
         });
 
-        // Use Transient for Jpeg2000EncoderService to avoid static cleanup issues
         services.AddTransient<IJpeg2000Encoder>(sp =>
         {
             var encoderLogger = sp.GetRequiredService<ILogger<Jpeg2000EncoderService>>();
             return new Jpeg2000EncoderService(encoderLogger);
         });
 
-        // Register quality assessor
         services.AddScoped<IQualityAssessor>(sp =>
         {
             var assessorLogger = sp.GetRequiredService<ILogger<QualityAssessor>>();
@@ -54,16 +51,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<FaceGeometryPipeline>();
         services.AddScoped<DocumentRenderService>();
         services.AddScoped<DocumentJobRunner>();
+        services.AddScoped<DiagnosticsCorpusService>();
+        services.AddScoped<DiagnosticsBatchService>();
 
-        // Register CLI commands
-        services.AddTransient<PivCommand>();
-        services.AddTransient<UsPassportCommand>();
-        services.AddTransient<UsPermanentResidentPhotoCommand>();
-        services.AddTransient<CanadaPassportCommand>();
-        services.AddTransient<CanadaPermanentResidentCardCommand>();
-        services.AddTransient<CanadaCitizenshipGrantCommand>();
-        services.AddTransient<CanadaProofOfCitizenshipCommand>();
-        services.AddTransient<DocumentsCommand>();
+        services.AddTransient<DetectCommand>();
+        services.AddTransient<CropCommand>();
+        services.AddTransient<SharpnessBlurCommand>();
+        services.AddTransient<SharpnessMeasureCommand>();
+        services.AddTransient<SharpnessCleanCommand>();
+
         return services;
     }
 }

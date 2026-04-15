@@ -43,7 +43,4 @@
       Version="9.0.7"
     />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="FaceOFFx.Cli.Tests" />
-  </ItemGroup>
 </Project>

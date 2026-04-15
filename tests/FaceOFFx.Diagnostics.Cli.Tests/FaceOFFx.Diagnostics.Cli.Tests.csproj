@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FaceOFFx.Tests.Common\FaceOFFx.Tests.Common.csproj" />
+    <ProjectReference Include="..\..\src\FaceOFFx.Diagnostics.Cli\FaceOFFx.Diagnostics.Cli.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" Version="9.1.0" />
+    <PackageReference Include="NUnit" Version="4.0.1" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+    <PackageReference Include="Spectre.Console.Testing" Version="0.53.1" />
+    <PackageReference Update="coverlet.collector" Version="6.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>
