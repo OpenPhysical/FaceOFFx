@@ -25,9 +25,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
-using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Core.Domain.Quality.Assessors;
+using FaceOFFx.Core.Domain.Transformations;
 using JetBrains.Annotations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -45,153 +46,136 @@ public static class QualityAssessmentPipeline
     /// <summary>
     /// Performs a complete quality assessment on a facial image
     /// </summary>
-    public static async Task<Result<Iso19794Assessment>> AssessAsync(
+    public static async Task<Result<Iso19794Assessment, PipelineError>> AssessAsync(
         Image<Rgba32> image,
         DetectedFace face,
         FaceLandmarks68 landmarks,
         QualityAssessmentOptions options)
     {
-        // Validate options
         var optionsValidation = options.Validate();
         if (optionsValidation.IsFailure)
         {
-            return Result.Failure<Iso19794Assessment>($"Invalid assessment options: {optionsValidation.Error}");
+            return Result.Failure<Iso19794Assessment, PipelineError>(
+                new ValidationError($"Invalid assessment options: {optionsValidation.Error}", options.Standard.Name));
         }
-        
-        if (options.EnableParallelAssessment)
-        {
-            return await AssessParallelAsync(image, face, landmarks, options);
-        }
-        
-        return await AssessSequentialAsync(image, face, landmarks, options);
+
+        return options.EnableParallelAssessment
+            ? await AssessParallelAsync(image, face, landmarks, options).ConfigureAwait(false)
+            : await AssessSequentialAsync(image, face, landmarks, options).ConfigureAwait(false);
     }
-    
-    private static async Task<Result<Iso19794Assessment>> AssessParallelAsync(
+
+    private static async Task<Result<Iso19794Assessment, PipelineError>> AssessParallelAsync(
         Image<Rgba32> image,
         DetectedFace face,
         FaceLandmarks68 landmarks,
         QualityAssessmentOptions options)
     {
-        // Calculate face ROI for focused sharpness assessment
-        Rectangle? faceRoi = null;
-        try
-        {
-            faceRoi = landmarks.CalculateFaceRoi();
-            
-            // Ensure ROI doesn't exceed image boundaries
-            faceRoi = Rectangle.Intersect(faceRoi.Value, new Rectangle(0, 0, image.Width, image.Height));
-            
-            // If intersection results in empty rectangle, use null (full image)
-            if (faceRoi.Value.Width <= 0 || faceRoi.Value.Height <= 0)
-            {
-                faceRoi = null;
-            }
-        }
-        catch (Exception)
-        {
-            // If face ROI calculation fails, fall back to full image analysis
-            faceRoi = null;
-        }
-        
-        // Run assessments in parallel for better performance
+        var faceRoi = GetFaceRoi(image, landmarks);
         var symmetryTask = Task.Run(() => SymmetryAssessor.Assess(image, landmarks));
-        var sharpnessTask = Task.Run(() => SharpnessAssessor.Assess(image, faceRoi));
-        var geometryTask = Task.Run(() => 
+        var sharpnessTask = Task.Run(() => AssessSharpness(image, faceRoi));
+        var geometryTask = Task.Run(() =>
             GeometryAssessor.Assess(
                 new ImageDimensions(image.Width, image.Height),
                 landmarks,
                 options.Standard));
-        
-        await Task.WhenAll(symmetryTask, sharpnessTask, geometryTask);
-        
+
+        await Task.WhenAll(symmetryTask, sharpnessTask, geometryTask).ConfigureAwait(false);
+
         return CombineResults(
-            await symmetryTask,
-            await sharpnessTask,
-            await geometryTask,
+            await symmetryTask.ConfigureAwait(false),
+            await sharpnessTask.ConfigureAwait(false),
+            await geometryTask.ConfigureAwait(false),
             options);
     }
-    
-    private static async Task<Result<Iso19794Assessment>> AssessSequentialAsync(
+
+    private static Task<Result<Iso19794Assessment, PipelineError>> AssessSequentialAsync(
         Image<Rgba32> image,
         DetectedFace face,
         FaceLandmarks68 landmarks,
         QualityAssessmentOptions options)
     {
-        // Calculate face ROI for focused sharpness assessment
-        Rectangle? faceRoi = null;
-        try
-        {
-            faceRoi = landmarks.CalculateFaceRoi();
-            
-            // Ensure ROI doesn't exceed image boundaries
-            faceRoi = Rectangle.Intersect(faceRoi.Value, new Rectangle(0, 0, image.Width, image.Height));
-            
-            // If intersection results in empty rectangle, use null (full image)
-            if (faceRoi.Value.Width <= 0 || faceRoi.Value.Height <= 0)
-            {
-                faceRoi = null;
-            }
-        }
-        catch (Exception)
-        {
-            // If face ROI calculation fails, fall back to full image analysis
-            faceRoi = null;
-        }
-        
+        var faceRoi = GetFaceRoi(image, landmarks);
         var symmetryResult = SymmetryAssessor.Assess(image, landmarks);
-        if (symmetryResult.IsFailure)
-            return Result.Failure<Iso19794Assessment>($"Symmetry assessment failed: {symmetryResult.Error}");
-        
-        var sharpnessResult = SharpnessAssessor.Assess(image, faceRoi);
-        if (sharpnessResult.IsFailure)
-            return Result.Failure<Iso19794Assessment>($"Sharpness assessment failed: {sharpnessResult.Error}");
-        
+        var sharpnessResult = AssessSharpness(image, faceRoi);
         var geometryResult = GeometryAssessor.Assess(
             new ImageDimensions(image.Width, image.Height),
             landmarks,
             options.Standard);
-        if (geometryResult.IsFailure)
-            return Result.Failure<Iso19794Assessment>($"Geometry assessment failed: {geometryResult.Error}");
-        
-        return await Task.FromResult(CombineResults(
+
+        return Task.FromResult(CombineResults(
             symmetryResult,
             sharpnessResult,
             geometryResult,
             options));
     }
-    
-    private static Result<Iso19794Assessment> CombineResults(
+
+    private static Result<Iso19794Assessment, PipelineError> CombineResults(
         Result<FacialSymmetryScore> symmetryResult,
         Result<SharpnessScore> sharpnessResult,
         Result<GeometricCompliance> geometryResult,
         QualityAssessmentOptions options)
     {
-        // Check if all results are successful
-        var combinedResult = Result.Combine(symmetryResult, sharpnessResult, geometryResult);
-        if (combinedResult.IsFailure)
+        var symmetry = symmetryResult.ToPipelineResult(
+            error => new ValidationError($"Symmetry assessment failed: {error}", options.Standard.Name));
+        if (symmetry.IsFailure)
         {
-            return Result.Failure<Iso19794Assessment>(combinedResult.Error);
+            return Result.Failure<Iso19794Assessment, PipelineError>(symmetry.Error);
         }
-        
-        var symmetry = symmetryResult.Value;
-        var sharpness = sharpnessResult.Value;
-        var geometry = geometryResult.Value;
-        
-        // Collect violations
-        var violations = CollectViolations(symmetry, sharpness, geometry, options);
-        
-        // Calculate overall score with weighted components
-        var overallScore = CalculateOverallScore(symmetry, sharpness, geometry);
-        
-        return overallScore.Map(score => new Iso19794Assessment(
-            score,
-            symmetry,
-            sharpness,
-            geometry,
+
+        var sharpness = sharpnessResult.ToPipelineResult(
+            error => new ValidationError($"Sharpness assessment failed: {error}", options.Standard.Name));
+        if (sharpness.IsFailure)
+        {
+            return Result.Failure<Iso19794Assessment, PipelineError>(sharpness.Error);
+        }
+
+        var geometry = geometryResult.ToPipelineResult(
+            error => new ValidationError($"Geometry assessment failed: {error}", options.Standard.Name));
+        if (geometry.IsFailure)
+        {
+            return Result.Failure<Iso19794Assessment, PipelineError>(geometry.Error);
+        }
+
+        var overallScore = CalculateOverallScore(symmetry.Value, sharpness.Value, geometry.Value)
+            .ToPipelineResult(error => new ValidationError($"Overall quality score calculation failed: {error}", options.Standard.Name));
+        if (overallScore.IsFailure)
+        {
+            return Result.Failure<Iso19794Assessment, PipelineError>(overallScore.Error);
+        }
+
+        var violations = CollectViolations(symmetry.Value, sharpness.Value, geometry.Value, options);
+
+        return Result.Success<Iso19794Assessment, PipelineError>(new Iso19794Assessment(
+            overallScore.Value,
+            symmetry.Value,
+            sharpness.Value,
+            geometry.Value,
             violations,
             DateTime.UtcNow));
     }
-    
+
+    private static Maybe<Rectangle> GetFaceRoi(Image<Rgba32> image, FaceLandmarks68 landmarks)
+    {
+        var faceRoiResult = landmarks.CalculateFaceRoi();
+        if (faceRoiResult.IsFailure)
+        {
+            return Maybe<Rectangle>.None;
+        }
+
+        var faceRoi = Rectangle.Intersect(
+            faceRoiResult.Value,
+            new Rectangle(0, 0, image.Width, image.Height));
+
+        return faceRoi.Width > 0 && faceRoi.Height > 0
+            ? Maybe<Rectangle>.From(faceRoi)
+            : Maybe<Rectangle>.None;
+    }
+
+    private static Result<SharpnessScore> AssessSharpness(Image<Rgba32> image, Maybe<Rectangle> faceRoi) =>
+        faceRoi.HasValue
+            ? SharpnessAssessor.Assess(image, faceRoi.Value)
+            : SharpnessAssessor.Assess(image);
+
     private static List<ComplianceViolation> CollectViolations(
         FacialSymmetryScore symmetry,
         SharpnessScore sharpness,
@@ -199,8 +183,7 @@ public static class QualityAssessmentPipeline
         QualityAssessmentOptions options)
     {
         var violations = new List<ComplianceViolation>();
-        
-        // Symmetry violations
+
         if (symmetry.Overall.Value < 0.6f)
         {
             violations.Add(new ComplianceViolation(
@@ -208,7 +191,7 @@ public static class QualityAssessmentPipeline
                 $"Facial symmetry score {symmetry.Overall} is below acceptable threshold",
                 symmetry.Overall.Value < 0.4f ? ViolationSeverity.Critical : ViolationSeverity.Moderate));
         }
-        
+
         if (symmetry.Illumination.Value < 0.5f)
         {
             violations.Add(new ComplianceViolation(
@@ -216,7 +199,7 @@ public static class QualityAssessmentPipeline
                 "Uneven illumination detected",
                 ViolationSeverity.Moderate));
         }
-        
+
         if (symmetry.Pose.Value < 0.5f)
         {
             violations.Add(new ComplianceViolation(
@@ -224,8 +207,7 @@ public static class QualityAssessmentPipeline
                 "Non-frontal pose detected",
                 ViolationSeverity.Moderate));
         }
-        
-        // Sharpness violations
+
         if (sharpness.Overall.Value < 0.5f)
         {
             violations.Add(new ComplianceViolation(
@@ -233,8 +215,7 @@ public static class QualityAssessmentPipeline
                 $"Image sharpness {sharpness.Overall} is below acceptable threshold",
                 sharpness.Overall.Value < 0.3f ? ViolationSeverity.Critical : ViolationSeverity.Moderate));
         }
-        
-        // Check regional sharpness
+
         foreach (var (region, score) in sharpness.RegionalScores)
         {
             var normalizedRegionScore = NormalizeRegionalSharpness(score);
@@ -246,8 +227,7 @@ public static class QualityAssessmentPipeline
                     ViolationSeverity.Critical));
             }
         }
-        
-        // Geometry violations
+
         if (geometry.HeadSize.Value < 0.7f)
         {
             violations.Add(new ComplianceViolation(
@@ -255,7 +235,7 @@ public static class QualityAssessmentPipeline
                 $"Head size ratio {geometry.HeadSize} is outside acceptable range",
                 geometry.HeadSize.Value < 0.5f ? ViolationSeverity.Critical : ViolationSeverity.Moderate));
         }
-        
+
         if (geometry.Centering.Value < 0.7f)
         {
             violations.Add(new ComplianceViolation(
@@ -263,7 +243,7 @@ public static class QualityAssessmentPipeline
                 "Face is not properly centered in the image",
                 ViolationSeverity.Moderate));
         }
-        
+
         if (geometry.InterPupillaryDistance.Value < 0.8f)
         {
             violations.Add(new ComplianceViolation(
@@ -271,13 +251,12 @@ public static class QualityAssessmentPipeline
                 "Inter-pupillary distance is outside acceptable range",
                 ViolationSeverity.Minor));
         }
-        
-        // Dimension violations
+
         var actualDims = geometry.ActualDimensions;
         var expectedDims = geometry.ExpectedDimensions;
         var widthRatio = (float)actualDims.Width / expectedDims.Width;
         var heightRatio = (float)actualDims.Height / expectedDims.Height;
-        
+
         if (MathF.Abs(widthRatio - 1f) > 0.1f || MathF.Abs(heightRatio - 1f) > 0.1f)
         {
             violations.Add(new ComplianceViolation(
@@ -285,25 +264,24 @@ public static class QualityAssessmentPipeline
                 $"Image dimensions {actualDims.Width}x{actualDims.Height} differ from expected {expectedDims.Width}x{expectedDims.Height}",
                 ViolationSeverity.Minor));
         }
-        
+
         return violations;
     }
-    
+
     private static Result<QualityScore> CalculateOverallScore(
         FacialSymmetryScore symmetry,
         SharpnessScore sharpness,
         GeometricCompliance geometry)
     {
-        // Weight different components
         const float symmetryWeight = 0.3f;
         const float sharpnessWeight = 0.3f;
         const float geometryWeight = 0.4f;
-        
-        var weightedScore = 
+
+        var weightedScore =
             symmetry.Overall.Value * symmetryWeight +
             sharpness.Overall.Value * sharpnessWeight +
             geometry.Overall.Value * geometryWeight;
-        
+
         return QualityScore.Create(weightedScore);
     }
 

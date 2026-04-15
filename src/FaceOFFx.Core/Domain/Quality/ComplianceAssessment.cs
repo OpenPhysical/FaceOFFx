@@ -23,6 +23,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 
 namespace FaceOFFx.Core.Domain.Quality;
@@ -174,7 +175,7 @@ public record SymmetryCompliance(
     float IlluminationAsymmetryPercent,
     float PoseAsymmetryPercent,
     float RequiredThreshold,
-    RejectionReason? Rejection = null,
+    Maybe<RejectionReason> Rejection = default,
     bool CountsTowardsCompliance = true);
 
 /// <summary>
@@ -186,7 +187,7 @@ public record SharpnessCompliance(
     float OverallSharpnessPercent,
     float RequiredThreshold,
     IReadOnlyDictionary<string, float> RegionalScores,
-    RejectionReason? Rejection = null);
+    Maybe<RejectionReason> Rejection = default);
 
 /// <summary>
 /// Head size compliance assessment
@@ -197,7 +198,7 @@ public record HeadSizeCompliance(
     float SizePercent,
     float MinPercent,
     float MaxPercent,
-    RejectionReason? Rejection = null);
+    Maybe<RejectionReason> Rejection = default);
 
 /// <summary>
 /// Centering compliance assessment
@@ -207,7 +208,7 @@ public record CenteringCompliance(
     bool Passed,
     float CenteringPercent,
     float RequiredThreshold,
-    RejectionReason? Rejection = null);
+    Maybe<RejectionReason> Rejection = default);
 
 /// <summary>
 /// Inter-pupillary distance compliance assessment
@@ -218,7 +219,7 @@ public record IpdCompliance(
     float DistancePixels,
     float MinPixels,
     float MaxPixels,
-    RejectionReason? Rejection = null,
+    Maybe<RejectionReason> Rejection = default,
     bool CountsTowardsCompliance = true);
 
 /// <summary>
@@ -230,7 +231,7 @@ public record GeometryCompliance(
     HeadSizeCompliance HeadSize,
     CenteringCompliance Centering,
     IpdCompliance InterPupillaryDistance,
-    RejectionReason? Rejection = null);
+    Maybe<RejectionReason> Rejection = default);
 
 /// <summary>
 /// Complete compliance assessment with clear pass/fail per metric

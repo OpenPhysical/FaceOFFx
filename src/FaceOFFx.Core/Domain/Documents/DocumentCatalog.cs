@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FaceOFFx.Core.Domain.Common;
 
 namespace FaceOFFx.Core.Domain.Documents;
 
@@ -440,28 +441,20 @@ public static class DocumentCatalog
     /// <summary>
     /// Gets an input capture profile used by a shipped document.
     /// </summary>
-    public static InputProfileDefinition GetInputProfileOrThrow(string profileId)
-    {
-        if (InputProfiles.TryGetValue(profileId, out var profile))
-        {
-            return profile;
-        }
-
-        throw new InvalidOperationException($"Unknown input profile '{profileId}'.");
-    }
+    public static Result<InputProfileDefinition, PipelineError> GetInputProfile(string profileId) =>
+        InputProfiles.TryGetValue(profileId, out var profile)
+            ? Result.Success<InputProfileDefinition, PipelineError>(profile)
+            : Result.Failure<InputProfileDefinition, PipelineError>(
+                new ConfigurationError($"Unknown input profile '{profileId}'.", profileId));
 
     /// <summary>
     /// Gets a portrait spec used by a shipped deliverable.
     /// </summary>
-    public static PassportPhotoSpec GetPassportPhotoSpecOrThrow(string specId)
-    {
-        if (PortraitSpecs.TryGetValue(specId, out var spec))
-        {
-            return spec;
-        }
-
-        throw new InvalidOperationException($"Unknown portrait spec '{specId}'.");
-    }
+    public static Result<PassportPhotoSpec, PipelineError> GetPassportPhotoSpec(string specId) =>
+        PortraitSpecs.TryGetValue(specId, out var spec)
+            ? Result.Success<PassportPhotoSpec, PipelineError>(spec)
+            : Result.Failure<PassportPhotoSpec, PipelineError>(
+                new ConfigurationError($"Unknown portrait spec '{specId}'.", specId));
 
     /// <summary>
     /// Looks up a document workflow by identifier.
@@ -470,16 +463,13 @@ public static class DocumentCatalog
         Documents.TryGetValue(documentId, out document!);
 
     /// <summary>
-    /// Gets a document workflow or throws when it is not shipped.
+    /// Gets a document workflow when it is shipped.
     /// </summary>
-    public static DocumentDefinition GetDocumentOrThrow(string documentId)
-    {
-        if (TryGetDocument(documentId, out var document))
-        {
-            return document;
-        }
-
-        throw new InvalidOperationException(
-            $"Unsupported document '{documentId}'. Supported documents: {string.Join(", ", Documents.Keys)}");
-    }
+    public static Result<DocumentDefinition, PipelineError> GetDocument(string documentId) =>
+        TryGetDocument(documentId, out var document)
+            ? Result.Success<DocumentDefinition, PipelineError>(document)
+            : Result.Failure<DocumentDefinition, PipelineError>(
+                new ConfigurationError(
+                    $"Unsupported document '{documentId}'. Supported documents: {string.Join(", ", Documents.Keys)}",
+                    documentId));
 }

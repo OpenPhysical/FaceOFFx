@@ -1,4 +1,6 @@
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Infrastructure.Services;
 using FaceOFFx.Tests.Common;
@@ -23,7 +25,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         var imagePath = PeopleCorpus.SubjectVariant("generic-guy", "rotated_15.png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
-        var result = await FacialImageEncoder.ProcessAsync(imageData);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData));
 
         result.Should().NotBeNull();
         result.ImageData.Should().NotBeEmpty();
@@ -41,7 +43,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         var imagePath = PeopleCorpus.SubjectVariant("generic-guy", "rotated_20.png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
-        var result = await FacialImageEncoder.ProcessAsync(imageData);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData));
 
         result.Should().NotBeNull();
         // Rotation should be clamped to 15 degrees
@@ -62,7 +64,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         {
             MaxRotationDegrees = 5.0f,
         };
-        var result = await FacialImageEncoder.ProcessAsync(imageData, options);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData, options));
 
         result.Should().NotBeNull();
         // Rotation should be clamped to 5 degrees
@@ -78,7 +80,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         var imagePath = PeopleCorpus.SubjectVariant("generic-guy", "rotated_neg10.png");
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
-        var result = await FacialImageEncoder.ProcessAsync(imageData);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData));
 
         result.Should().NotBeNull();
         // The rotation applied is to correct the image, so if the image is rotated -10 degrees,
@@ -105,7 +107,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
             var imagePath = PeopleCorpus.SubjectVariant("generic-guy", fileName);
             var imageData = await File.ReadAllBytesAsync(imagePath);
 
-            var result = await FacialImageEncoder.ProcessAsync(imageData);
+            var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData));
             results[rotation] = result.Metadata.RotationApplied;
         }
 
@@ -134,7 +136,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         {
             MinFaceConfidence = 0.95f,
         };
-        var result = await FacialImageEncoder.ProcessAsync(imageData, options);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData, options));
 
         result.Should().NotBeNull();
         result.Metadata.FaceConfidence.Should().BeGreaterThanOrEqualTo(0.95f);
@@ -154,7 +156,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         {
             MinFaceConfidence = 0.5f,
         };
-        var result = await FacialImageEncoder.ProcessAsync(imageData, options);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData, options));
 
         result.Should().NotBeNull();
         // Should process successfully even with lower threshold
@@ -177,7 +179,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
             MinFaceConfidence = 0.9f,
         };
 
-        var result = await FacialImageEncoder.ProcessAsync(imageData, options);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData, options));
 
         result.Should().NotBeNull();
         // Rotation should be limited to 8 degrees
@@ -196,14 +198,14 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         var imageData = await File.ReadAllBytesAsync(imagePath);
 
         // Test archival preset (has high confidence requirement)
-        var archivalResult = await FacialImageEncoder.ProcessAsync(
+        var archivalResult = ExpectSuccess(await FacialImageEncoder.ProcessAsync(
             imageData,
             ProcessingOptions.Archival
-        );
+        ));
         archivalResult.Metadata.FaceConfidence.Should().BeGreaterThanOrEqualTo(0.95f); // Archival has 0.95 threshold
 
         // Test fast preset (has lower confidence requirement)
-        var fastResult = await FacialImageEncoder.ProcessAsync(imageData, ProcessingOptions.Fast);
+        var fastResult = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData, ProcessingOptions.Fast));
         fastResult.Should().NotBeNull(); // Fast has 0.7 threshold
     }
 
@@ -221,7 +223,7 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         {
             MaxRotationDegrees = 0.0f,
         };
-        var zeroResult = await FacialImageEncoder.ProcessAsync(imageData, zeroRotationOptions);
+        var zeroResult = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData, zeroRotationOptions));
         zeroResult.Metadata.RotationApplied.Should().Be(0.0f);
 
         // Test very high rotation limit
@@ -229,7 +231,13 @@ public class FacialImageEncoderParameterTests : IntegrationTestBase
         {
             MaxRotationDegrees = 45.0f,
         };
-        var highResult = await FacialImageEncoder.ProcessAsync(imageData, highRotationOptions);
+        var highResult = ExpectSuccess(await FacialImageEncoder.ProcessAsync(imageData, highRotationOptions));
         highResult.Should().NotBeNull();
+    }
+
+    private static ProcessingResultDto ExpectSuccess(Result<ProcessingResultDto, PipelineError> result)
+    {
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Message : null);
+        return result.Value;
     }
 }

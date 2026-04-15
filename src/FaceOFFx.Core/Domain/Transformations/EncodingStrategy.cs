@@ -1,4 +1,5 @@
 using FaceOFFx.Core.Abstractions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -72,6 +73,7 @@ public sealed record FixedRateStrategy(float Rate) : EncodingStrategy
                 options.EnableRoi,
                 options.AlignRoi
             )
+            .ToResult()
             .Map(data => new EncodingResult(data, Rate, Maybe<int>.None));
     }
 }

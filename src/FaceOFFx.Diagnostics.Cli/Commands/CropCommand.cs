@@ -35,7 +35,14 @@ internal sealed class CropCommand(
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
-        var subjects = corpusService.ResolveInputs(settings.InputPath, settings.CorpusId);
+        var subjectsResult = corpusService.ResolveInputs(settings.InputPath, settings.CorpusId);
+        if (subjectsResult.IsFailure)
+        {
+            console.MarkupLine($"[red]{Markup.Escape(subjectsResult.Error.Message)}[/]");
+            return 1;
+        }
+
+        var subjects = subjectsResult.Value;
         Directory.CreateDirectory(settings.OutputDirectory);
         var records = new List<object>();
         var failures = new List<string>();
@@ -51,7 +58,7 @@ internal sealed class CropCommand(
                 var result = await diagnostics.CropAsync(subject.InputPath, settings.ProfileId, settings.Variant, subjectOutput, cancellationToken);
                 if (result.IsFailure)
                 {
-                    failures.Add($"{subject.Id}: {result.Error}");
+                    failures.Add($"{subject.Id}: {result.Error.Message}");
                     task.Increment(1);
                     continue;
                 }

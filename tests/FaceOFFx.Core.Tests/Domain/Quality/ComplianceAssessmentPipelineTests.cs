@@ -24,20 +24,18 @@ public class ComplianceAssessmentPipelineTests
         var outputLandmarks = CreateLandmarks(new ImageDimensions(outputPortraitImage.Width, outputPortraitImage.Height), 100f);
         var detectedFace = new DetectedFace(faceBox, 0.99f, Maybe<FaceLandmarks5>.None);
 
-        var inputAssessment = await ComplianceAssessmentPipeline.AssessComplianceAsync(
+        var inputAssessment = await ComplianceAssessmentPipeline.AssessInputComplianceAsync(
             image,
             detectedFace,
             landmarks,
-            "PIV",
-            AssessmentMode.InputValidation);
+            "PIV");
 
-        var outputAssessment = await ComplianceAssessmentPipeline.AssessComplianceAsync(
+        var outputAssessment = await ComplianceAssessmentPipeline.AssessOutputComplianceAsync(
             image,
             detectedFace,
             landmarks,
-            "PIV",
-            AssessmentMode.OutputValidation,
-            new OutputPortraitAssessmentInput(outputPortraitImage, outputLandmarks));
+            new OutputPortraitAssessmentInput(outputPortraitImage, outputLandmarks),
+            "PIV");
 
         inputAssessment.IsSuccess.Should().BeTrue();
         outputAssessment.IsSuccess.Should().BeTrue();
@@ -58,12 +56,11 @@ public class ComplianceAssessmentPipelineTests
         var landmarks = CreateLandmarks(new ImageDimensions(image.Width, image.Height), 210f);
         var detectedFace = new DetectedFace(faceBox, 0.99f, Maybe<FaceLandmarks5>.None);
 
-        var assessment = await ComplianceAssessmentPipeline.AssessComplianceAsync(
+        var assessment = await ComplianceAssessmentPipeline.AssessInputComplianceAsync(
             image,
             detectedFace,
             landmarks,
-            "PIV",
-            AssessmentMode.InputValidation);
+            "PIV");
 
         assessment.IsSuccess.Should().BeTrue();
         assessment.Value.Geometry.InterPupillaryDistance.CountsTowardsCompliance.Should().BeFalse();

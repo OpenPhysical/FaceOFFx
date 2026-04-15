@@ -30,93 +30,52 @@ public sealed class DocumentJobRunner(
     /// <summary>
     /// Runs a single document workflow and writes its artifacts plus provenance.
     /// </summary>
-    public async Task<Result<DocumentJobResult>> RunAsync(
+    /// <summary>
+    /// Runs a single document workflow and writes its artifacts plus provenance.
+    /// </summary>
+    public async Task<Result<DocumentJobResult, PipelineError>> RunAsync(
         DocumentJobRequest request,
         CancellationToken cancellationToken = default)
     {
-        DocumentDefinition document;
-        VariantDefinition variant;
-
-        try
+        var requestContextResult = ResolveRequest(request);
+        if (requestContextResult.IsFailure)
         {
-            document = DocumentCatalog.GetDocumentOrThrow(request.DocumentId);
-            var variantId = request.VariantId ?? document.PrimaryVariantId;
-            if (!document.Variants.TryGetValue(variantId, out variant!))
-            {
-                return Result.Failure<DocumentJobResult>(
-                    $"Unsupported variant '{variantId}' for document '{document.Id}'.");
-            }
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<DocumentJobResult>(ex.Message);
+            return Result.Failure<DocumentJobResult, PipelineError>(requestContextResult.Error);
         }
 
-        if (!File.Exists(request.InputPath))
+        var requestContext = requestContextResult.Value;
+
+        var inputResult = await LoadInputAsync(request, requestContext.OutputDirectory, cancellationToken).ConfigureAwait(false);
+        if (inputResult.IsFailure)
         {
-            return Result.Failure<DocumentJobResult>($"Input file '{request.InputPath}' was not found.");
+            return Result.Failure<DocumentJobResult, PipelineError>(inputResult.Error);
         }
 
-        var outputDirectory = request.OutputDirectory
-            ?? Path.GetDirectoryName(Path.GetFullPath(request.InputPath))
-            ?? Directory.GetCurrentDirectory();
-        Directory.CreateDirectory(outputDirectory);
+        using var sourceImage = inputResult.Value.SourceImage;
 
-        var inputBytes = await File.ReadAllBytesAsync(request.InputPath, cancellationToken).ConfigureAwait(false);
-        using var sourceImage = Image.Load<Rgba32>(inputBytes);
-
-        Maybe<CanonicalFaceGeometry> canonicalGeometry = Maybe<CanonicalFaceGeometry>.None;
-        Result<AutomatedDocumentInputResult> inputCheckResult;
-
-        if (document.WorkflowFamily == DocumentWorkflowFamily.Piv)
-        {
-            inputCheckResult = await EvaluateInputAsync(document, inputBytes).ConfigureAwait(false);
-        }
-        else
-        {
-            var profile = DocumentCatalog.GetInputProfileOrThrow(document.InputProfileId);
-            var geometryResult = await _documentRenderService
-                .AnalyzeSingleFaceAsync(sourceImage, profile, cancellationToken)
-                .ConfigureAwait(false);
-            if (geometryResult.IsFailure)
-            {
-                inputCheckResult = Result.Success(new AutomatedDocumentInputResult(false, geometryResult.Error));
-            }
-            else
-            {
-                canonicalGeometry = Maybe<CanonicalFaceGeometry>.From(geometryResult.Value);
-                var rollDegrees = Math.Abs(FaceGeometryTransformations.CalculateEyeRotation(
-                    geometryResult.Value.SourceLandmarks.LeftEyeCenter,
-                    geometryResult.Value.SourceLandmarks.RightEyeCenter));
-
-                inputCheckResult = rollDegrees > profile.MaxRollDegrees
-                    ? Result.Success(new AutomatedDocumentInputResult(
-                        false,
-                        $"{profile.DisplayName} rejected: eye-line rotation {rollDegrees:F1}° exceeds the capture limit of {profile.MaxRollDegrees:F1}°."))
-                    : Result.Success(new AutomatedDocumentInputResult(
-                        true,
-                        $"{profile.DisplayName} accepted: one usable face was detected with a level eye line."));
-            }
-        }
-
+        var inputCheckResult = await EvaluateInputDetailedAsync(
+            requestContext.Document,
+            inputResult.Value.InputBytes,
+            sourceImage,
+            cancellationToken).ConfigureAwait(false);
         if (inputCheckResult.IsFailure)
         {
-            return Result.Failure<DocumentJobResult>(inputCheckResult.Error);
+            return Result.Failure<DocumentJobResult, PipelineError>(inputCheckResult.Error);
         }
 
         var inputChecks = new[]
         {
             new AutomatedCheckResult(
-                document.InputChecks[0].Id,
-                document.InputChecks[0].Stage,
-                document.InputChecks[0].Disposition,
-                document.InputChecks[0].Name,
-                inputCheckResult.Value.IsCompliant,
+                requestContext.Document.InputChecks[0].Id,
+                requestContext.Document.InputChecks[0].Stage,
+                requestContext.Document.InputChecks[0].Disposition,
+                requestContext.Document.InputChecks[0].Name,
+                inputCheckResult.Value.IsAccepted,
                 inputCheckResult.Value.Summary,
-                document.InputChecks[0].Citations)
+                requestContext.Document.InputChecks[0].Citations)
         };
 
-        var manualChecklist = document.ManualChecklist
+        var manualChecklist = requestContext.Document.ManualChecklist
             .Select(item => new ManualChecklistResult(
                 item.Id,
                 item.Name,
@@ -124,134 +83,200 @@ public sealed class DocumentJobRunner(
                 item.Citations))
             .ToArray();
 
-        if (!inputCheckResult.Value.IsCompliant)
+        if (inputCheckResult.Value is RejectedInputState rejected)
         {
             var failedResult = new DocumentJobResult(
-                document,
-                variant,
+                requestContext.Document,
+                requestContext.Variant,
                 request.InputPath,
                 false,
-                inputCheckResult.Value.Summary,
-                Path.Combine(outputDirectory, BuildProvenanceFileName(request.InputPath, document.Id)),
+                rejected.Summary,
+                Path.Combine(requestContext.OutputDirectory, BuildProvenanceFileName(request.InputPath, requestContext.Document.Id)),
                 inputChecks,
                 manualChecklist,
                 Array.Empty<DeliverableResult>(),
                 DateTimeOffset.UtcNow);
 
-            await WriteProvenanceAsync(failedResult, cancellationToken).ConfigureAwait(false);
-            return Result.Success(failedResult);
+            var provenanceResult = await WriteProvenanceDetailedAsync(failedResult, cancellationToken).ConfigureAwait(false);
+            return provenanceResult.IsFailure
+                ? Result.Failure<DocumentJobResult, PipelineError>(provenanceResult.Error)
+                : Result.Success<DocumentJobResult, PipelineError>(failedResult);
         }
 
         var deliverables = new List<DeliverableResult>();
 
-        foreach (var deliverable in variant.Deliverables)
+        foreach (var deliverable in requestContext.Variant.Deliverables)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var renderResult = await RenderDeliverableAsync(
-                document,
+                requestContext.Document,
                 deliverable,
                 request.InputPath,
-                inputBytes,
+                inputResult.Value.InputBytes,
                 sourceImage,
-                outputDirectory,
-                canonicalGeometry).ConfigureAwait(false);
+                requestContext.OutputDirectory,
+                inputCheckResult.Value).ConfigureAwait(false);
             if (renderResult.IsFailure)
             {
-                return Result.Failure<DocumentJobResult>(renderResult.Error);
+                return Result.Failure<DocumentJobResult, PipelineError>(renderResult.Error);
             }
 
             deliverables.Add(renderResult.Value);
         }
 
         var jobResult = new DocumentJobResult(
-            document,
-            variant,
+            requestContext.Document,
+            requestContext.Variant,
             request.InputPath,
             true,
             inputCheckResult.Value.Summary,
-            Path.Combine(outputDirectory, BuildProvenanceFileName(request.InputPath, document.Id)),
+            Path.Combine(requestContext.OutputDirectory, BuildProvenanceFileName(request.InputPath, requestContext.Document.Id)),
             inputChecks,
             manualChecklist,
             deliverables,
             DateTimeOffset.UtcNow);
 
-        await WriteProvenanceAsync(jobResult, cancellationToken).ConfigureAwait(false);
-        return Result.Success(jobResult);
+        var writeResult = await WriteProvenanceDetailedAsync(jobResult, cancellationToken).ConfigureAwait(false);
+        return writeResult.IsFailure
+            ? Result.Failure<DocumentJobResult, PipelineError>(writeResult.Error)
+            : Result.Success<DocumentJobResult, PipelineError>(jobResult);
     }
 
-    private async Task<Result<AutomatedDocumentInputResult>> EvaluateInputAsync(DocumentDefinition document, byte[] inputBytes)
+    private static Result<RequestContext, PipelineError> ResolveRequest(DocumentJobRequest request)
+    {
+        var documentResult = DocumentCatalog.GetDocument(request.DocumentId);
+        if (documentResult.IsFailure)
+        {
+            return Result.Failure<RequestContext, PipelineError>(documentResult.Error);
+        }
+
+        var document = documentResult.Value;
+        var variantId = request.VariantId ?? document.PrimaryVariantId;
+        if (!document.Variants.TryGetValue(variantId, out var variant))
+        {
+            return Result.Failure<RequestContext, PipelineError>(
+                new ConfigurationError($"Unsupported variant '{variantId}' for document '{document.Id}'."));
+        }
+
+        var outputDirectory = request.OutputDirectory
+            ?? Path.GetDirectoryName(Path.GetFullPath(request.InputPath))
+            ?? Directory.GetCurrentDirectory();
+        Directory.CreateDirectory(outputDirectory);
+
+        return Result.Success<RequestContext, PipelineError>(new RequestContext(document, variant, outputDirectory));
+    }
+
+    private static async Task<Result<LoadedInput, PipelineError>> LoadInputAsync(
+        DocumentJobRequest request,
+        string outputDirectory,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(request.InputPath))
+        {
+            return Result.Failure<LoadedInput, PipelineError>(
+                new InputError($"Input file '{request.InputPath}' was not found."));
+        }
+
+        try
+        {
+            Directory.CreateDirectory(outputDirectory);
+            var inputBytes = await File.ReadAllBytesAsync(request.InputPath, cancellationToken).ConfigureAwait(false);
+            return Result.Success<LoadedInput, PipelineError>(new LoadedInput(inputBytes, Image.Load<Rgba32>(inputBytes)));
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<LoadedInput, PipelineError>(
+                new PersistenceError(ex.Message, request.InputPath));
+        }
+    }
+
+    private async Task<Result<InputEvaluationState, PipelineError>> EvaluateInputDetailedAsync(
+        DocumentDefinition document,
+        byte[] inputBytes,
+        Image<Rgba32> sourceImage,
+        CancellationToken cancellationToken)
     {
         if (document.WorkflowFamily == DocumentWorkflowFamily.Piv)
         {
             var result = await inputBytes.ValidateComplianceAsync(
-                "piv",
-                logger: _logger,
-                mode: AssessmentMode.InputValidation).ConfigureAwait(false);
+                    "piv",
+                    logger: _logger,
+                    mode: AssessmentMode.InputValidation)
+                .ConfigureAwait(false);
 
             return result.IsFailure
-                ? Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {result.Error}")
-                : Result.Success(new AutomatedDocumentInputResult(result.Value.IsCompliant, result.Value.Summary));
+                ? Result.Failure<InputEvaluationState, PipelineError>(new ValidationError($"Input analysis failed: {result.Error}", document.Id))
+                : result.Value.IsCompliant
+                    ? Result.Success<InputEvaluationState, PipelineError>(new AcceptedWithoutGeometry(result.Value.Summary))
+                    : Result.Success<InputEvaluationState, PipelineError>(new RejectedInputState(result.Value.Summary));
         }
 
-        using var image = Image.Load<Rgba32>(inputBytes);
-        var profile = DocumentCatalog.GetInputProfileOrThrow(document.InputProfileId);
+        var profileResult = DocumentCatalog.GetInputProfile(document.InputProfileId);
+        if (profileResult.IsFailure)
+        {
+            return Result.Failure<InputEvaluationState, PipelineError>(profileResult.Error);
+        }
+
+        var profile = profileResult.Value;
         var geometryResult = await _documentRenderService
-            .AnalyzeSingleFaceAsync(image, profile)
+            .AnalyzeSingleFaceAsync(sourceImage, profile, cancellationToken)
             .ConfigureAwait(false);
         if (geometryResult.IsFailure)
         {
-            return Result.Success(new AutomatedDocumentInputResult(false, geometryResult.Error));
+            return Result.Success<InputEvaluationState, PipelineError>(new RejectedInputState(geometryResult.Error.Message));
         }
 
         var rollDegrees = Math.Abs(FaceGeometryTransformations.CalculateEyeRotation(
             geometryResult.Value.SourceLandmarks.LeftEyeCenter,
             geometryResult.Value.SourceLandmarks.RightEyeCenter));
-        if (rollDegrees > profile.MaxRollDegrees)
-        {
-            return Result.Success(new AutomatedDocumentInputResult(
-                false,
-                $"{profile.DisplayName} rejected: eye-line rotation {rollDegrees:F1}° exceeds the capture limit of {profile.MaxRollDegrees:F1}°."));
-        }
-
-        return Result.Success(new AutomatedDocumentInputResult(
-            true,
-            $"{profile.DisplayName} accepted: one usable face was detected with a level eye line."));
+        return rollDegrees > profile.MaxRollDegrees
+            ? Result.Success<InputEvaluationState, PipelineError>(new RejectedInputState(
+                $"{profile.DisplayName} rejected: eye-line rotation {rollDegrees:F1}° exceeds the capture limit of {profile.MaxRollDegrees:F1}°."))
+            : Result.Success<InputEvaluationState, PipelineError>(new AcceptedWithGeometry(
+                geometryResult.Value,
+                $"{profile.DisplayName} accepted: one usable face was detected with a level eye line."));
     }
 
-    private async Task<Result<DeliverableResult>> RenderDeliverableAsync(
+    private async Task<Result<DeliverableResult, PipelineError>> RenderDeliverableAsync(
         DocumentDefinition document,
         DeliverableDefinition deliverable,
         string inputPath,
         byte[] inputBytes,
         Image<Rgba32> sourceImage,
         string outputDirectory,
-        Maybe<CanonicalFaceGeometry> canonicalGeometry)
+        InputEvaluationState inputState)
     {
         return (document.WorkflowFamily, deliverable.Kind) switch
         {
             (DocumentWorkflowFamily.Piv, DeliverableKind.PivCardImage) => await RenderPivCardAsync(deliverable, inputPath, sourceImage, outputDirectory),
             (DocumentWorkflowFamily.Piv, DeliverableKind.PivPrintedPhoto) => await RenderPivPrintAsync(deliverable, inputPath, sourceImage, outputDirectory),
-            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.PaperPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory, canonicalGeometry),
-            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.DigitalUploadPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory, canonicalGeometry),
-            _ => Result.Failure<DeliverableResult>($"Deliverable kind '{deliverable.Kind}' is not implemented for '{document.WorkflowFamily}'.")
+            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.PaperPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory, inputState),
+            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.DigitalUploadPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory, inputState),
+            _ => Result.Failure<DeliverableResult, PipelineError>(new RenderError($"Deliverable kind '{deliverable.Kind}' is not implemented for '{document.WorkflowFamily}'.", deliverable.Id))
         };
     }
 
-    private async Task<Result<DeliverableResult>> RenderPivCardAsync(
+    private async Task<Result<DeliverableResult, PipelineError>> RenderPivCardAsync(
         DeliverableDefinition deliverable,
         string inputPath,
         Image<Rgba32> sourceImage,
         string outputDirectory)
     {
-        var profile = DocumentCatalog.GetInputProfileOrThrow("piv-capture");
+        var profileResult = DocumentCatalog.GetInputProfile("piv-capture");
+        if (profileResult.IsFailure)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(profileResult.Error);
+        }
+
+        var profile = profileResult.Value;
         var geometryResult = await _documentRenderService
             .AnalyzeSingleFaceAsync(sourceImage, profile)
             .ConfigureAwait(false);
         if (geometryResult.IsFailure)
         {
-            return Result.Failure<DeliverableResult>(
-                $"Failed to render deliverable '{deliverable.Id}': {geometryResult.Error}");
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new RenderError($"Failed to render deliverable '{deliverable.Id}': {geometryResult.Error.Message}", deliverable.Id));
         }
 
         var pivResult = _documentRenderService.RenderPivCard(
@@ -260,12 +285,20 @@ public sealed class DocumentJobRunner(
             PivProcessingOptions.Default);
         if (pivResult.IsFailure)
         {
-            return Result.Failure<DeliverableResult>(
-                $"Failed to render deliverable '{deliverable.Id}': {pivResult.Error}");
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new RenderError($"Failed to render deliverable '{deliverable.Id}': {pivResult.Error.Message}", deliverable.Id));
         }
 
         var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
-        await File.WriteAllBytesAsync(outputPath, pivResult.Value.ImageData).ConfigureAwait(false);
+        try
+        {
+            await File.WriteAllBytesAsync(outputPath, pivResult.Value.ImageData).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(new PersistenceError(ex.Message, outputPath));
+        }
+
         var validation = pivResult.Value.Geometry.ComplianceValidation;
 
         var checks = deliverable.OutputChecks
@@ -281,7 +314,7 @@ public sealed class DocumentJobRunner(
                 check.Citations))
             .ToArray();
 
-        return Result.Success(CreateDeliverableResult(
+        return Result.Success<DeliverableResult, PipelineError>(CreateDeliverableResult(
             deliverable,
             outputPath,
             pivResult.Value.ImageData.Length,
@@ -290,20 +323,26 @@ public sealed class DocumentJobRunner(
             null));
     }
 
-    private async Task<Result<DeliverableResult>> RenderPivPrintAsync(
+    private async Task<Result<DeliverableResult, PipelineError>> RenderPivPrintAsync(
         DeliverableDefinition deliverable,
         string inputPath,
         Image<Rgba32> sourceImage,
         string outputDirectory)
     {
-        var profile = DocumentCatalog.GetInputProfileOrThrow("piv-capture");
+        var profileResult = DocumentCatalog.GetInputProfile("piv-capture");
+        if (profileResult.IsFailure)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(profileResult.Error);
+        }
+
+        var profile = profileResult.Value;
         var geometryResult = await _documentRenderService
             .AnalyzeSingleFaceAsync(sourceImage, profile)
             .ConfigureAwait(false);
         if (geometryResult.IsFailure)
         {
-            return Result.Failure<DeliverableResult>(
-                $"Failed to render deliverable '{deliverable.Id}': {geometryResult.Error}");
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new RenderError($"Failed to render deliverable '{deliverable.Id}': {geometryResult.Error.Message}", deliverable.Id));
         }
 
         var pivResult = _documentRenderService.RenderPiv(
@@ -312,15 +351,23 @@ public sealed class DocumentJobRunner(
             PivProcessingOptions.Default);
         if (pivResult.IsFailure)
         {
-            return Result.Failure<DeliverableResult>(
-                $"Failed to render deliverable '{deliverable.Id}': {pivResult.Error}");
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new RenderError($"Failed to render deliverable '{deliverable.Id}': {pivResult.Error.Message}", deliverable.Id));
         }
 
         var validation = pivResult.Value.ComplianceValidation;
         using var printableImage = pivResult.Value.PivImage.Clone();
         var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
         var fileBytes = await EncodeJpegAsync(printableImage, 92, 300).ConfigureAwait(false);
-        await File.WriteAllBytesAsync(outputPath, fileBytes).ConfigureAwait(false);
+        try
+        {
+            await File.WriteAllBytesAsync(outputPath, fileBytes).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(new PersistenceError(ex.Message, outputPath));
+        }
+
         using var reloaded = Image.Load<Rgba32>(fileBytes);
         var dpiPassed = reloaded.Metadata.HorizontalResolution >= 300f
             && reloaded.Metadata.VerticalResolution >= 300f;
@@ -355,7 +402,7 @@ public sealed class DocumentJobRunner(
                 check.Citations);
         }).ToArray();
 
-        return Result.Success(CreateDeliverableResult(
+        return Result.Success<DeliverableResult, PipelineError>(CreateDeliverableResult(
             deliverable,
             outputPath,
             fileBytes.Length,
@@ -364,20 +411,27 @@ public sealed class DocumentJobRunner(
             null));
     }
 
-    private async Task<Result<DeliverableResult>> RenderPortraitDeliverableAsync(
+    private async Task<Result<DeliverableResult, PipelineError>> RenderPortraitDeliverableAsync(
         DeliverableDefinition deliverable,
         string inputPath,
         byte[] inputBytes,
         Image<Rgba32> sourceImage,
         string outputDirectory,
-        Maybe<CanonicalFaceGeometry> canonicalGeometry)
+        InputEvaluationState inputState)
     {
         if (!deliverable.ProductionDefaults.TryGetValue("spec", out var specId))
         {
-            return Result.Failure<DeliverableResult>($"Deliverable '{deliverable.Id}' is missing a portrait spec.");
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new ConfigurationError($"Deliverable '{deliverable.Id}' is missing a portrait spec.", deliverable.Id));
         }
 
-        var spec = DocumentCatalog.GetPassportPhotoSpecOrThrow(specId);
+        var specResult = DocumentCatalog.GetPassportPhotoSpec(specId);
+        if (specResult.IsFailure)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(specResult.Error);
+        }
+
+        var spec = specResult.Value;
         if (deliverable.Kind == DeliverableKind.DigitalUploadPhoto && spec.PreserveOriginalFileWhenValid)
         {
             var preserved = await TryPreserveOriginalDigitalAsync(
@@ -387,26 +441,26 @@ public sealed class DocumentJobRunner(
                 sourceImage,
                 outputDirectory,
                 spec).ConfigureAwait(false);
-            if (preserved is not null)
+            if (preserved.HasValue)
             {
-                return Result.Success(preserved);
+                return Result.Success<DeliverableResult, PipelineError>(preserved.Value);
             }
         }
 
-        if (canonicalGeometry.HasNoValue)
+        if (inputState is not AcceptedWithGeometry accepted)
         {
-            return Result.Failure<DeliverableResult>(
-                $"Failed to render deliverable '{deliverable.Id}': canonical face geometry was not available.");
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new RenderError($"Failed to render deliverable '{deliverable.Id}': canonical face geometry was not available.", deliverable.Id));
         }
 
         var alignment = _documentRenderService.RenderPassport(
             sourceImage,
-            canonicalGeometry.GetValueOrThrow("Canonical face geometry is required."),
+            accepted.Geometry,
             spec);
         if (alignment.IsFailure)
         {
-            return Result.Failure<DeliverableResult>(
-                $"Failed to render deliverable '{deliverable.Id}': {alignment.Error}");
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new RenderError($"Failed to render deliverable '{deliverable.Id}': {alignment.Error.Message}", deliverable.Id));
         }
 
         using var alignedPortrait = alignment.Value.Image;
@@ -418,7 +472,15 @@ public sealed class DocumentJobRunner(
             fileBytes = await ShrinkJpegToMaxBytesAsync(alignedPortrait, spec.MaxFileSizeBytes.Value, spec.Dpi).ConfigureAwait(false);
         }
 
-        await File.WriteAllBytesAsync(outputPath, fileBytes).ConfigureAwait(false);
+        try
+        {
+            await File.WriteAllBytesAsync(outputPath, fileBytes).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(new PersistenceError(ex.Message, outputPath));
+        }
+
         using var reloaded = Image.Load<Rgba32>(fileBytes);
 
         var checks = BuildPortraitChecks(
@@ -435,7 +497,7 @@ public sealed class DocumentJobRunner(
             ? await WriteSupportingInfoFileAsync(outputPath, sourceImage).ConfigureAwait(false)
             : null;
 
-        return Result.Success(CreateDeliverableResult(
+        return Result.Success<DeliverableResult, PipelineError>(CreateDeliverableResult(
             deliverable,
             outputPath,
             fileBytes.Length,
@@ -444,7 +506,7 @@ public sealed class DocumentJobRunner(
             spec.RequiresSupportingInfoSidecar ? false : null));
     }
 
-    private async Task<DeliverableResult?> TryPreserveOriginalDigitalAsync(
+    private async Task<Maybe<DeliverableResult>> TryPreserveOriginalDigitalAsync(
         DeliverableDefinition deliverable,
         string inputPath,
         byte[] inputBytes,
@@ -456,13 +518,13 @@ public sealed class DocumentJobRunner(
         if (!string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase))
         {
-            return null;
+            return Maybe<DeliverableResult>.None;
         }
 
         var landmarks = await DetectLandmarksAsync(sourceImage).ConfigureAwait(false);
         if (landmarks.IsFailure)
         {
-            return null;
+            return Maybe<DeliverableResult>.None;
         }
 
         var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
@@ -482,7 +544,7 @@ public sealed class DocumentJobRunner(
             .All(check => check.Passed);
         if (!blockingPassed)
         {
-            return null;
+            return Maybe<DeliverableResult>.None;
         }
 
         await File.WriteAllBytesAsync(outputPath, inputBytes).ConfigureAwait(false);
@@ -490,13 +552,13 @@ public sealed class DocumentJobRunner(
             ? await WriteSupportingInfoFileAsync(outputPath, sourceImage).ConfigureAwait(false)
             : null;
 
-        return CreateDeliverableResult(
+        return Maybe<DeliverableResult>.From(CreateDeliverableResult(
             deliverable,
             outputPath,
             inputBytes.Length,
             checks,
             supportingInfoPath,
-            true);
+            true));
     }
 
     private IReadOnlyList<AutomatedCheckResult> BuildPortraitChecks(
@@ -564,15 +626,21 @@ public sealed class DocumentJobRunner(
         }).ToArray();
     }
 
-    private async Task<Result<FaceLandmarks68>> DetectLandmarksAsync(Image<Rgba32> image)
+    private async Task<Result<FaceLandmarks68, PipelineError>> DetectLandmarksAsync(Image<Rgba32> image)
     {
-        var profile = DocumentCatalog.GetInputProfileOrThrow("us-portrait-capture");
+        var profileResult = DocumentCatalog.GetInputProfile("us-portrait-capture");
+        if (profileResult.IsFailure)
+        {
+            return Result.Failure<FaceLandmarks68, PipelineError>(profileResult.Error);
+        }
+
+        var profile = profileResult.Value;
         var geometryResult = await _documentRenderService
             .AnalyzeSingleFaceAsync(image, profile)
             .ConfigureAwait(false);
         return geometryResult.IsFailure
-            ? Result.Failure<FaceLandmarks68>(geometryResult.Error)
-            : Result.Success(geometryResult.Value.SourceLandmarks);
+            ? Result.Failure<FaceLandmarks68, PipelineError>(geometryResult.Error)
+            : Result.Success<FaceLandmarks68, PipelineError>(geometryResult.Value.SourceLandmarks);
     }
 
     private static PortraitMeasurements MeasurePortraitComposition(FaceLandmarks68 landmarks, int imageHeight)
@@ -618,7 +686,7 @@ public sealed class DocumentJobRunner(
     private static async Task<string> WriteSupportingInfoFileAsync(string outputPath, Image<Rgba32> sourceImage)
     {
         var supportingInfoPath = $"{Path.ChangeExtension(outputPath, null)}.supporting-info.txt";
-        var dateTaken = TryGetPhotoTakenDate(sourceImage) ?? "[enter date photo was taken]";
+        var dateTaken = TryGetPhotoTakenDate(sourceImage).GetValueOrDefault("[enter date photo was taken]");
 
         var contents = string.Join(Environment.NewLine, new[]
         {
@@ -633,9 +701,9 @@ public sealed class DocumentJobRunner(
         return supportingInfoPath;
     }
 
-    private static string? TryGetPhotoTakenDate(Image<Rgba32> image)
+    private static Maybe<string> TryGetPhotoTakenDate(Image<Rgba32> image)
     {
-        return null;
+        return Maybe<string>.None;
     }
 
     private static DeliverableResult CreateDeliverableResult(
@@ -679,29 +747,58 @@ public sealed class DocumentJobRunner(
     private static string BuildProvenanceFileName(string inputPath, string documentId) =>
         $"{Path.GetFileNameWithoutExtension(inputPath)}.{documentId}.provenance.json";
 
-    private static async Task WriteProvenanceAsync(DocumentJobResult jobResult, CancellationToken cancellationToken)
+    private static async Task<UnitResult<PipelineError>> WriteProvenanceDetailedAsync(DocumentJobResult jobResult, CancellationToken cancellationToken)
     {
-        var provenance = new
+        try
         {
-            DocumentId = jobResult.Document.Id,
-            DocumentDisplayName = jobResult.Document.DisplayName,
-            VariantId = jobResult.Variant.Id,
-            VariantDisplayName = jobResult.Variant.DisplayName,
-            jobResult.InputPath,
-            jobResult.InputPassed,
-            jobResult.InputSummary,
-            GeneratedAtUtc = jobResult.GeneratedAtUtc,
-            DocumentCitations = jobResult.Document.Citations,
-            InputChecks = jobResult.InputChecks,
-            ManualChecklist = jobResult.ManualChecklist,
-            Deliverables = jobResult.Deliverables
-        };
+            var provenance = new
+            {
+                DocumentId = jobResult.Document.Id,
+                DocumentDisplayName = jobResult.Document.DisplayName,
+                VariantId = jobResult.Variant.Id,
+                VariantDisplayName = jobResult.Variant.DisplayName,
+                jobResult.InputPath,
+                jobResult.InputPassed,
+                jobResult.InputSummary,
+                GeneratedAtUtc = jobResult.GeneratedAtUtc,
+                DocumentCitations = jobResult.Document.Citations,
+                InputChecks = jobResult.InputChecks,
+                ManualChecklist = jobResult.ManualChecklist,
+                Deliverables = jobResult.Deliverables
+            };
 
-        var json = JsonSerializer.Serialize(provenance, JsonOptions);
-        await File.WriteAllTextAsync(jobResult.ProvenancePath, json, cancellationToken).ConfigureAwait(false);
+            var json = JsonSerializer.Serialize(provenance, JsonOptions);
+            await File.WriteAllTextAsync(jobResult.ProvenancePath, json, cancellationToken).ConfigureAwait(false);
+            return UnitResult.Success<PipelineError>();
+        }
+        catch (Exception ex)
+        {
+            return UnitResult.Failure<PipelineError>(new PersistenceError(ex.Message, jobResult.ProvenancePath));
+        }
     }
 
     private readonly record struct PortraitMeasurements(float HeadHeightRatio, float EyeFromBottomRatio);
 
-    private readonly record struct AutomatedDocumentInputResult(bool IsCompliant, string Summary);
+    private sealed record RequestContext(DocumentDefinition Document, VariantDefinition Variant, string OutputDirectory);
+    private sealed record LoadedInput(byte[] InputBytes, Image<Rgba32> SourceImage);
+
+    private abstract record InputEvaluationState(string Summary)
+    {
+        public abstract bool IsAccepted { get; }
+    }
+
+    private sealed record RejectedInputState(string Summary) : InputEvaluationState(Summary)
+    {
+        public override bool IsAccepted => false;
+    }
+
+    private sealed record AcceptedWithoutGeometry(string Summary) : InputEvaluationState(Summary)
+    {
+        public override bool IsAccepted => true;
+    }
+
+    private sealed record AcceptedWithGeometry(CanonicalFaceGeometry Geometry, string Summary) : InputEvaluationState(Summary)
+    {
+        public override bool IsAccepted => true;
+    }
 }

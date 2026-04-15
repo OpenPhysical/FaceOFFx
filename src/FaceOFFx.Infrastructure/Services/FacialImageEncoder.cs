@@ -1,4 +1,5 @@
 using FaceOFFx.Core.Abstractions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Transformations;
 using JetBrains.Annotations;
@@ -13,7 +14,7 @@ namespace FaceOFFx.Infrastructure.Services;
 
 /// <summary>
 /// Facial image encoder for PIV and TWIC compatible image transformation.
-/// This is the primary public API that uses standard .NET exception handling.
+/// This is the primary public API for PIV/TWIC-compatible processing.
 /// </summary>
 [PublicAPI]
 public static class FacialImageEncoder
@@ -26,12 +27,8 @@ public static class FacialImageEncoder
     /// ProcessingOptions is an immutable record - use 'with' syntax to modify:
     /// ProcessingOptions.PivBalanced with { MinFaceConfidence = 0.9f }</param>
     /// <param name="logger">Optional logger for processing information. Uses NullLogger if not provided.</param>
-    /// <returns>Processing result with encoded image data and metadata</returns>
-    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
-    /// <exception cref="ArgumentException">Thrown when processing options are invalid</exception>
-    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
-    /// <exception cref="TimeoutException">Thrown when processing exceeds the timeout</exception>
-    public static async Task<ProcessingResultDto> ProcessAsync(
+    /// <returns>Typed processing result with encoded image data and metadata</returns>
+    public static async Task<Result<ProcessingResultDto, PipelineError>> ProcessAsync(
         byte[] imageData,
         ProcessingOptions? options = null,
         ILogger? logger = null
@@ -48,30 +45,29 @@ public static class FacialImageEncoder
     /// <param name="outputFormat">Output format: "jp2", "jpeg", "png", or "tiff"</param>
     /// <param name="jpegQuality">JPEG quality (1-100) when outputFormat is "jpeg"</param>
     /// <param name="logger">Optional logger for processing information. Uses NullLogger if not provided.</param>
-    /// <returns>Processing result with encoded image data and metadata</returns>
-    /// <exception cref="ArgumentNullException">Thrown when imageData is null</exception>
-    /// <exception cref="ArgumentException">Thrown when processing options are invalid</exception>
-    /// <exception cref="InvalidOperationException">Thrown when processing fails</exception>
-    /// <exception cref="TimeoutException">Thrown when processing exceeds the timeout</exception>
-    public static async Task<ProcessingResultDto> ProcessAsync(
+    /// <returns>Typed processing result with encoded image data and metadata</returns>
+    public static async Task<Result<ProcessingResultDto, PipelineError>> ProcessAsync(
         byte[] imageData,
         ProcessingOptions? options,
         string outputFormat,
         int jpegQuality,
         ILogger? logger)
     {
-        if (imageData == null)
+        if (imageData is null)
         {
-            throw new ArgumentNullException(nameof(imageData));
+            return Result.Failure<ProcessingResultDto, PipelineError>(
+                new InputError("Input image data is required.", nameof(imageData)));
         }
 
         var processingOptions = options ?? ProcessingOptions.PivBalanced;
         logger ??= NullLogger.Instance;
 
-        // Validate options
-        ValidateProcessingOptions(processingOptions);
+        var validation = ValidateProcessingOptions(processingOptions);
+        if (validation.IsFailure)
+        {
+            return Result.Failure<ProcessingResultDto, PipelineError>(validation.Error);
+        }
 
-        // Apply timeout if specified
         using var cts =
             processingOptions.ProcessingTimeout != TimeSpan.Zero
                 ? new CancellationTokenSource(processingOptions.ProcessingTimeout)
@@ -86,19 +82,21 @@ public static class FacialImageEncoder
                 jpegQuality,
                 logger,
                 cts.Token
-            );
-            return ConvertToDto(result);
+            ).ConfigureAwait(false);
+
+            return result.Map(ConvertToDto);
         }
         catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
         {
-            throw new TimeoutException(
-                $"Processing exceeded timeout of {processingOptions.ProcessingTimeout}"
-            );
+            return Result.Failure<ProcessingResultDto, PipelineError>(
+                new RenderError(
+                    $"Processing exceeded timeout of {processingOptions.ProcessingTimeout}",
+                    "facial-image-encoder"));
         }
         catch (Exception ex)
-            when (ex is not (ArgumentException or InvalidOperationException or TimeoutException))
         {
-            throw new InvalidOperationException($"Face processing failed: {ex.Message}", ex);
+            return Result.Failure<ProcessingResultDto, PipelineError>(
+                new RenderError($"Face processing failed: {ex.Message}", "facial-image-encoder"));
         }
     }
 
@@ -114,7 +112,7 @@ public static class FacialImageEncoder
     /// TWIC cards have strict size constraints. This method targets 14KB maximum
     /// to fit within the card storage limits.
     /// </remarks>
-    public static async Task<ProcessingResultDto> ProcessForTwicAsync(
+    public static async Task<Result<ProcessingResultDto, PipelineError>> ProcessForTwicAsync(
         byte[] imageData,
         ILogger? logger = null
     ) => await ProcessAsync(imageData, ProcessingOptions.TwicMax, logger);
@@ -131,7 +129,7 @@ public static class FacialImageEncoder
     /// Standard PIV processing that balances file size with image quality.
     /// Suitable for most government ID card applications.
     /// </remarks>
-    public static async Task<ProcessingResultDto> ProcessForPivAsync(
+    public static async Task<Result<ProcessingResultDto, PipelineError>> ProcessForPivAsync(
         byte[] imageData,
         ILogger? logger = null
     ) => await ProcessAsync(imageData, ProcessingOptions.PivBalanced, logger);
@@ -150,7 +148,7 @@ public static class FacialImageEncoder
     /// Uses stepped compression rates to achieve the target file size.
     /// May not achieve exact size due to the discrete nature of JPEG 2000 compression.
     /// </remarks>
-    public static async Task<ProcessingResultDto> ProcessToSizeAsync(
+    public static async Task<Result<ProcessingResultDto, PipelineError>> ProcessToSizeAsync(
         byte[] imageData,
         int targetSizeBytes,
         ILogger? logger = null
@@ -158,10 +156,8 @@ public static class FacialImageEncoder
     {
         if (targetSizeBytes <= 0)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(targetSizeBytes),
-                "Target size must be greater than zero"
-            );
+            return Result.Failure<ProcessingResultDto, PipelineError>(
+                new ValidationError("Target size must be greater than zero", nameof(targetSizeBytes)));
         }
 
         var options = ProcessingOptions.PivBalanced with
@@ -186,7 +182,7 @@ public static class FacialImageEncoder
     /// Provides predictable compression behavior when file size constraints are flexible.
     /// Higher rates produce larger files with better quality.
     /// </remarks>
-    public static async Task<ProcessingResultDto> ProcessWithRateAsync(
+    public static async Task<Result<ProcessingResultDto, PipelineError>> ProcessWithRateAsync(
         byte[] imageData,
         float compressionRate,
         ILogger? logger = null
@@ -194,10 +190,8 @@ public static class FacialImageEncoder
     {
         if (compressionRate <= 0)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(compressionRate),
-                "Compression rate must be greater than zero"
-            );
+            return Result.Failure<ProcessingResultDto, PipelineError>(
+                new ValidationError("Compression rate must be greater than zero", nameof(compressionRate)));
         }
 
         var options = ProcessingOptions.PivBalanced with
@@ -215,22 +209,11 @@ public static class FacialImageEncoder
     /// <param name="options">Processing options. Uses PIV standard if not specified.</param>
     /// <param name="logger">Optional logger for processing information</param>
     /// <returns>Tuple containing success status, result if successful, and error message if failed</returns>
-    public static async Task<(
-        bool Success,
-        ProcessingResultDto? Result,
-        string? ErrorMessage
-    )> TryProcessAsync(byte[] imageData, ProcessingOptions? options = null, ILogger? logger = null)
-    {
-        try
-        {
-            var result = await ProcessAsync(imageData, options, logger);
-            return (true, result, null);
-        }
-        catch (Exception ex)
-        {
-            return (false, null, ex.Message);
-        }
-    }
+    public static Task<Result<ProcessingResultDto, PipelineError>> TryProcessAsync(
+        byte[] imageData,
+        ProcessingOptions? options = null,
+        ILogger? logger = null) =>
+        ProcessAsync(imageData, options, logger);
 
     /// <summary>
     /// Process image bytes without face detection, using the image as-is
@@ -250,7 +233,7 @@ public static class FacialImageEncoder
     /// For JPEG output, no ROI is applied as JPEG doesn't support ROI encoding.
     /// </remarks>
     [PublicAPI]
-    public static async Task<ProcessingResultDto> ProcessWithoutFaceDetectionAsync(
+    public static async Task<Result<ProcessingResultDto, PipelineError>> ProcessWithoutFaceDetectionAsync(
         byte[] imageData,
         ProcessingOptions? options = null,
         string outputFormat = "jp2",
@@ -258,16 +241,21 @@ public static class FacialImageEncoder
         ILogger? logger = null
     )
     {
-        if (imageData == null)
+        if (imageData is null)
         {
-            throw new ArgumentNullException(nameof(imageData));
+            return Result.Failure<ProcessingResultDto, PipelineError>(
+                new InputError("Input image data is required.", nameof(imageData)));
         }
 
         var processingOptions = options ?? ProcessingOptions.PivBalanced;
         logger ??= NullLogger.Instance;
 
         // Validate options
-        ValidateProcessingOptions(processingOptions);
+        var validation = ValidateProcessingOptions(processingOptions);
+        if (validation.IsFailure)
+        {
+            return Result.Failure<ProcessingResultDto, PipelineError>(validation.Error);
+        }
 
         // Validate JPEG quality
         if (
@@ -277,17 +265,21 @@ public static class FacialImageEncoder
             ) && (jpegQuality < 1 || jpegQuality > 100)
         )
         {
-            throw new ArgumentException(
-                "JPEG quality must be between 1 and 100",
-                nameof(jpegQuality)
-            );
+            return Result.Failure<ProcessingResultDto, PipelineError>(
+                new ValidationError("JPEG quality must be between 1 and 100", nameof(jpegQuality)));
         }
 
         var startTime = DateTime.UtcNow;
 
         try
         {
-            using var image = LoadImage(imageData);
+            var imageResult = LoadImage(imageData);
+            if (imageResult.IsFailure)
+            {
+                return Result.Failure<ProcessingResultDto, PipelineError>(imageResult.Error);
+            }
+
+            using var image = imageResult.Value;
             logger.LogDebug(
                 "ProcessWithoutFaceDetection: Loaded image {Width}x{Height}",
                 image.Width,
@@ -329,7 +321,13 @@ public static class FacialImageEncoder
                 // Calculate ROI based on image dimensions using Appendix C.6 formula
                 var roiSet = FacialRoiSet.CalculateRoiForDimensions(image.Width, image.Height);
 
-                using var services = new FacialProcessingServices(logger);
+                var servicesResult = FacialProcessingServices.Create(logger);
+                if (servicesResult.IsFailure)
+                {
+                    return Result.Failure<ProcessingResultDto, PipelineError>(servicesResult.Error);
+                }
+
+                using var services = servicesResult.Value;
                 var encodingResult = ExecuteEncodingStrategy(
                     image,
                     roiSet,
@@ -337,9 +335,13 @@ public static class FacialImageEncoder
                     services,
                     logger
                 );
+                if (encodingResult.IsFailure)
+                {
+                    return Result.Failure<ProcessingResultDto, PipelineError>(encodingResult.Error);
+                }
 
-                encodedData = encodingResult.Data;
-                compressionRate = encodingResult.ActualRate;
+                encodedData = encodingResult.Value.Data;
+                compressionRate = encodingResult.Value.ActualRate;
             }
 
             var processingTime = DateTime.UtcNow - startTime;
@@ -366,11 +368,12 @@ public static class FacialImageEncoder
                 },
             };
 
-            return new ProcessingResultDto(encodedData, metadata);
+            return Result.Success<ProcessingResultDto, PipelineError>(new ProcessingResultDto(encodedData, metadata));
         }
-        catch (Exception ex) when (ex is not (ArgumentException or ArgumentNullException))
+        catch (Exception ex)
         {
-            throw new InvalidOperationException($"Image processing failed: {ex.Message}", ex);
+            return Result.Failure<ProcessingResultDto, PipelineError>(
+                new RenderError($"Image processing failed: {ex.Message}", "no-face-detection"));
         }
     }
 
@@ -407,36 +410,36 @@ public static class FacialImageEncoder
         return ms.ToArray();
     }
 
-    private static void ValidateProcessingOptions(ProcessingOptions options)
+    private static UnitResult<PipelineError> ValidateProcessingOptions(ProcessingOptions options)
     {
         if (options.MinFaceConfidence < 0 || options.MinFaceConfidence > 1)
         {
-            throw new ArgumentException(
-                "MinFaceConfidence must be between 0 and 1",
-                nameof(options)
-            );
+            return UnitResult.Failure<PipelineError>(
+                new ValidationError("MinFaceConfidence must be between 0 and 1", nameof(options)));
         }
 
         if (options.MaxRotationDegrees < 0 || options.MaxRotationDegrees > 45)
         {
-            throw new ArgumentException(
-                "MaxRotationDegrees must be between 0 and 45",
-                nameof(options)
-            );
+            return UnitResult.Failure<PipelineError>(
+                new ValidationError("MaxRotationDegrees must be between 0 and 45", nameof(options)));
         }
 
         if (options.RoiStartLevel < 0 || options.RoiStartLevel > 3)
         {
-            throw new ArgumentException("RoiStartLevel must be between 0 and 3", nameof(options));
+            return UnitResult.Failure<PipelineError>(
+                new ValidationError("RoiStartLevel must be between 0 and 3", nameof(options)));
         }
 
         if (options.MaxRetries < 0)
         {
-            throw new ArgumentException("MaxRetries must be non-negative", nameof(options));
+            return UnitResult.Failure<PipelineError>(
+                new ValidationError("MaxRetries must be non-negative", nameof(options)));
         }
+
+        return UnitResult.Success<PipelineError>();
     }
 
-    private static async Task<ProcessingResult> ProcessImageInternalAsync(
+    private static async Task<Result<ProcessingResult, PipelineError>> ProcessImageInternalAsync(
         byte[] imageData,
         ProcessingOptions options,
         ILogger logger,
@@ -446,7 +449,7 @@ public static class FacialImageEncoder
         return await ProcessImageInternalAsync(imageData, options, "jp2", 85, logger, cancellationToken);
     }
     
-    private static async Task<ProcessingResult> ProcessImageInternalAsync(
+    private static async Task<Result<ProcessingResult, PipelineError>> ProcessImageInternalAsync(
         byte[] imageData,
         ProcessingOptions options,
         string outputFormat,
@@ -455,8 +458,20 @@ public static class FacialImageEncoder
         CancellationToken cancellationToken
     )
     {
-        using var image = LoadImage(imageData);
-        using var services = new FacialProcessingServices(logger);
+        var imageResult = LoadImage(imageData);
+        if (imageResult.IsFailure)
+        {
+            return Result.Failure<ProcessingResult, PipelineError>(imageResult.Error);
+        }
+
+        using var image = imageResult.Value;
+        var servicesResult = FacialProcessingServices.Create(logger);
+        if (servicesResult.IsFailure)
+        {
+            return Result.Failure<ProcessingResult, PipelineError>(servicesResult.Error);
+        }
+
+        using var services = servicesResult.Value;
 
         var startTime = DateTime.UtcNow;
 
@@ -470,18 +485,28 @@ public static class FacialImageEncoder
             services,
             logger,
             cancellationToken
-        );
+        ).ConfigureAwait(false);
+        if (detectedFace.IsFailure)
+        {
+            return Result.Failure<ProcessingResult, PipelineError>(detectedFace.Error);
+        }
 
         // Step 2: Transform to PIV format
         logger.LogDebug("Starting PIV transformation");
-        var (pivImage, roiSet, transformData) = await TransformImageAsync(
+        var transformResult = await TransformImageAsync(
             image,
-            detectedFace,
+            detectedFace.Value,
             options,
             services,
             logger,
             cancellationToken
-        );
+        ).ConfigureAwait(false);
+        if (transformResult.IsFailure)
+        {
+            return Result.Failure<ProcessingResult, PipelineError>(transformResult.Error);
+        }
+
+        var (pivImage, roiSet, transformData) = transformResult.Value;
 
         // Step 3: Encode based on output format
         EncodingResult encoding;
@@ -491,7 +516,13 @@ public static class FacialImageEncoder
                 "Starting JPEG 2000 encoding with strategy: {Strategy}",
                 options.Strategy.GetType().Name
             );
-            encoding = ExecuteEncodingStrategy(pivImage, roiSet, options, services, logger);
+            var encodingResult = ExecuteEncodingStrategy(pivImage, roiSet, options, services, logger);
+            if (encodingResult.IsFailure)
+            {
+                return Result.Failure<ProcessingResult, PipelineError>(encodingResult.Error);
+            }
+
+            encoding = encodingResult.Value;
         }
         else
         {
@@ -515,7 +546,8 @@ public static class FacialImageEncoder
             }
             else
             {
-                throw new ArgumentException($"Unsupported output format: {outputFormat}");
+                return Result.Failure<ProcessingResult, PipelineError>(
+                    new ValidationError($"Unsupported output format: {outputFormat}", nameof(outputFormat)));
             }
             
             encoding = new EncodingResult(
@@ -536,7 +568,7 @@ public static class FacialImageEncoder
         var metadata = new ProcessingMetadata(
             transformData.OutputDimensions,
             transformData.RotationApplied,
-            detectedFace.Confidence,
+            detectedFace.Value.Confidence,
             encoding.Data.Length,
             processingTime
         )
@@ -547,23 +579,24 @@ public static class FacialImageEncoder
             AdditionalData = transformData.AdditionalData,
         };
 
-        return new ProcessingResult(encoding.Data, metadata);
+        return Result.Success<ProcessingResult, PipelineError>(new ProcessingResult(encoding.Data, metadata));
     }
 
-    private static Image<Rgba32> LoadImage(byte[] imageData)
+    private static Result<Image<Rgba32>, PipelineError> LoadImage(byte[] imageData)
     {
         try
         {
             using var stream = new MemoryStream(imageData);
-            return Image.Load<Rgba32>(stream);
+            return Result.Success<Image<Rgba32>, PipelineError>(Image.Load<Rgba32>(stream));
         }
         catch (Exception ex)
         {
-            throw new ArgumentException($"Invalid image data: {ex.Message}", nameof(imageData), ex);
+            return Result.Failure<Image<Rgba32>, PipelineError>(
+                new InputError($"Invalid image data: {ex.Message}", nameof(imageData)));
         }
     }
 
-    private static async Task<DetectedFace> DetectPrimaryFaceAsync(
+    private static async Task<Result<DetectedFace, PipelineError>> DetectPrimaryFaceAsync(
         Image<Rgba32> image,
         ProcessingOptions options,
         FacialProcessingServices services,
@@ -574,7 +607,8 @@ public static class FacialImageEncoder
         var facesResult = await services.Detector.DetectFacesAsync(image, cancellationToken);
         if (facesResult.IsFailure)
         {
-            throw new InvalidOperationException($"Face detection failed: {facesResult.Error}");
+            return Result.Failure<DetectedFace, PipelineError>(
+                new DetectionError($"Face detection failed: {facesResult.Error.Message}", "facial-image-encoder"));
         }
 
         var faces = facesResult.Value;
@@ -582,14 +616,16 @@ public static class FacialImageEncoder
 
         if (faces.Count == 0)
         {
-            throw new InvalidOperationException("No faces detected in the image");
+            return Result.Failure<DetectedFace, PipelineError>(
+                new DetectionError("No faces detected in the image", "facial-image-encoder"));
         }
 
         if (options.RequireSingleFace && faces.Count > 1)
         {
-            throw new InvalidOperationException(
-                $"Multiple faces detected ({faces.Count}). Single face required."
-            );
+            return Result.Failure<DetectedFace, PipelineError>(
+                new DetectionError(
+                    $"Multiple faces detected ({faces.Count}). Single face required.",
+                    "facial-image-encoder"));
         }
 
         // Use highest confidence face
@@ -601,23 +637,24 @@ public static class FacialImageEncoder
         if (primaryFace == null)
         {
             var bestConfidence = faces.Max(f => f.Confidence);
-            throw new InvalidOperationException(
-                $"No faces meet minimum confidence threshold of {options.MinFaceConfidence:P1}. Best confidence: {bestConfidence:P1}"
-            );
+            return Result.Failure<DetectedFace, PipelineError>(
+                new DetectionError(
+                    $"No faces meet minimum confidence threshold of {options.MinFaceConfidence:P1}. Best confidence: {bestConfidence:P1}",
+                    "facial-image-encoder"));
         }
 
         logger.LogDebug(
             "Selected primary face with confidence: {Confidence:P1}",
             primaryFace.Confidence
         );
-        return primaryFace;
+        return Result.Success<DetectedFace, PipelineError>(primaryFace);
     }
 
-    private static async Task<(
+    private static async Task<Result<(
         Image<Rgba32> PivImage,
         FacialRoiSet RoiSet,
         TransformationData Data
-    )> TransformImageAsync(
+    ), PipelineError>> TransformImageAsync(
         Image<Rgba32> image,
         DetectedFace face,
         ProcessingOptions options,
@@ -647,7 +684,11 @@ public static class FacialImageEncoder
         );
         if (result.IsFailure)
         {
-            throw new InvalidOperationException($"PIV transformation failed: {result.Error}");
+            return Result.Failure<(
+                Image<Rgba32> PivImage,
+                FacialRoiSet RoiSet,
+                TransformationData Data
+            ), PipelineError>(new GeometryError($"PIV transformation failed: {result.Error}", "facial-image-encoder"));
         }
 
         var pivData = result.Value;
@@ -664,10 +705,14 @@ public static class FacialImageEncoder
             }
         );
 
-        return (pivData.PivImage, pivData.RoiSet, transformData);
+        return Result.Success<(
+            Image<Rgba32> PivImage,
+            FacialRoiSet RoiSet,
+            TransformationData Data
+        ), PipelineError>((pivData.PivImage, pivData.RoiSet, transformData));
     }
 
-    private static EncodingResult ExecuteEncodingStrategy(
+    private static Result<EncodingResult, PipelineError> ExecuteEncodingStrategy(
         Image<Rgba32> pivImage,
         FacialRoiSet roiSet,
         ProcessingOptions options,
@@ -684,12 +729,11 @@ public static class FacialImageEncoder
         );
         if (encodingResult.IsFailure)
         {
-            throw new InvalidOperationException(
-                $"JPEG 2000 encoding failed: {encodingResult.Error}"
-            );
+            return Result.Failure<EncodingResult, PipelineError>(
+                new RenderError($"JPEG 2000 encoding failed: {encodingResult.Error}", "facial-image-encoder"));
         }
 
-        return encodingResult.Value;
+        return Result.Success<EncodingResult, PipelineError>(encodingResult.Value);
     }
 
     private sealed record TransformationData(
@@ -724,20 +768,70 @@ public static class FacialImageEncoder
 /// <summary>
 /// Internal service container for facial processing operations
 /// </summary>
-internal sealed class FacialProcessingServices : IDisposable
+public sealed class FacialProcessingServices : IDisposable
 {
+    /// <summary>
+    /// Gets the shared face detector instance.
+    /// </summary>
     public IFaceDetector Detector { get; }
+
+    /// <summary>
+    /// Gets the shared landmark extractor instance.
+    /// </summary>
     public ILandmarkExtractor LandmarkExtractor { get; }
+
+    /// <summary>
+    /// Gets the shared JPEG 2000 encoder instance.
+    /// </summary>
     public IJpeg2000Encoder Encoder { get; }
 
-    public FacialProcessingServices(ILogger logger)
+    private FacialProcessingServices(
+        IFaceDetector detector,
+        ILandmarkExtractor landmarkExtractor,
+        IJpeg2000Encoder encoder)
     {
-        // Services use NullLogger for now - main processing logic uses the provided logger
-        Detector = new RetinaFaceDetector(NullLogger<RetinaFaceDetector>.Instance);
-        LandmarkExtractor = new OnnxLandmarkExtractor(NullLogger<OnnxLandmarkExtractor>.Instance);
-        Encoder = new Jpeg2000EncoderService(NullLogger<Jpeg2000EncoderService>.Instance);
+        Detector = detector;
+        LandmarkExtractor = landmarkExtractor;
+        Encoder = encoder;
     }
 
+    /// <summary>
+    /// Creates the ONNX-backed facial processing services using the supplied logger factory.
+    /// </summary>
+    public static Result<FacialProcessingServices, PipelineError> Create(ILoggerFactory loggerFactory)
+    {
+        var detectorResult = RetinaFaceDetector.Create(loggerFactory.CreateLogger<RetinaFaceDetector>());
+        if (detectorResult.IsFailure)
+        {
+            return Result.Failure<FacialProcessingServices, PipelineError>(detectorResult.Error);
+        }
+
+        var extractorResult = OnnxLandmarkExtractor.Create(
+            loggerFactory.CreateLogger<OnnxLandmarkExtractor>());
+        if (extractorResult.IsFailure)
+        {
+            detectorResult.Value.Dispose();
+            return Result.Failure<FacialProcessingServices, PipelineError>(extractorResult.Error);
+        }
+
+        var encoder = new Jpeg2000EncoderService(loggerFactory.CreateLogger<Jpeg2000EncoderService>());
+        return Result.Success<FacialProcessingServices, PipelineError>(
+            new FacialProcessingServices(detectorResult.Value, extractorResult.Value, encoder));
+    }
+
+    /// <summary>
+    /// Creates the ONNX-backed facial processing services using null-loggers.
+    /// </summary>
+    public static Result<FacialProcessingServices, PipelineError> Create(ILogger logger) =>
+        Create(NullLoggerFactory.Instance);
+
+    internal static FacialProcessingServices FromExisting(
+        IFaceDetector detector,
+        ILandmarkExtractor landmarkExtractor,
+        IJpeg2000Encoder encoder) =>
+        new(detector, landmarkExtractor, encoder);
+
+    /// <inheritdoc />
     public void Dispose()
     {
         if (Detector is IDisposable disposableDetector)

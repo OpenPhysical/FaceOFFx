@@ -41,7 +41,7 @@ public class OnnxLandmarkExtractorTests : IntegrationTestBase
     {
         base.OneTimeSetUp();
         var typedLogger = Substitute.For<ILogger<OnnxLandmarkExtractor>>();
-        _extractor = new OnnxLandmarkExtractor(typedLogger);
+        _extractor = OnnxLandmarkExtractor.Create(typedLogger).Value;
     }
 
     /// <summary>
@@ -163,7 +163,7 @@ public class OnnxLandmarkExtractorTests : IntegrationTestBase
     public void Constructor_LoadsModelSuccessfully()
     {
         var typedLogger = Substitute.For<ILogger<OnnxLandmarkExtractor>>();
-        using var extractor = new OnnxLandmarkExtractor(typedLogger);
+        using var extractor = OnnxLandmarkExtractor.Create(typedLogger).Value;
         extractor.Should().NotBeNull();
     }
 
@@ -190,7 +190,7 @@ public class OnnxLandmarkExtractorTests : IntegrationTestBase
     public void Dispose_CanBeCalledMultipleTimes()
     {
         var typedLogger = Substitute.For<ILogger<OnnxLandmarkExtractor>>();
-        using var extractor = new OnnxLandmarkExtractor(typedLogger);
+        using var extractor = OnnxLandmarkExtractor.Create(typedLogger).Value;
 
         extractor.Dispose();
         extractor.Dispose();

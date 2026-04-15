@@ -1,4 +1,5 @@
 using FaceOFFx.Core.Abstractions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using JetBrains.Annotations;
 using SixLabors.ImageSharp;
@@ -82,7 +83,7 @@ public static class PivProcessor
     /// </code>
     /// </example>
     [PublicAPI]
-    public static async Task<Result<PivResult>> ProcessAsync(
+    public static async Task<Result<PivResult, PipelineError>> ProcessAsync(
         Image<Rgba32> sourceImage,
         IFaceDetector faceDetector,
         ILandmarkExtractor landmarkExtractor,
@@ -113,7 +114,7 @@ public static class PivProcessor
         if (detectedFaces.IsFailure)
         {
             logger?.LogWarning("Face detection failed: {Error}", detectedFaces.Error);
-            return Result.Failure<PivResult>(detectedFaces.Error);
+            return Result.Failure<PivResult, PipelineError>(detectedFaces.Error);
         }
 
         var face = detectedFaces.Value;
@@ -135,7 +136,8 @@ public static class PivProcessor
         if (pivLandmarkResult.IsFailure)
         {
             logger?.LogWarning("PIV landmark processing failed: {Error}", pivLandmarkResult.Error);
-            return Result.Failure<PivResult>(pivLandmarkResult.Error);
+            return Result.Failure<PivResult, PipelineError>(
+                new GeometryError(pivLandmarkResult.Error, "piv-landmarks"));
         }
 
         var pivData = pivLandmarkResult.Value;
@@ -151,6 +153,17 @@ public static class PivProcessor
 
         // Step 3: Create metadata with all relevant information
         logger?.LogDebug("Step 3: Creating metadata");
+        var transformMapResult = RenderTransformMapBuilder.CreateRotateCropResize(
+            sourceDimensions,
+            pivData.AppliedRotation,
+            RenderTransformMapBuilder.ComputeExpandedRotationDimensions(sourceDimensions, pivData.AppliedRotation),
+            pivData.FaceCrop,
+            pivData.Dimensions);
+        if (transformMapResult.IsFailure)
+        {
+            return Result.Failure<PivResult, PipelineError>(transformMapResult.Error);
+        }
+
         var metadata = new Dictionary<string, object>
         {
             ["SourceDimensions"] = sourceDimensions,
@@ -163,12 +176,7 @@ public static class PivProcessor
             ["PivImage"] = pivData.PivImage.Clone(), // Clone for visualization purposes to avoid disposal issues
             ["PivLines"] = pivData.PivLines, // PIV compliance lines (AA, BB, CC)
             ["ComplianceValidation"] = pivData.ComplianceValidation, // PIV compliance validation results
-            ["RenderTransformMap"] = RenderTransformMapBuilder.CreateRotateCropResize(
-                sourceDimensions,
-                pivData.AppliedRotation,
-                RenderTransformMapBuilder.ComputeExpandedRotationDimensions(sourceDimensions, pivData.AppliedRotation),
-                pivData.FaceCrop,
-                pivData.Dimensions),
+            ["RenderTransformMap"] = transformMapResult.Value,
         };
 
         // Step 4: Create PIV transform for compatibility (derived from unified processor results)
@@ -205,7 +213,7 @@ public static class PivProcessor
         if (encodingResult.IsFailure)
         {
             logger?.LogError("JPEG 2000 encoding failed: {Error}", encodingResult.Error);
-            return Result.Failure<PivResult>(encodingResult.Error);
+            return Result.Failure<PivResult, PipelineError>(encodingResult.Error);
         }
         logger?.LogDebug(
             "JPEG 2000 encoding successful, data size: {Size} bytes",
@@ -225,7 +233,11 @@ public static class PivProcessor
             Maybe<IReadOnlyDictionary<string, object>>.From(metadata)
         );
 
-        var validationResult = result.Validate().Map(() => result);
+        var validation = result.Validate();
+        var validationResult = validation.IsSuccess
+            ? Result.Success<PivResult, PipelineError>(result)
+            : Result.Failure<PivResult, PipelineError>(
+                new ValidationError(validation.Error, "piv-result"));
         if (validationResult.IsSuccess)
         {
             logger?.LogInformation(
@@ -258,7 +270,7 @@ public static class PivProcessor
     /// - Choosing the highest confidence detection when multiple faces exist
     /// - Respecting the minimum confidence threshold from options
     /// </remarks>
-    private static async Task<Result<DetectedFace>> DetectFacesSimple(
+    private static async Task<Result<DetectedFace, PipelineError>> DetectFacesSimple(
         Image<Rgba32> image,
         IFaceDetector detector,
         PivProcessingOptions options,
@@ -271,13 +283,14 @@ public static class PivProcessor
         if (faces.IsFailure)
         {
             logger?.LogWarning("Face detection service failed: {Error}", faces.Error);
-            return Result.Failure<DetectedFace>(faces.Error);
+            return Result.Failure<DetectedFace, PipelineError>(faces.Error);
         }
 
         if (faces.Value.Count == 0)
         {
             logger?.LogWarning("No faces detected in the image");
-            return Result.Failure<DetectedFace>("No faces detected");
+            return Result.Failure<DetectedFace, PipelineError>(
+                new DetectionError("No faces detected", "piv"));
         }
 
         logger?.LogDebug("Detected {Count} face(s) in the image", faces.Value.Count);
@@ -289,7 +302,7 @@ public static class PivProcessor
             selectedFace.Confidence,
             selectedFace.BoundingBox
         );
-        return Result.Success(selectedFace);
+        return Result.Success<DetectedFace, PipelineError>(selectedFace);
     }
 
     /// <summary>
@@ -570,7 +583,7 @@ public static class PivProcessor
     /// - Maximized head size within PIV guidelines (240px width)
     /// </remarks>
     [PublicAPI]
-    public static async Task<Result<PivResult>> ConvertJpegToPivJp2Async(
+    public static async Task<Result<PivResult, PipelineError>> ConvertJpegToPivJp2Async(
         string inputJpegPath,
         string outputJp2Path,
         IFaceDetector faceDetector,

@@ -1,4 +1,5 @@
 using System.Numerics;
+using CSharpFunctionalExtensions;
 using FaceOFFx.Core.Abstractions;
 using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
@@ -68,71 +69,128 @@ public static class CanonicalFaceGeometryPipeline
     /// <summary>
     /// Builds canonical geometry from a coarse face detection and one fine landmark extraction pass.
     /// </summary>
-    public static async Task<Result<CanonicalFaceGeometry>> ExtractAsync(
+    /// <summary>
+    /// Builds canonical geometry from a coarse face detection and returns typed pipeline errors.
+    /// </summary>
+    public static async Task<Result<CanonicalFaceGeometry, PipelineError>> ExtractAsync(
         Image<Rgba32> sourceImage,
         DetectedFace detectedFace,
         ILandmarkExtractor landmarkExtractor,
         CancellationToken cancellationToken = default)
     {
-        if (detectedFace.Landmarks5.HasNoValue)
+        var coarseLandmarksResult = detectedFace.Landmarks5.ToPipelineResult(
+            new DetectionError("Coarse face detection did not provide 5-point landmarks required for normalization."));
+
+        if (coarseLandmarksResult.IsFailure)
         {
-            return Result.Failure<CanonicalFaceGeometry>(
-                "Coarse face detection did not provide 5-point landmarks required for normalization.");
+            return Result.Failure<CanonicalFaceGeometry, PipelineError>(coarseLandmarksResult.Error);
         }
 
-        var coarseLandmarks = detectedFace.Landmarks5.GetValueOrThrow(
-            "Coarse 5-point landmarks are required for normalized chip extraction.");
+        var coarseLandmarks = coarseLandmarksResult.Value;
+        var transformResult = BuildChipTransforms(detectedFace, coarseLandmarks, DefaultChipSize);
+        if (transformResult.IsFailure)
+        {
+            return Result.Failure<CanonicalFaceGeometry, PipelineError>(transformResult.Error);
+        }
 
-        var sourceToChip = BuildSourceToChipTransform(detectedFace, coarseLandmarks, DefaultChipSize);
-        var chipToSource = sourceToChip.GetInverse()
-            .GetValueOrThrow("Source-to-chip transform is not invertible.");
-        using var chipImage = RenderNormalizedChip(sourceImage, chipToSource, DefaultChipSize, DefaultChipSize);
+        var chipFaceBoxResult = FaceBox.Create(0, 0, DefaultChipSize, DefaultChipSize)
+            .ToPipelineResult(error => new GeometryError(error, "normalized-chip-face-box"));
+        if (chipFaceBoxResult.IsFailure)
+        {
+            return Result.Failure<CanonicalFaceGeometry, PipelineError>(chipFaceBoxResult.Error);
+        }
+
+        using var chipImage = RenderNormalizedChip(
+            sourceImage,
+            transformResult.Value.ChipToSource,
+            DefaultChipSize,
+            DefaultChipSize);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var chipFaceBoxResult = FaceBox.Create(0, 0, DefaultChipSize, DefaultChipSize);
-        if (chipFaceBoxResult.IsFailure)
-        {
-            return Result.Failure<CanonicalFaceGeometry>(chipFaceBoxResult.Error);
-        }
-        var chipFaceBox = chipFaceBoxResult.Value;
-
         var chipLandmarksResult = await landmarkExtractor
-            .ExtractLandmarksAsync(chipImage, chipFaceBox, cancellationToken)
+            .ExtractLandmarksAsync(chipImage, chipFaceBoxResult.Value, cancellationToken)
             .ConfigureAwait(false);
         if (chipLandmarksResult.IsFailure)
         {
-            return Result.Failure<CanonicalFaceGeometry>(
-                $"Fine landmark extraction failed on normalized chip: {chipLandmarksResult.Error}");
+            return Result.Failure<CanonicalFaceGeometry, PipelineError>(
+                new DetectionError(
+                    $"Fine landmark extraction failed on normalized chip: {chipLandmarksResult.Error.Message}",
+                    "normalized-chip"));
         }
 
+        return Result.Success<CanonicalFaceGeometry, PipelineError>(CreateCanonicalFaceGeometry(
+            detectedFace,
+            coarseLandmarks,
+            transformResult.Value.SourceToChip,
+            transformResult.Value.ChipToSource,
+            chipLandmarksResult.Value));
+    }
+
+    private static CanonicalFaceGeometry CreateCanonicalFaceGeometry(
+        DetectedFace detectedFace,
+        FaceLandmarks5 coarseLandmarks,
+        TransformationMatrix sourceToChip,
+        TransformationMatrix chipToSource,
+        FaceLandmarks68 chipLandmarks)
+    {
         var sourceLandmarks = new FaceLandmarks68(
-            chipLandmarksResult.Value.Points
+            chipLandmarks.Points
                 .Select(chipToSource.TransformPoint)
                 .ToList());
 
-        return Result.Success(new CanonicalFaceGeometry(
+        return new CanonicalFaceGeometry(
             detectedFace,
             coarseLandmarks,
             new ImageDimensions(DefaultChipSize, DefaultChipSize),
-            chipLandmarksResult.Value,
+            chipLandmarks,
             sourceLandmarks,
             sourceToChip,
-            chipToSource));
+            chipToSource);
     }
 
-    private static TransformationMatrix BuildSourceToChipTransform(
+    private static Result<(TransformationMatrix SourceToChip, TransformationMatrix ChipToSource), PipelineError> BuildChipTransforms(
+        DetectedFace detectedFace,
+        FaceLandmarks5 coarseLandmarks,
+        int chipSize)
+    {
+        var sourceToChipResult = BuildSourceToChipTransform(detectedFace, coarseLandmarks, chipSize);
+        if (sourceToChipResult.IsFailure)
+        {
+            return Result.Failure<(TransformationMatrix SourceToChip, TransformationMatrix ChipToSource), PipelineError>(
+                sourceToChipResult.Error);
+        }
+
+        var sourceToChip = sourceToChipResult.Value;
+        return sourceToChip.GetInverse()
+            .ToPipelineResult(new GeometryError("Source-to-chip transform is not invertible.", "chip-transform"))
+            .Map(chipToSource => (sourceToChip, chipToSource));
+    }
+
+    private static Result<TransformationMatrix, PipelineError> BuildSourceToChipTransform(
         DetectedFace detectedFace,
         FaceLandmarks5 landmarks,
         int chipSize)
     {
-        var horizontalAxis = CalculateHorizontalAxis(landmarks);
+        var horizontalAxisResult = CalculateHorizontalAxis(landmarks);
+        if (horizontalAxisResult.IsFailure)
+        {
+            return Result.Failure<TransformationMatrix, PipelineError>(horizontalAxisResult.Error);
+        }
+
+        var horizontalAxis = horizontalAxisResult.Value;
         var verticalAxis = new Point2D(-horizontalAxis.Y, horizontalAxis.X);
-        var chipSquare = BuildChipSquare(detectedFace.BoundingBox, landmarks.Nose, horizontalAxis, verticalAxis);
-        return BuildSquareToChipTransform(chipSquare, horizontalAxis, verticalAxis, chipSize);
+        var chipSquareResult = BuildChipSquare(detectedFace.BoundingBox, landmarks.Nose, horizontalAxis, verticalAxis);
+        if (chipSquareResult.IsFailure)
+        {
+            return Result.Failure<TransformationMatrix, PipelineError>(chipSquareResult.Error);
+        }
+
+        return Result.Success<TransformationMatrix, PipelineError>(
+            BuildSquareToChipTransform(chipSquareResult.Value, horizontalAxis, verticalAxis, chipSize));
     }
 
-    private static ChipSquare BuildChipSquare(
+    private static Result<ChipSquare, PipelineError> BuildChipSquare(
         FaceBox coarseFaceBox,
         Point2D nosePoint,
         Point2D horizontalAxis,
@@ -150,14 +208,15 @@ public static class CanonicalFaceGeometryPipeline
         var sideLength = Math.Max(width, height) * (1f + ChipMarginRatio);
         if (sideLength <= 0.0001f)
         {
-            throw new InvalidOperationException("Cannot build chip square from degenerate coarse face bounds.");
+            return Result.Failure<ChipSquare, PipelineError>(
+                new GeometryError("Cannot build chip square from degenerate coarse face bounds.", "chip-square"));
         }
 
         var centerInAxisSpace = new Point2D((minX + maxX) / 2f, (minY + maxY) / 2f);
         var sourceCenter = nosePoint
             + (horizontalAxis * centerInAxisSpace.X)
             + (verticalAxis * centerInAxisSpace.Y);
-        return new ChipSquare(sourceCenter, sideLength);
+        return Result.Success<ChipSquare, PipelineError>(new ChipSquare(sourceCenter, sideLength));
     }
 
     private static IEnumerable<Point2D> BuildDetectorExtent(FaceBox coarseFaceBox)
@@ -171,10 +230,22 @@ public static class CanonicalFaceGeometryPipeline
         };
     }
 
-    private static Point2D CalculateHorizontalAxis(FaceLandmarks5 landmarks)
+    private static Result<Point2D, PipelineError> CalculateHorizontalAxis(FaceLandmarks5 landmarks)
     {
-        var eyeVector = Normalize(landmarks.RightEye - landmarks.LeftEye);
-        var mouthVector = Normalize(landmarks.RightMouth - landmarks.LeftMouth);
+        var eyeVectorResult = Normalize(landmarks.RightEye - landmarks.LeftEye);
+        if (eyeVectorResult.IsFailure)
+        {
+            return Result.Failure<Point2D, PipelineError>(eyeVectorResult.Error);
+        }
+
+        var mouthVectorResult = Normalize(landmarks.RightMouth - landmarks.LeftMouth);
+        if (mouthVectorResult.IsFailure)
+        {
+            return Result.Failure<Point2D, PipelineError>(mouthVectorResult.Error);
+        }
+
+        var eyeVector = eyeVectorResult.Value;
+        var mouthVector = mouthVectorResult.Value;
         var combined = eyeVector + mouthVector;
         if (combined.DistanceTo(Point2D.Zero) <= 0.0001f)
         {
@@ -184,15 +255,16 @@ public static class CanonicalFaceGeometryPipeline
         return Normalize(combined);
     }
 
-    private static Point2D Normalize(Point2D vector)
+    private static Result<Point2D, PipelineError> Normalize(Point2D vector)
     {
         var length = vector.DistanceTo(Point2D.Zero);
         if (length <= 0.0001f)
         {
-            throw new InvalidOperationException("Cannot normalize a zero-length axis vector.");
+            return Result.Failure<Point2D, PipelineError>(
+                new GeometryError("Cannot normalize a zero-length axis vector.", "chip-axis"));
         }
 
-        return new Point2D(vector.X / length, vector.Y / length);
+        return Result.Success<Point2D, PipelineError>(new Point2D(vector.X / length, vector.Y / length));
     }
 
     private static Point2D ProjectToAxisSpace(

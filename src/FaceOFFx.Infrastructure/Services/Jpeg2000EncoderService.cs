@@ -1,5 +1,6 @@
 using CoreJ2K;
 using CoreJ2K.ImageSharp;
+using FaceOFFx.Core.Domain.Common;
 using JetBrains.Annotations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -63,7 +64,7 @@ public class Jpeg2000EncoderService : IJpeg2000Encoder
     /// Encodes an image to JPEG 2000 with ROI Inner Region for PIV compliance.
     /// Uses JPEG 2000 maxshift ROI encoding with configurable quality balance.
     /// </summary>
-    public Result<byte[]> EncodeWithRoi(
+    public Result<byte[], PipelineError> EncodeWithRoi(
         Image<Rgba32> image,
         FacialRoiSet roiSet,
         float baseRate = 1.0f,
@@ -145,12 +146,13 @@ public class Jpeg2000EncoderService : IJpeg2000Encoder
                 "EncodeWithRoi completed successfully, encoded {Bytes} bytes",
                 encodedData.Length
             );
-            return Result.Success(encodedData);
+            return Result.Success<byte[], PipelineError>(encodedData);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "JPEG 2000 ROI encoding failed");
-            return Result.Failure<byte[]>($"JPEG 2000 ROI encoding failed: {ex.Message}");
+            return Result.Failure<byte[], PipelineError>(
+                new RenderError($"JPEG 2000 ROI encoding failed: {ex.Message}", "jpeg2000"));
         }
         finally
         {

@@ -23,17 +23,7 @@ public static class ServiceCollectionExtensions
     {
         services.TryAddSingleton<IAnsiConsole>(AnsiConsole.Console);
 
-        services.AddScoped<IFaceDetector>(sp =>
-        {
-            var detectorLogger = sp.GetRequiredService<ILogger<RetinaFaceDetector>>();
-            return new RetinaFaceDetector(detectorLogger);
-        });
-
-        services.AddScoped<ILandmarkExtractor>(sp =>
-        {
-            var extractorLogger = sp.GetRequiredService<ILogger<OnnxLandmarkExtractor>>();
-            return new OnnxLandmarkExtractor(extractorLogger);
-        });
+        services.AddScoped<IFacialProcessingServiceFactory, OnnxFacialProcessingServiceFactory>();
 
         services.AddTransient<IJpeg2000Encoder>(sp =>
         {

@@ -1,4 +1,6 @@
 using JetBrains.Annotations;
+using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 
 namespace FaceOFFx.Models;
 
@@ -18,21 +20,21 @@ public static class ModelRegistry
     public const string FaceLandmarks68 = "FaceOFFx.Models.Resources.landmarks_68_pfld.onnx";
 
     /// <summary>
-    /// Gets a model as a byte array from embedded resources
+    /// Gets a model as a byte array from embedded resources.
     /// </summary>
-    /// [PublicAPI]
-    public static byte[] GetModel(string modelName)
+    public static Result<byte[], PipelineError> TryGetModel(string modelName)
     {
         var assembly = typeof(ModelRegistry).Assembly;
-        using var stream =
-            assembly.GetManifestResourceStream(modelName)
-            ?? throw new InvalidOperationException(
-                $"Model {modelName} not found in embedded resources"
-            );
+        using var stream = assembly.GetManifestResourceStream(modelName);
+        if (stream is null)
+        {
+            return Result.Failure<byte[], PipelineError>(
+                new ConfigurationError($"Model {modelName} not found in embedded resources", modelName));
+        }
 
         using var memoryStream = new MemoryStream();
         stream.CopyTo(memoryStream);
-        return memoryStream.ToArray();
+        return Result.Success<byte[], PipelineError>(memoryStream.ToArray());
     }
 
     /// <summary>

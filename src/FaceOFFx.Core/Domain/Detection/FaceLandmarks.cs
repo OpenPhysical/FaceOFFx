@@ -152,12 +152,14 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
     /// This is particularly important for professional photos where the background may be
     /// intentionally blurred while the face remains sharp.
     /// </remarks>
-    public Rectangle CalculateFaceRoi(float paddingPercent = 0.15f)
+    public Result<Rectangle, PipelineError> CalculateFaceRoi(float paddingPercent = 0.15f)
     {
         if (!IsValid)
         {
-            throw new InvalidOperationException(
-                "Cannot calculate face ROI from invalid landmarks (must have exactly 68 points)");
+            return Result.Failure<Rectangle, PipelineError>(
+                new GeometryError(
+                    "Cannot calculate face ROI from invalid landmarks (must have exactly 68 points)",
+                    "landmarks"));
         }
 
         // Get face contour points (jaw line: 0-16)
@@ -193,24 +195,25 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
         var roiWidth = faceWidth + (2 * paddingX);
         var roiHeight = totalFaceHeight + (2 * paddingY);
         
-        return new Rectangle(
+        return Result.Success<Rectangle, PipelineError>(new Rectangle(
             (int)Math.Floor(roiX),
             (int)Math.Floor(roiY),
             (int)Math.Ceiling(roiWidth),
-            (int)Math.Ceiling(roiHeight));
+            (int)Math.Ceiling(roiHeight)));
     }
 
     /// <summary>
     /// Calculates an elliptical face region from the 68-point landmarks for quality analysis
     /// </summary>
     /// <returns>Center point, width, height, and rotation angle of the face ellipse</returns>
-    public (Point2D center, float width, float height, float angle) CalculateFaceEllipse()
+    public Result<(Point2D center, float width, float height, float angle), PipelineError> CalculateFaceEllipse()
     {
         if (!IsValid)
         {
-            throw new InvalidOperationException(
-                "Cannot calculate face ellipse from invalid landmarks (must have exactly 68 points)"
-            );
+            return Result.Failure<(Point2D center, float width, float height, float angle), PipelineError>(
+                new GeometryError(
+                    "Cannot calculate face ellipse from invalid landmarks (must have exactly 68 points)",
+                    "landmarks"));
         }
         
         // Use jaw line points (0-16) plus eyebrow points (17-26) to estimate face boundary
@@ -249,7 +252,8 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
         // Increase height to include forehead
         height *= 1.2f;
         
-        return (center, width, height, angle);
+        return Result.Success<(Point2D center, float width, float height, float angle), PipelineError>(
+            (center, width, height, angle));
     }
     
     /// <summary>
@@ -261,13 +265,14 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
     /// Line BB (Horizontal Eye): Passes through both eye centers
     /// Line CC (Head Width): Level line between the widest face contour points
     /// </remarks>
-    public PivComplianceLines CalculatePivLines()
+    public Result<PivComplianceLines, PipelineError> CalculatePivLines()
     {
         if (!IsValid)
         {
-            throw new InvalidOperationException(
-                "Cannot calculate PIV lines from invalid landmarks (must have exactly 68 points)"
-            );
+            return Result.Failure<PivComplianceLines, PipelineError>(
+                new GeometryError(
+                    "Cannot calculate PIV lines from invalid landmarks (must have exactly 68 points)",
+                    "landmarks"));
         }
 
         // Calculate nose center from nose bridge landmarks (27-30)
@@ -306,7 +311,7 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
         // Calculate Line CC (Head Width) - now using actual widest points
         var lineCC_Width = rightmostPoint.X - leftmostPoint.X;
 
-        return new PivComplianceLines(
+        return Result.Success<PivComplianceLines, PipelineError>(new PivComplianceLines(
             lineAA_X,
             lineBB_Y,
             lineCC_Width,
@@ -316,6 +321,6 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
             rightEyeCenter,
             leftEarPoint,
             rightEarPoint
-        );
+        ));
     }
 }

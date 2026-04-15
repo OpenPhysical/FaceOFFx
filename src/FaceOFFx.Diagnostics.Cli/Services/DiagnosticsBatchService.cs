@@ -24,26 +24,40 @@ internal sealed class DiagnosticsBatchService(
     private readonly DocumentJobRunner _documentJobRunner = documentJobRunner;
     private readonly ILogger<DiagnosticsBatchService> _logger = logger;
 
-    public async Task<Result<DetectionAnalysisResult>> DetectAsync(string inputPath, CancellationToken cancellationToken = default)
+    public async Task<Result<DetectionAnalysisResult, PipelineError>> DetectAsync(string inputPath, CancellationToken cancellationToken = default)
     {
-        using var image = await Image.LoadAsync<Rgba32>(inputPath, cancellationToken);
+        var imageResult = await LoadImageAsync(inputPath, cancellationToken).ConfigureAwait(false);
+        if (imageResult.IsFailure)
+        {
+            return Result.Failure<DetectionAnalysisResult, PipelineError>(imageResult.Error);
+        }
+
+        using var image = imageResult.Value;
         var facesResult = await _faceGeometryPipeline.DetectFacesAsync(image, cancellationToken);
         if (facesResult.IsFailure)
         {
-            return Result.Failure<DetectionAnalysisResult>(facesResult.Error);
+            return Result.Failure<DetectionAnalysisResult, PipelineError>(facesResult.Error);
         }
 
         var faces = facesResult.Value.OrderByDescending(face => face.Confidence).ToArray();
         FaceLandmarks68? landmarks = null;
         Maybe<DetectedFace> primaryFace = Maybe<DetectedFace>.None;
         Maybe<CanonicalFaceGeometry> canonicalGeometry = Maybe<CanonicalFaceGeometry>.None;
+        IReadOnlyList<PointDto> chipPolygon = Array.Empty<PointDto>();
         IReadOnlyList<PointDto> coarseLandmarks = Array.Empty<PointDto>();
         if (faces.Length > 0)
         {
             primaryFace = Maybe<DetectedFace>.From(faces[0]);
             if (faces[0].Landmarks5.HasValue)
             {
-                var coarse = faces[0].Landmarks5.GetValueOrThrow("Coarse 5-point landmarks were expected.");
+                var coarseResult = faces[0].Landmarks5.ToPipelineResult(
+                    new DetectionError("Coarse 5-point landmarks were expected.", inputPath));
+                if (coarseResult.IsFailure)
+                {
+                    return Result.Failure<DetectionAnalysisResult, PipelineError>(coarseResult.Error);
+                }
+
+                var coarse = coarseResult.Value;
                 coarseLandmarks = new[]
                 {
                     new PointDto(coarse.LeftEye.X, coarse.LeftEye.Y),
@@ -60,24 +74,23 @@ internal sealed class DiagnosticsBatchService(
             {
                 canonicalGeometry = Maybe<CanonicalFaceGeometry>.From(geometryResult.Value);
                 landmarks = geometryResult.Value.SourceLandmarks;
+                chipPolygon = BuildChipPolygon(geometryResult.Value);
             }
         }
 
-        return Result.Success(new DetectionAnalysisResult(
+        return Result.Success<DetectionAnalysisResult, PipelineError>(new DetectionAnalysisResult(
             inputPath,
             image.Width,
             image.Height,
             faces.Select(face => new DetectionFaceResult(face.BoundingBox.X, face.BoundingBox.Y, face.BoundingBox.Width, face.BoundingBox.Height, face.Confidence)).ToArray(),
             coarseLandmarks,
-            canonicalGeometry.HasValue
-                ? BuildChipPolygon(canonicalGeometry.GetValueOrThrow("Canonical geometry is required for chip polygon projection."))
-                : Array.Empty<PointDto>(),
+            chipPolygon,
             landmarks?.Points.Select(point => new PointDto(point.X, point.Y)).ToArray() ?? Array.Empty<PointDto>(),
             primaryFace,
             canonicalGeometry));
     }
 
-    public async Task<Result<OverlayAnalysisResult>> AnalyzeOverlayAsync(
+    public async Task<Result<OverlayAnalysisResult, PipelineError>> AnalyzeOverlayAsync(
         string inputPath,
         string? profileId,
         CancellationToken cancellationToken = default)
@@ -85,23 +98,29 @@ internal sealed class DiagnosticsBatchService(
         var detection = await DetectAsync(inputPath, cancellationToken);
         if (detection.IsFailure)
         {
-            return Result.Failure<OverlayAnalysisResult>(detection.Error);
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(detection.Error);
         }
 
         return await AnalyzeOverlayAsync(inputPath, detection.Value, profileId, cancellationToken);
     }
 
-    public async Task<Result<OverlayAnalysisResult>> AnalyzeOverlayAsync(
+    public async Task<Result<OverlayAnalysisResult, PipelineError>> AnalyzeOverlayAsync(
         string inputPath,
         DetectionAnalysisResult detection,
         string? profileId,
         CancellationToken cancellationToken = default)
     {
-        using var image = await Image.LoadAsync<Rgba32>(inputPath, cancellationToken);
+        var imageResult = await LoadImageAsync(inputPath, cancellationToken).ConfigureAwait(false);
+        if (imageResult.IsFailure)
+        {
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(imageResult.Error);
+        }
+
+        using var image = imageResult.Value;
 
         if (string.IsNullOrWhiteSpace(profileId))
         {
-            return Result.Success(new OverlayAnalysisResult(detection, Array.Empty<PointDto>(), Array.Empty<PointDto>(), Array.Empty<PointDto>(), "raw"));
+            return Result.Success<OverlayAnalysisResult, PipelineError>(new OverlayAnalysisResult(detection, Array.Empty<PointDto>(), Array.Empty<PointDto>(), Array.Empty<PointDto>(), "raw"));
         }
 
         if (string.Equals(profileId, "piv", StringComparison.OrdinalIgnoreCase))
@@ -112,7 +131,7 @@ internal sealed class DiagnosticsBatchService(
         return await AnalyzePassportStyleOverlayAsync(inputPath, detection, profileId!, cancellationToken);
     }
 
-    public Task<Result<DocumentJobResult>> CropAsync(
+    public Task<Result<DocumentJobResult, PipelineError>> CropAsync(
         string inputPath,
         string profileId,
         string? variant,
@@ -146,28 +165,36 @@ internal sealed class DiagnosticsBatchService(
             .ToArray();
     }
 
-    private async Task<Result<OverlayAnalysisResult>> AnalyzePivOverlayAsync(
+    private async Task<Result<OverlayAnalysisResult, PipelineError>> AnalyzePivOverlayAsync(
         string inputPath,
         DetectionAnalysisResult detection,
         CancellationToken cancellationToken)
     {
-        if (detection.CanonicalGeometry.HasNoValue)
+        var geometryResult = detection.CanonicalGeometry.ToPipelineResult(
+            new GeometryError("Canonical geometry was not available for PIV overlay rendering.", "piv"));
+        if (geometryResult.IsFailure)
         {
-            return Result.Failure<OverlayAnalysisResult>("Canonical geometry was not available for PIV overlay rendering.");
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(geometryResult.Error);
         }
 
-        using var sourceImage = await Image.LoadAsync<Rgba32>(inputPath, cancellationToken);
+        var sourceImageResult = await LoadImageAsync(inputPath, cancellationToken).ConfigureAwait(false);
+        if (sourceImageResult.IsFailure)
+        {
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(sourceImageResult.Error);
+        }
+
+        using var sourceImage = sourceImageResult.Value;
         var pivResult = _documentRenderService.RenderPiv(
             sourceImage,
-            detection.CanonicalGeometry.GetValueOrThrow("Canonical geometry is required for PIV overlays."),
+            geometryResult.Value,
             PivProcessingOptions.Default);
         if (pivResult.IsFailure)
         {
-            return Result.Failure<OverlayAnalysisResult>(pivResult.Error);
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(pivResult.Error);
         }
 
         var transformedLandmarks = pivResult.Value.Landmarks;
-        var transformMap = RenderTransformMapBuilder.CreateRotateCropResize(
+        var transformMapResult = RenderTransformMapBuilder.CreateRotateCropResize(
             new ImageDimensions(sourceImage.Width, sourceImage.Height),
             pivResult.Value.AppliedRotation,
             RenderTransformMapBuilder.ComputeExpandedRotationDimensions(
@@ -175,6 +202,12 @@ internal sealed class DiagnosticsBatchService(
                 pivResult.Value.AppliedRotation),
             pivResult.Value.FaceCrop,
             pivResult.Value.Dimensions);
+        if (transformMapResult.IsFailure)
+        {
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(transformMapResult.Error);
+        }
+
+        var transformMap = transformMapResult.Value;
 
         var projected = transformedLandmarks.Points
             .Select(transformMap.MapOutputToSource)
@@ -185,7 +218,7 @@ internal sealed class DiagnosticsBatchService(
             .Select(point => new PointDto(point.X, point.Y))
             .ToArray();
 
-        return Result.Success(new OverlayAnalysisResult(
+        return Result.Success<OverlayAnalysisResult, PipelineError>(new OverlayAnalysisResult(
             detection,
             projected,
             cropPolygon,
@@ -193,31 +226,51 @@ internal sealed class DiagnosticsBatchService(
             "piv"));
     }
 
-    private async Task<Result<OverlayAnalysisResult>> AnalyzePassportStyleOverlayAsync(
+    private async Task<Result<OverlayAnalysisResult, PipelineError>> AnalyzePassportStyleOverlayAsync(
         string inputPath,
         DetectionAnalysisResult detection,
         string documentId,
         CancellationToken cancellationToken)
     {
-        var document = DocumentCatalog.GetDocumentOrThrow(documentId);
+        var documentResult = DocumentCatalog.GetDocument(documentId);
+        if (documentResult.IsFailure)
+        {
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(documentResult.Error);
+        }
+
+        var document = documentResult.Value;
         var variantId = document.PrimaryVariantId;
         var deliverable = document.Variants[variantId].Deliverables.First();
         var specId = deliverable.ProductionDefaults["spec"];
-        var spec = DocumentCatalog.GetPassportPhotoSpecOrThrow(specId);
-
-        if (detection.CanonicalGeometry.HasNoValue)
+        var specResult = DocumentCatalog.GetPassportPhotoSpec(specId);
+        if (specResult.IsFailure)
         {
-            return Result.Failure<OverlayAnalysisResult>("Canonical geometry was not available for document overlay rendering.");
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(specResult.Error);
         }
 
-        using var sourceImage = await Image.LoadAsync<Rgba32>(inputPath, cancellationToken);
+        var spec = specResult.Value;
+
+        var geometryResult = detection.CanonicalGeometry.ToPipelineResult(
+            new GeometryError("Canonical geometry was not available for document overlay rendering.", documentId));
+        if (geometryResult.IsFailure)
+        {
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(geometryResult.Error);
+        }
+
+        var sourceImageResult = await LoadImageAsync(inputPath, cancellationToken).ConfigureAwait(false);
+        if (sourceImageResult.IsFailure)
+        {
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(sourceImageResult.Error);
+        }
+
+        using var sourceImage = sourceImageResult.Value;
         var alignment = _documentRenderService.RenderPassport(
             sourceImage,
-            detection.CanonicalGeometry.GetValueOrThrow("Canonical geometry is required for overlay rendering."),
+            geometryResult.Value,
             spec);
         if (alignment.IsFailure)
         {
-            return Result.Failure<OverlayAnalysisResult>(alignment.Error);
+            return Result.Failure<OverlayAnalysisResult, PipelineError>(alignment.Error);
         }
 
         using var alignedPortrait = alignment.Value.Image;
@@ -230,12 +283,26 @@ internal sealed class DiagnosticsBatchService(
             .Select(point => new PointDto(point.X, point.Y))
             .ToArray();
 
-        return Result.Success(new OverlayAnalysisResult(
+        return Result.Success<OverlayAnalysisResult, PipelineError>(new OverlayAnalysisResult(
             detection,
             projected,
             cropPolygon,
             alignment.Value.Landmarks.Points.Select(point => new PointDto(point.X, point.Y)).ToArray(),
             documentId));
+    }
+
+    private static async Task<Result<Image<Rgba32>, PipelineError>> LoadImageAsync(string inputPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Result.Success<Image<Rgba32>, PipelineError>(
+                await Image.LoadAsync<Rgba32>(inputPath, cancellationToken).ConfigureAwait(false));
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<Image<Rgba32>, PipelineError>(
+                new InputError($"Failed to load image '{inputPath}': {ex.Message}", inputPath));
+        }
     }
 
 }

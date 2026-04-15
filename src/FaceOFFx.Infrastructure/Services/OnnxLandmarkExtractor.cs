@@ -1,4 +1,5 @@
 using JetBrains.Annotations;
+using FaceOFFx.Core.Domain.Common;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -18,14 +19,22 @@ public sealed class OnnxLandmarkExtractor : ILandmarkExtractor, IDisposable
     private const int NumLandmarks = 68;
     private bool _disposed;
 
-    /// <summary>
-    /// 68-point facial landmark extraction using Onnx
-    /// </summary>
-    /// <param name="logger"></param>
-    public OnnxLandmarkExtractor(ILogger<OnnxLandmarkExtractor> logger)
+    private OnnxLandmarkExtractor(
+        ILogger<OnnxLandmarkExtractor> logger,
+        InferenceSession session,
+        string inputName)
     {
         _logger = logger;
+        _session = session;
+        _inputName = inputName;
+    }
 
+    /// <summary>
+    /// Creates a new 68-point facial landmark extractor using ONNX.
+    /// </summary>
+    public static Result<OnnxLandmarkExtractor, PipelineError> Create(
+        ILogger<OnnxLandmarkExtractor> logger)
+    {
         try
         {
             var sessionOptions = new SessionOptions
@@ -33,24 +42,29 @@ public sealed class OnnxLandmarkExtractor : ILandmarkExtractor, IDisposable
                 GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
             };
 
-            // Load model from embedded resources
-            var modelBytes = Models.ModelRegistry.GetModel(Models.ModelRegistry.FaceLandmarks68);
-            _session = new InferenceSession(modelBytes, sessionOptions);
+            var modelBytesResult = Models.ModelRegistry.TryGetModel(Models.ModelRegistry.FaceLandmarks68);
+            if (modelBytesResult.IsFailure)
+            {
+                return Result.Failure<OnnxLandmarkExtractor, PipelineError>(modelBytesResult.Error);
+            }
 
-            // Get input/output names from the model
-            _inputName = _session.InputMetadata.Keys.First();
+            var session = new InferenceSession(modelBytesResult.Value, sessionOptions);
+            var inputName = session.InputMetadata.Keys.First();
+            return Result.Success<OnnxLandmarkExtractor, PipelineError>(
+                new OnnxLandmarkExtractor(logger, session, inputName));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize OnnxLandmarkExtractor");
-            throw;
+            logger.LogError(ex, "Failed to initialize OnnxLandmarkExtractor");
+            return Result.Failure<OnnxLandmarkExtractor, PipelineError>(
+                new ConfigurationError($"Failed to initialize landmark extractor: {ex.Message}", "pfld"));
         }
     }
 
     /// <summary>
     /// Extracts 68 facial landmark points from a face region
     /// </summary>
-    public async Task<Result<FaceLandmarks68>> ExtractLandmarksAsync(
+    public async Task<Result<FaceLandmarks68, PipelineError>> ExtractLandmarksAsync(
         Image<Rgba32> image,
         FaceBox faceBox,
         CancellationToken cancellationToken = default
@@ -99,9 +113,10 @@ public sealed class OnnxLandmarkExtractor : ILandmarkExtractor, IDisposable
             // Step 5: Convert output to landmarks
             if (output.Length != NumLandmarks * 2)
             {
-                return Result.Failure<FaceLandmarks68>(
-                    $"Invalid model output: expected {NumLandmarks * 2} values, got {output.Length}"
-                );
+                return Result.Failure<FaceLandmarks68, PipelineError>(
+                    new DetectionError(
+                        $"Invalid model output: expected {NumLandmarks * 2} values, got {output.Length}",
+                        "pfld-output"));
             }
 
             // Calculate padding used when resizing with Mode=Pad
@@ -149,12 +164,13 @@ public sealed class OnnxLandmarkExtractor : ILandmarkExtractor, IDisposable
             }
 
             _logger.LogDebug("Successfully extracted {Count} landmarks", landmarks.Count);
-            return Result.Success(new FaceLandmarks68(landmarks));
+            return Result.Success<FaceLandmarks68, PipelineError>(new FaceLandmarks68(landmarks));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Landmark extraction failed");
-            return Result.Failure<FaceLandmarks68>($"Landmark extraction failed: {ex.Message}");
+            return Result.Failure<FaceLandmarks68, PipelineError>(
+                new DetectionError($"Landmark extraction failed: {ex.Message}", "pfld"));
         }
     }
 

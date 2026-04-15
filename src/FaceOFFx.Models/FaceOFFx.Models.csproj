@@ -8,6 +8,10 @@
     <EmbeddedResource Include="Resources\*.onnx" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FaceOFFx.Core\FaceOFFx.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CSharpFunctionalExtensions" Version="3.6.0" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.0" />
   </ItemGroup>
 </Project>

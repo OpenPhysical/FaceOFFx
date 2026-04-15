@@ -1,4 +1,5 @@
 using FaceOFFx.Core.Domain.Detection;
+using FaceOFFx.Core.Domain.Common;
 using JetBrains.Annotations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -18,7 +19,7 @@ public interface ILandmarkExtractor
     /// <param name="faceBox">The bounding box of the detected face</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>68 facial landmark points</returns>
-    Task<Result<FaceLandmarks68>> ExtractLandmarksAsync(
+    Task<Result<FaceLandmarks68, PipelineError>> ExtractLandmarksAsync(
         Image<Rgba32> image,
         FaceBox faceBox,
         CancellationToken cancellationToken = default

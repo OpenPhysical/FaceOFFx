@@ -55,7 +55,7 @@ public static class RenderTransformMapBuilder
     /// <summary>
     /// Creates an affine transform map for the exact sequence rotate expanded-canvas, crop, then resize.
     /// </summary>
-    public static RenderTransformMap CreateRotateCropResize(
+    public static Result<RenderTransformMap, PipelineError> CreateRotateCropResize(
         ImageDimensions sourceDimensions,
         float rotationDegrees,
         ImageDimensions rotatedDimensions,
@@ -72,15 +72,15 @@ public static class RenderTransformMapBuilder
                 0);
 
         var sourceToOutput = cropAndResize * rotate;
-        var inverse = sourceToOutput.GetInverse().GetValueOrThrow("Render transform is not invertible.");
-
-        return new RenderTransformMap(
-            sourceDimensions,
-            rotatedDimensions,
-            cropRectangle,
-            outputDimensions,
-            sourceToOutput,
-            inverse);
+        return sourceToOutput.GetInverse()
+            .ToPipelineResult(new GeometryError("Render transform is not invertible.", "render-transform"))
+            .Map(inverse => new RenderTransformMap(
+                sourceDimensions,
+                rotatedDimensions,
+                cropRectangle,
+                outputDimensions,
+                sourceToOutput,
+                inverse));
     }
 
     /// <summary>

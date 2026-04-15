@@ -71,11 +71,11 @@ internal abstract class DocumentIssuanceCommandBase(
             {
                 if (settings.Json)
                 {
-                    WriteJson(originalStdout, new { Error = result.Error });
+                    WriteJson(originalStdout, new { Error = result.Error.Message });
                 }
                 else
                 {
-                    Console.MarkupLine($"[red]Error:[/] {result.Error}");
+                    Console.MarkupLine($"[red]Error:[/] {result.Error.Message}");
                 }
 
                 return 1;

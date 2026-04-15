@@ -23,6 +23,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 
 namespace FaceOFFx.Core.Domain.Quality;
@@ -45,28 +46,28 @@ public static class ComplianceEvaluators
         var illuminationPassed = measurement.IlluminationAsymmetryPercent >= rules.MinSymmetryPercent;
         var posePassed = measurement.PoseAsymmetryPercent >= rules.MinSymmetryPercent;
         
-        RejectionReason? rejection = null;
+        var rejection = Maybe<RejectionReason>.None;
         if (countsTowardsCompliance && !illuminationPassed)
         {
-            rejection = RejectionReason.Create(
+            rejection = Maybe<RejectionReason>.From(RejectionReason.Create(
                 "Illumination Asymmetry",
                 measurement.IlluminationAsymmetryPercent,
                 rules.MinSymmetryPercent,
                 standard,
                 ComparisonType.MustBeGreaterThan,
                 MetricUnit.Percentage
-            );
+            ));
         }
         else if (countsTowardsCompliance && !posePassed)
         {
-            rejection = RejectionReason.Create(
+            rejection = Maybe<RejectionReason>.From(RejectionReason.Create(
                 "Pose Asymmetry",
                 measurement.PoseAsymmetryPercent,
                 rules.MinSymmetryPercent,
                 standard,
                 ComparisonType.MustBeGreaterThan,
                 MetricUnit.Percentage
-            );
+            ));
         }
         
         return new SymmetryCompliance(
@@ -89,17 +90,17 @@ public static class ComplianceEvaluators
         var standard = rules.ToStandard();
         var passed = measurement.OverallSharpnessPercent >= rules.MinSharpnessPercent;
         
-        RejectionReason? rejection = null;
+        var rejection = Maybe<RejectionReason>.None;
         if (!passed)
         {
-            rejection = RejectionReason.Create(
+            rejection = Maybe<RejectionReason>.From(RejectionReason.Create(
                 "Sharpness",
                 measurement.OverallSharpnessPercent,
                 rules.MinSharpnessPercent,
                 standard,
                 ComparisonType.MustBeGreaterThan,
                 MetricUnit.Percentage
-            );
+            ));
         }
         
         return new SharpnessCompliance(
@@ -121,28 +122,28 @@ public static class ComplianceEvaluators
         var standard = rules.ToStandard();
         var passed = headSizePercent >= rules.MinHeadSizePercent && headSizePercent <= rules.MaxHeadSizePercent;
         
-        RejectionReason? rejection = null;
+        var rejection = Maybe<RejectionReason>.None;
         if (headSizePercent < rules.MinHeadSizePercent)
         {
-            rejection = RejectionReason.Create(
+            rejection = Maybe<RejectionReason>.From(RejectionReason.Create(
                 "Head Size",
                 headSizePercent,
                 rules.MinHeadSizePercent,
                 standard,
                 ComparisonType.MustBeGreaterThan,
                 MetricUnit.Percentage
-            );
+            ));
         }
         else if (headSizePercent > rules.MaxHeadSizePercent)
         {
-            rejection = RejectionReason.Create(
+            rejection = Maybe<RejectionReason>.From(RejectionReason.Create(
                 "Head Size",
                 headSizePercent,
                 rules.MaxHeadSizePercent,
                 standard,
                 ComparisonType.MustBeLessThan,
                 MetricUnit.Percentage
-            );
+            ));
         }
         
         return new HeadSizeCompliance(
@@ -165,17 +166,17 @@ public static class ComplianceEvaluators
         const float requiredThreshold = 80f; // 80% centering required
         var passed = centeringPercent >= requiredThreshold;
         
-        RejectionReason? rejection = null;
+        var rejection = Maybe<RejectionReason>.None;
         if (!passed)
         {
-            rejection = RejectionReason.Create(
+            rejection = Maybe<RejectionReason>.From(RejectionReason.Create(
                 "Centering",
                 centeringPercent,
                 requiredThreshold,
                 standard,
                 ComparisonType.MustBeGreaterThan,
                 MetricUnit.Percentage
-            );
+            ));
         }
         
         return new CenteringCompliance(
@@ -204,32 +205,32 @@ public static class ComplianceEvaluators
                 DistancePixels: ipdPixels,
                 MinPixels: rules.MinIpdPixels,
                 MaxPixels: rules.MaxIpdPixels,
-                Rejection: null,
+                Rejection: Maybe<RejectionReason>.None,
                 CountsTowardsCompliance: false);
         }
         
-        RejectionReason? rejection = null;
+        var rejection = Maybe<RejectionReason>.None;
         if (ipdPixels < rules.MinIpdPixels)
         {
-            rejection = RejectionReason.Create(
+            rejection = Maybe<RejectionReason>.From(RejectionReason.Create(
                 "Inter-Pupillary Distance",
                 ipdPixels,
                 rules.MinIpdPixels,
                 standard,
                 ComparisonType.MustBeGreaterThan,
                 MetricUnit.Pixels
-            );
+            ));
         }
         else if (ipdPixels > rules.MaxIpdPixels)
         {
-            rejection = RejectionReason.Create(
+            rejection = Maybe<RejectionReason>.From(RejectionReason.Create(
                 "Inter-Pupillary Distance",
                 ipdPixels,
                 rules.MaxIpdPixels,
                 standard,
                 ComparisonType.MustBeLessThan,
                 MetricUnit.Pixels
-            );
+            ));
         }
         
         return new IpdCompliance(
@@ -262,7 +263,11 @@ public static class ComplianceEvaluators
             && (!ipdCompliance.CountsTowardsCompliance || ipdCompliance.Passed);
         
         // Use the first rejection found as the primary geometry rejection
-        var rejection = headSizeCompliance.Rejection ?? centeringCompliance.Rejection ?? ipdCompliance.Rejection;
+        var rejection = headSizeCompliance.Rejection.HasValue
+            ? headSizeCompliance.Rejection
+            : centeringCompliance.Rejection.HasValue
+                ? centeringCompliance.Rejection
+                : ipdCompliance.Rejection;
         
         return new GeometryCompliance(
             Passed: allPassed,
@@ -296,9 +301,9 @@ public static class ComplianceEvaluators
         
         // Collect all rejections
         var rejections = new List<RejectionReason>();
-        if (symmetryCompliance.Rejection != null) rejections.Add(symmetryCompliance.Rejection);
-        if (sharpnessCompliance.Rejection != null) rejections.Add(sharpnessCompliance.Rejection);
-        if (geometryCompliance.Rejection != null) rejections.Add(geometryCompliance.Rejection);
+        if (symmetryCompliance.Rejection.HasValue) rejections.Add(symmetryCompliance.Rejection.Value);
+        if (sharpnessCompliance.Rejection.HasValue) rejections.Add(sharpnessCompliance.Rejection.Value);
+        if (geometryCompliance.Rejection.HasValue) rejections.Add(geometryCompliance.Rejection.Value);
         
         return new ComplianceAssessment(
             symmetryCompliance,

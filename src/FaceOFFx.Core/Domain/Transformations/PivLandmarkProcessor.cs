@@ -147,7 +147,15 @@ public static class PivLandmarkProcessor
 
         // Step 8: Calculate PIV compliance lines and validation
         logger?.LogDebug("Step 8: Calculating PIV compliance lines and validation");
-        var pivLines = pivLandmarks.CalculatePivLines();
+        var pivLinesResult = pivLandmarks.CalculatePivLines();
+        if (pivLinesResult.IsFailure)
+        {
+            pivImage.Dispose();
+            logger?.LogWarning("PIV line calculation failed: {Error}", pivLinesResult.Error);
+            return Result.Failure<PivLandmarkResult>($"PIV line calculation failed: {pivLinesResult.Error}");
+        }
+
+        var pivLines = pivLinesResult.Value;
         var complianceValidation = PivComplianceValidation.Validate(
             pivLines,
             pivImage.Width,
@@ -323,7 +331,14 @@ public static class PivLandmarkProcessor
         }
 
         // Step 1: Calculate PIV compliance lines
-        var pivLines = landmarks.CalculatePivLines();
+        var pivLinesResult = landmarks.CalculatePivLines();
+        if (pivLinesResult.IsFailure)
+        {
+            logger?.LogWarning("PIV line calculation failed: {Error}", pivLinesResult.Error);
+            return Result.Failure<Rectangle>(pivLinesResult.Error.Message);
+        }
+
+        var pivLines = pivLinesResult.Value;
         logger?.LogDebug(
             "PIV Lines - AA (center): {AA:F1}, BB (eyes): {BB:F1}, CC (width): {CC:F1}",
             pivLines.LineAA_X,

@@ -12,8 +12,8 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 [NonParallelizable]
 public class DocumentJobRunnerTests : IntegrationTestBase
 {
-    private RetinaFaceDetector _faceDetector = null!;
-    private OnnxLandmarkExtractor _landmarkExtractor = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private OnnxFacialProcessingServiceFactory _processingServiceFactory = null!;
     private Jpeg2000EncoderService _jpeg2000Encoder = null!;
     private PassportPhotoRenderService _passportPhotoRenderService = null!;
     private FaceGeometryPipeline _faceGeometryPipeline = null!;
@@ -26,16 +26,14 @@ public class DocumentJobRunnerTests : IntegrationTestBase
     {
         base.OneTimeSetUp();
 
-        _faceDetector = new RetinaFaceDetector(Substitute.For<ILogger<RetinaFaceDetector>>());
-        _landmarkExtractor = new OnnxLandmarkExtractor(Substitute.For<ILogger<OnnxLandmarkExtractor>>());
+        _loggerFactory = LoggerFactory.Create(builder => { });
+        _processingServiceFactory = new OnnxFacialProcessingServiceFactory(_loggerFactory);
         _jpeg2000Encoder = new Jpeg2000EncoderService(Substitute.For<ILogger<Jpeg2000EncoderService>>());
         _passportPhotoRenderService = new PassportPhotoRenderService(
-            _faceDetector,
-            _landmarkExtractor,
+            _processingServiceFactory,
             Substitute.For<ILogger<PassportPhotoRenderService>>());
         _faceGeometryPipeline = new FaceGeometryPipeline(
-            _faceDetector,
-            _landmarkExtractor,
+            _processingServiceFactory,
             Substitute.For<ILogger<FaceGeometryPipeline>>());
         _documentRenderService = new DocumentRenderService(
             _faceGeometryPipeline,
@@ -52,8 +50,8 @@ public class DocumentJobRunnerTests : IntegrationTestBase
     [OneTimeTearDown]
     public override void OneTimeTearDown()
     {
-        _landmarkExtractor?.Dispose();
-        _faceDetector?.Dispose();
+        _processingServiceFactory?.Dispose();
+        _loggerFactory?.Dispose();
         base.OneTimeTearDown();
     }
 

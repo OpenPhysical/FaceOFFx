@@ -40,7 +40,7 @@ public class RetinaFaceDetectorTests : IDisposable
     public RetinaFaceDetectorTests()
     {
         _logger = Substitute.For<ILogger<RetinaFaceDetector>>();
-        _detector = new RetinaFaceDetector(_logger);
+        _detector = RetinaFaceDetector.Create(_logger).Value;
     }
 
     /// <summary>
@@ -61,7 +61,7 @@ public class RetinaFaceDetectorTests : IDisposable
     [Test]
     public void Constructor_ShouldInitializeSuccessfully()
     {
-        using var detector = new RetinaFaceDetector(_logger);
+        using var detector = RetinaFaceDetector.Create(_logger).Value;
         detector.Should().NotBeNull();
     }
 
@@ -202,7 +202,7 @@ public class RetinaFaceDetectorTests : IDisposable
     [Test]
     public void Dispose_ShouldCompleteWithoutError()
     {
-        var detector = new RetinaFaceDetector(_logger);
+        var detector = RetinaFaceDetector.Create(_logger).Value;
 
         var act = () => detector.Dispose();
 
@@ -216,7 +216,7 @@ public class RetinaFaceDetectorTests : IDisposable
     [Test]
     public void Dispose_WhenCalledMultipleTimes_ShouldNotThrow()
     {
-        var detector = new RetinaFaceDetector(_logger);
+        var detector = RetinaFaceDetector.Create(_logger).Value;
 
         detector.Dispose();
         var act = () => detector.Dispose();

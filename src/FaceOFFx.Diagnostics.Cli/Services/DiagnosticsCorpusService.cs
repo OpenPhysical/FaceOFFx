@@ -1,4 +1,6 @@
 using System.Text.Json;
+using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 
 namespace FaceOFFx.Diagnostics.Cli.Services;
 
@@ -9,7 +11,7 @@ internal sealed class DiagnosticsCorpusService
         PropertyNameCaseInsensitive = true
     };
 
-    public IReadOnlyList<CorpusSubject> ResolveInputs(string? inputPath, string? corpusId)
+    public Result<IReadOnlyList<CorpusSubject>, PipelineError> ResolveInputs(string? inputPath, string? corpusId)
     {
         if (!string.IsNullOrWhiteSpace(corpusId))
         {
@@ -18,59 +20,82 @@ internal sealed class DiagnosticsCorpusService
 
         if (string.IsNullOrWhiteSpace(inputPath))
         {
-            throw new InvalidOperationException("Either an input path or --corpus must be provided.");
+            return Result.Failure<IReadOnlyList<CorpusSubject>, PipelineError>(
+                new InputError("Either an input path or --corpus must be provided."));
         }
 
         var fullPath = Path.GetFullPath(inputPath);
         if (File.Exists(fullPath))
         {
-            return new[]
+            return Result.Success<IReadOnlyList<CorpusSubject>, PipelineError>(new[]
             {
                 new CorpusSubject(
                     Path.GetFileNameWithoutExtension(fullPath),
                     fullPath,
                     null,
                     null)
-            };
+            });
         }
 
         if (Directory.Exists(fullPath))
         {
-            return Directory
+            return Result.Success<IReadOnlyList<CorpusSubject>, PipelineError>(Directory
                 .EnumerateFiles(fullPath)
                 .Where(IsImagePath)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .Select(path => new CorpusSubject(Path.GetFileNameWithoutExtension(path), path, null, null))
-                .ToArray();
+                .ToArray());
         }
 
-        throw new FileNotFoundException($"Input path '{inputPath}' was not found.");
+        return Result.Failure<IReadOnlyList<CorpusSubject>, PipelineError>(
+            new InputError($"Input path '{inputPath}' was not found.", inputPath));
     }
 
     public string CorpusOutputBase(string corpusId) => Path.Combine("artifacts", "diagnostics", corpusId);
 
-    private static IReadOnlyList<CorpusSubject> LoadCorpus(string corpusId)
+    private static Result<IReadOnlyList<CorpusSubject>, PipelineError> LoadCorpus(string corpusId)
     {
         if (!string.Equals(corpusId, "people", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException($"Unsupported corpus '{corpusId}'.");
+            return Result.Failure<IReadOnlyList<CorpusSubject>, PipelineError>(
+                new ConfigurationError($"Unsupported corpus '{corpusId}'.", corpusId));
         }
 
-        var root = FindSolutionRoot();
-        var manifestPath = Path.Combine(root, "tests", "test-images", "people", "corpus.json");
-        var manifest = JsonSerializer.Deserialize<CorpusManifest>(File.ReadAllText(manifestPath), JsonOptions)
-            ?? throw new InvalidOperationException($"Failed to parse corpus manifest '{manifestPath}'.");
+        var rootResult = FindSolutionRoot();
+        if (rootResult.IsFailure)
+        {
+            return Result.Failure<IReadOnlyList<CorpusSubject>, PipelineError>(rootResult.Error);
+        }
 
-        return manifest.Subjects
+        var root = rootResult.Value;
+        var manifestPath = Path.Combine(root, "tests", "test-images", "people", "corpus.json");
+        CorpusManifest? manifest;
+        try
+        {
+            manifest = JsonSerializer.Deserialize<CorpusManifest>(File.ReadAllText(manifestPath), JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<IReadOnlyList<CorpusSubject>, PipelineError>(
+                new InputError($"Failed to parse corpus manifest '{manifestPath}': {ex.Message}", manifestPath));
+        }
+
+        if (manifest is null)
+        {
+            return Result.Failure<IReadOnlyList<CorpusSubject>, PipelineError>(
+                new InputError($"Failed to parse corpus manifest '{manifestPath}'.", manifestPath));
+        }
+
+        return Result.Success<IReadOnlyList<CorpusSubject>, PipelineError>(manifest.Subjects
             .Select(subject => new CorpusSubject(
                 subject.Id,
                 Path.GetFullPath(Path.Combine(Path.GetDirectoryName(manifestPath)!, subject.Source)),
                 subject.ExpectedFaceCount,
                 subject.ExpectLandmarks))
-            .ToArray();
+            .ToArray());
     }
 
-    private static string FindSolutionRoot()
+    private static Result<string, PipelineError> FindSolutionRoot()
     {
         var currentDir = Directory.GetCurrentDirectory();
         var searchDir = new DirectoryInfo(currentDir);
@@ -80,8 +105,10 @@ internal sealed class DiagnosticsCorpusService
             searchDir = searchDir.Parent;
         }
 
-        return searchDir?.FullName
-            ?? throw new InvalidOperationException("Could not find solution root.");
+        return searchDir is not null
+            ? Result.Success<string, PipelineError>(searchDir.FullName)
+            : Result.Failure<string, PipelineError>(
+                new ConfigurationError("Could not find solution root."));
     }
 
     private static bool IsImagePath(string path)

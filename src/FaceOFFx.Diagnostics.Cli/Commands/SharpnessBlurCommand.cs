@@ -46,7 +46,14 @@ internal sealed class SharpnessBlurCommand(
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
-        var subjects = corpusService.ResolveInputs(settings.InputPath, settings.CorpusId);
+        var subjectsResult = corpusService.ResolveInputs(settings.InputPath, settings.CorpusId);
+        if (subjectsResult.IsFailure)
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(subjectsResult.Error.Message)}[/]");
+            return 1;
+        }
+
+        var subjects = subjectsResult.Value;
         Directory.CreateDirectory(settings.OutputDirectory);
 
         foreach (var subject in subjects)

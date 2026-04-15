@@ -1,4 +1,5 @@
 using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Documents;
 using FaceOFFx.Core.Domain.Transformations;
 using Microsoft.Extensions.Logging;
@@ -24,7 +25,10 @@ public sealed class DocumentRenderService(
     /// <summary>
     /// Builds canonical geometry for a single face selected by the supplied input profile.
     /// </summary>
-    public Task<Result<CanonicalFaceGeometry>> AnalyzeSingleFaceAsync(
+    /// <summary>
+    /// Builds canonical geometry for a single face selected by the supplied input profile.
+    /// </summary>
+    public Task<Result<CanonicalFaceGeometry, PipelineError>> AnalyzeSingleFaceAsync(
         Image<Rgba32> sourceImage,
         InputProfileDefinition profile,
         CancellationToken cancellationToken = default) =>
@@ -33,7 +37,10 @@ public sealed class DocumentRenderService(
     /// <summary>
     /// Renders a passport-style portrait from canonical original-space landmarks.
     /// </summary>
-    public Result<PassportPhotoRenderResult> RenderPassport(
+    /// <summary>
+    /// Renders a passport-style portrait from canonical original-space landmarks.
+    /// </summary>
+    public Result<PassportPhotoRenderResult, PipelineError> RenderPassport(
         Image<Rgba32> sourceImage,
         CanonicalFaceGeometry geometry,
         PassportPhotoSpec spec) =>
@@ -42,19 +49,26 @@ public sealed class DocumentRenderService(
     /// <summary>
     /// Renders a PIV portrait from canonical original-space landmarks.
     /// </summary>
-    public Result<PivLandmarkResult> RenderPiv(
+    /// <summary>
+    /// Renders a PIV portrait from canonical original-space landmarks.
+    /// </summary>
+    public Result<PivLandmarkResult, PipelineError> RenderPiv(
         Image<Rgba32> sourceImage,
         CanonicalFaceGeometry geometry,
         PivProcessingOptions options)
     {
         _logger.LogDebug("Rendering PIV portrait from canonical face geometry.");
-        return PivLandmarkProcessor.ProcessAsync(sourceImage, geometry, options, _logger);
+        return PivLandmarkProcessor.ProcessAsync(sourceImage, geometry, options, _logger)
+            .ToPipelineResult(error => new RenderError(error, "piv-render"));
     }
 
     /// <summary>
     /// Renders and JPEG 2000 encodes a PIV card image from canonical original-space landmarks.
     /// </summary>
-    public Result<PivRenderedArtifact> RenderPivCard(
+    /// <summary>
+    /// Renders and JPEG 2000 encodes a PIV card image from canonical original-space landmarks.
+    /// </summary>
+    public Result<PivRenderedArtifact, PipelineError> RenderPivCard(
         Image<Rgba32> sourceImage,
         CanonicalFaceGeometry geometry,
         PivProcessingOptions options)
@@ -62,23 +76,18 @@ public sealed class DocumentRenderService(
         var pivResult = RenderPiv(sourceImage, geometry, options);
         if (pivResult.IsFailure)
         {
-            return Result.Failure<PivRenderedArtifact>(pivResult.Error);
+            return Result.Failure<PivRenderedArtifact, PipelineError>(pivResult.Error);
         }
 
         using var imageForEncoding = pivResult.Value.PivImage.Clone();
-        var encoded = _jpeg2000Encoder.EncodeWithRoi(
-            imageForEncoding,
-            pivResult.Value.RoiSet,
-            options.BaseRate,
-            options.RoiStartLevel,
-            enableRoi: true,
-            roiAlign: false);
-        if (encoded.IsFailure)
-        {
-            return Result.Failure<PivRenderedArtifact>(encoded.Error);
-        }
-
-        return Result.Success(new PivRenderedArtifact(encoded.Value, pivResult.Value));
+        return _jpeg2000Encoder.EncodeWithRoi(
+                imageForEncoding,
+                pivResult.Value.RoiSet,
+                options.BaseRate,
+                options.RoiStartLevel,
+                enableRoi: true,
+                roiAlign: false)
+            .Map(encoded => new PivRenderedArtifact(encoded, pivResult.Value));
     }
 }
 

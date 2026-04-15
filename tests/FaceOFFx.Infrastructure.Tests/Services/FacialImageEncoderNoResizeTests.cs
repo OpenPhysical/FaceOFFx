@@ -1,4 +1,6 @@
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Infrastructure.Services;
 using FaceOFFx.Tests.Common;
@@ -28,12 +30,12 @@ public class FacialImageEncoderNoResizeTests : IntegrationTestBase
         var imageData = ms.ToArray();
 
         // Act
-        var result = await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
             imageData,
             options: null,
             outputFormat: "jpeg",
             jpegQuality: 85
-        );
+        ));
 
         // Assert
         result.Should().NotBeNull();
@@ -57,10 +59,10 @@ public class FacialImageEncoderNoResizeTests : IntegrationTestBase
         var imageData = ms.ToArray();
 
         // Act
-        var result = await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
             imageData,
             outputFormat: "png"
-        );
+        ));
 
         // Assert
         result.Should().NotBeNull();
@@ -88,10 +90,10 @@ public class FacialImageEncoderNoResizeTests : IntegrationTestBase
         var imageData = ms.ToArray();
 
         // Act
-        var result = await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
             imageData,
             outputFormat: "tiff"
-        );
+        ));
 
         // Assert
         result.Should().NotBeNull();
@@ -120,11 +122,11 @@ public class FacialImageEncoderNoResizeTests : IntegrationTestBase
         var options = ProcessingOptions.PivBalanced with { EnableRoi = true };
 
         // Act
-        var result = await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
             imageData,
             options: options,
             outputFormat: "jp2"
-        );
+        ));
 
         // Assert
         result.Should().NotBeNull();
@@ -149,11 +151,11 @@ public class FacialImageEncoderNoResizeTests : IntegrationTestBase
         var imageData = ms.ToArray();
 
         // Act
-        var result = await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
             imageData,
             outputFormat: format,
             jpegQuality: 90
-        );
+        ));
 
         // Assert
         result.Should().NotBeNull();
@@ -171,10 +173,10 @@ public class FacialImageEncoderNoResizeTests : IntegrationTestBase
         var imageData = ms.ToArray();
 
         // Act
-        var result = await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
             imageData,
             outputFormat: "png"
-        );
+        ));
 
         // Assert
         result.Metadata.FaceConfidence.Should().Be(1.0f);
@@ -190,10 +192,10 @@ public class FacialImageEncoderNoResizeTests : IntegrationTestBase
         var imageData = ms.ToArray();
 
         // Act
-        var result = await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
             imageData,
             outputFormat: "tiff"
-        );
+        ));
 
         // Assert
         result.Metadata.RotationApplied.Should().Be(0f);
@@ -210,15 +212,21 @@ public class FacialImageEncoderNoResizeTests : IntegrationTestBase
         var imageData = ms.ToArray();
 
         // Act
-        var result = await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithoutFaceDetectionAsync(
             imageData,
             outputFormat: format
-        );
+        ));
 
         // Assert
         result.Metadata.OutputDimensions.Width.Should().Be(300);
         result.Metadata.OutputDimensions.Height.Should().Be(400);
         result.Metadata.AdditionalData["ProcessingMode"].Should().Be("NoResize");
         result.Metadata.AdditionalData["OutputFormat"].Should().Be(format.ToUpperInvariant());
+    }
+
+    private static ProcessingResultDto ExpectSuccess(Result<ProcessingResultDto, PipelineError> result)
+    {
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Message : null);
+        return result.Value;
     }
 }

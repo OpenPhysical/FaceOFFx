@@ -20,7 +20,7 @@ public class ComplianceEvaluatorsTests
             ComplianceStandards.GetRulesOrDefault("PIV"));
 
         compliance.Passed.Should().BeTrue();
-        compliance.Rejection.Should().BeNull();
+        compliance.Rejection.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -36,8 +36,8 @@ public class ComplianceEvaluatorsTests
             ComplianceStandards.GetRulesOrDefault("PIV"));
 
         compliance.Passed.Should().BeFalse();
-        compliance.Rejection.Should().NotBeNull();
-        compliance.Rejection!.Type.Should().Be(ComparisonType.MustBeGreaterThan);
+        compliance.Rejection.HasValue.Should().BeTrue();
+        compliance.Rejection.Value.Type.Should().Be(ComparisonType.MustBeGreaterThan);
     }
 
     [Test]
@@ -55,6 +55,6 @@ public class ComplianceEvaluatorsTests
 
         compliance.Passed.Should().BeFalse();
         compliance.CountsTowardsCompliance.Should().BeFalse();
-        compliance.Rejection.Should().BeNull();
+        compliance.Rejection.HasValue.Should().BeFalse();
     }
 }

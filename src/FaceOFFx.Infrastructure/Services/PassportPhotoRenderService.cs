@@ -15,22 +15,26 @@ namespace FaceOFFx.Infrastructure.Services;
 /// Produces the exact portrait render geometry used by document workflows.
 /// </summary>
 public sealed class PassportPhotoRenderService(
-    IFaceDetector faceDetector,
-    ILandmarkExtractor landmarkExtractor,
+    IFacialProcessingServiceFactory processingServiceFactory,
     ILogger<PassportPhotoRenderService> logger)
 {
-    private readonly IFaceDetector _faceDetector = faceDetector;
-    private readonly ILandmarkExtractor _landmarkExtractor = landmarkExtractor;
+    private readonly IFacialProcessingServiceFactory _processingServiceFactory = processingServiceFactory;
     private readonly ILogger<PassportPhotoRenderService> _logger = logger;
 
     /// <summary>
     /// Aligns, crops, and resizes a portrait according to the supplied document photo specification.
     /// </summary>
-    public async Task<Result<PassportPhotoRenderResult>> AlignAsync(
+    public async Task<Result<PassportPhotoRenderResult, PipelineError>> AlignAsync(
         Image<Rgba32> sourceImage,
         PassportPhotoSpec spec,
         CancellationToken cancellationToken = default)
     {
+        var servicesResult = _processingServiceFactory.GetServices();
+        if (servicesResult.IsFailure)
+        {
+            return Result.Failure<PassportPhotoRenderResult, PipelineError>(servicesResult.Error);
+        }
+
         _logger.LogDebug(
             "Rendering portrait alignment for {Width}x{Height} -> {TargetWidth}x{TargetHeight}",
             sourceImage.Width,
@@ -38,10 +42,15 @@ public sealed class PassportPhotoRenderService(
             spec.TargetWidth,
             spec.TargetHeight);
 
-        var detection = await _faceDetector.DetectFacesAsync(sourceImage).ConfigureAwait(false);
+        var detection = await servicesResult.Value.Detector
+            .DetectFacesAsync(sourceImage)
+            .ConfigureAwait(false);
         if (detection.IsFailure || detection.Value.Count == 0)
         {
-            return Result.Failure<PassportPhotoRenderResult>("No suitable faces found for portrait rendering.");
+            return detection.IsFailure
+                ? Result.Failure<PassportPhotoRenderResult, PipelineError>(detection.Error)
+                : Result.Failure<PassportPhotoRenderResult, PipelineError>(
+                    new DetectionError("No suitable faces found for portrait rendering.", "passport-render"));
         }
 
         var face = detection.Value
@@ -49,11 +58,15 @@ public sealed class PassportPhotoRenderService(
             .First();
 
         var geometryResult = await CanonicalFaceGeometryPipeline
-            .ExtractAsync(sourceImage, face, _landmarkExtractor, cancellationToken)
+            .ExtractAsync(
+                sourceImage,
+                face,
+                servicesResult.Value.LandmarkExtractor,
+                cancellationToken)
             .ConfigureAwait(false);
         if (geometryResult.IsFailure)
         {
-            return Result.Failure<PassportPhotoRenderResult>(geometryResult.Error);
+            return Result.Failure<PassportPhotoRenderResult, PipelineError>(geometryResult.Error);
         }
 
         return Align(sourceImage, geometryResult.Value, spec);
@@ -62,7 +75,7 @@ public sealed class PassportPhotoRenderService(
     /// <summary>
     /// Aligns, crops, and resizes a portrait from canonical original-space landmarks.
     /// </summary>
-    internal Result<PassportPhotoRenderResult> Align(
+    internal Result<PassportPhotoRenderResult, PipelineError> Align(
         Image<Rgba32> sourceImage,
         CanonicalFaceGeometry geometry,
         PassportPhotoSpec spec)
@@ -99,19 +112,18 @@ public sealed class PassportPhotoRenderService(
             rotatedLandmarks,
             crop,
             new ImageDimensions(spec.TargetWidth, spec.TargetHeight));
-        var transformMap = RenderTransformMapBuilder.CreateRotateCropResize(
-            new ImageDimensions(sourceImage.Width, sourceImage.Height),
-            rotation,
-            new ImageDimensions(rotated.Width, rotated.Height),
-            crop,
-            new ImageDimensions(spec.TargetWidth, spec.TargetHeight));
-
-        return Result.Success(new PassportPhotoRenderResult(
-            outputImage,
-            outputLandmarks,
-            rotation,
-            crop,
-            transformMap));
+        return RenderTransformMapBuilder.CreateRotateCropResize(
+                new ImageDimensions(sourceImage.Width, sourceImage.Height),
+                rotation,
+                new ImageDimensions(rotated.Width, rotated.Height),
+                crop,
+                new ImageDimensions(spec.TargetWidth, spec.TargetHeight))
+            .Map(transformMap => new PassportPhotoRenderResult(
+                outputImage,
+                outputLandmarks,
+                rotation,
+                crop,
+                transformMap));
     }
 
     private static Rectangle CalculatePortraitCrop(

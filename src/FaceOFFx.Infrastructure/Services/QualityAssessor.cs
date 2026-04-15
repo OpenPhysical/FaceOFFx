@@ -1,4 +1,5 @@
 using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Abstractions;
 using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Quality;
@@ -27,7 +28,7 @@ public class QualityAssessor : IQualityAssessor
     }
     
     /// <inheritdoc />
-    public async Task<Result<Iso19794Assessment>> AssessAsync(
+    public async Task<Result<Iso19794Assessment, PipelineError>> AssessAsync(
         Image<Rgba32> image,
         DetectedFace face,
         FaceLandmarks68 landmarks,

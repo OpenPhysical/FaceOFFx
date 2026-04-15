@@ -1,4 +1,5 @@
 using FaceOFFx.Core.Domain.Detection;
+using FaceOFFx.Core.Domain.Common;
 using JetBrains.Annotations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -21,7 +22,7 @@ public interface IJpeg2000Encoder
     /// <param name="enableRoi">Enable ROI encoding for facial region priority.</param>
     /// <param name="roiAlign">Align the ROI with the blocks</param>
     /// <returns>Result containing the encoded byte data or error.</returns>
-    Result<byte[]> EncodeWithRoi(
+    Result<byte[], PipelineError> EncodeWithRoi(
         Image<Rgba32> image,
         FacialRoiSet roiSet,
         float baseRate = 1.0f,

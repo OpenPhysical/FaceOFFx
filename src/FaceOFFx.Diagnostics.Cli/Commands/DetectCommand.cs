@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Documents;
 using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Diagnostics.Cli.Services;
@@ -57,7 +58,14 @@ internal sealed class DetectCommand(
             return 1;
         }
 
-        var subjects = corpusService.ResolveInputs(settings.InputPath, settings.CorpusId);
+        var subjectsResult = corpusService.ResolveInputs(settings.InputPath, settings.CorpusId);
+        if (subjectsResult.IsFailure)
+        {
+            console.MarkupLine($"[red]{Markup.Escape(subjectsResult.Error.Message)}[/]");
+            return 1;
+        }
+
+        var subjects = subjectsResult.Value;
         var profiles = settings.GrossOnly || settings.FineOnly ? Array.Empty<string>() : ResolveProfiles(settings.Profiles);
         Directory.CreateDirectory(settings.OutputDirectory);
         var chipDir = Path.Combine(settings.OutputDirectory, "chips");
@@ -78,8 +86,8 @@ internal sealed class DetectCommand(
                 var result = await diagnostics.DetectAsync(subject.InputPath, cancellationToken);
                 if (result.IsFailure)
                 {
-                    failures.Add($"{subject.Id}: {result.Error}");
-                    records.Add(new { subject.Id, subject.InputPath, Error = result.Error });
+                    failures.Add($"{subject.Id}: {result.Error.Message}");
+                    records.Add(new { subject.Id, subject.InputPath, Error = result.Error.Message });
                     task.Increment(1);
                     continue;
                 }
@@ -151,12 +159,12 @@ internal sealed class DetectCommand(
 
                     if (overlay.IsFailure)
                     {
-                        failures.Add($"{subject.Id}/{profileId}: {overlay.Error}");
+                        failures.Add($"{subject.Id}/{profileId}: {overlay.Error.Message}");
                         overlayResults.Add(new
                         {
                             ProfileId = profileId,
                             OverlayPath = (string?)null,
-                            Error = overlay.Error
+                            Error = overlay.Error.Message
                         });
                         continue;
                     }
@@ -184,16 +192,25 @@ internal sealed class DetectCommand(
                 string? chipReviewPath = null;
                 if (settings.SaveChips && result.Value.CanonicalGeometry.HasValue)
                 {
+                    var geometryResult = result.Value.CanonicalGeometry.ToPipelineResult(
+                        new GeometryError("Canonical geometry is required to save the normalized chip."));
+                    if (geometryResult.IsFailure)
+                    {
+                        failures.Add($"{subject.Id}: {geometryResult.Error.Message}");
+                        task.Increment(1);
+                        continue;
+                    }
+
                     using var image = await Image.LoadAsync<SixLabors.ImageSharp.PixelFormats.Rgba32>(subject.InputPath, cancellationToken);
                     using var chip = CanonicalFaceGeometryPipeline.RenderChip(
                         image,
-                        result.Value.CanonicalGeometry.GetValueOrThrow("Canonical geometry is required to save the normalized chip."));
+                        geometryResult.Value);
                     chipPath = Path.Combine("chips", $"{subject.Id}.png");
                     await chip.SaveAsPngAsync(Path.Combine(settings.OutputDirectory, chipPath), cancellationToken);
 
                     using var chipReview = OverlayRenderer.RenderChipReview(
                         chip,
-                        result.Value.CanonicalGeometry.GetValueOrThrow("Canonical geometry is required to render the chip review overlay.").ChipLandmarks);
+                        geometryResult.Value.ChipLandmarks);
                     chipReviewPath = Path.Combine("chips", $"{subject.Id}.review.png");
                     await chipReview.SaveAsPngAsync(Path.Combine(settings.OutputDirectory, chipReviewPath), cancellationToken);
                 }

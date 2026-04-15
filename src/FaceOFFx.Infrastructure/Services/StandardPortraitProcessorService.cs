@@ -15,34 +15,51 @@ namespace FaceOFFx.Infrastructure.Services;
 /// Shared standard portrait processing service used by CLI dataset workflows and output-mode validation.
 /// </summary>
 public sealed class StandardPortraitProcessorService(
-    IFaceDetector faceDetector,
-    ILandmarkExtractor landmarkExtractor,
+    IFacialProcessingServiceFactory processingServiceFactory,
     IJpeg2000Encoder jpeg2000Encoder,
     ILogger<StandardPortraitProcessorService> logger)
 {
-    private readonly IFaceDetector _faceDetector = faceDetector;
-    private readonly ILandmarkExtractor _landmarkExtractor = landmarkExtractor;
+    private readonly IFacialProcessingServiceFactory _processingServiceFactory = processingServiceFactory;
     private readonly IJpeg2000Encoder _jpeg2000Encoder = jpeg2000Encoder;
     private readonly ILogger<StandardPortraitProcessorService> _logger = logger;
+
+    internal StandardPortraitProcessorService(
+        IFaceDetector faceDetector,
+        ILandmarkExtractor landmarkExtractor,
+        IJpeg2000Encoder jpeg2000Encoder,
+        ILogger<StandardPortraitProcessorService> logger)
+        : this(
+            new SharedFacialProcessingServiceFactory(
+                FacialProcessingServices.FromExisting(faceDetector, landmarkExtractor, jpeg2000Encoder)),
+            jpeg2000Encoder,
+            logger)
+    {
+    }
 
     /// <summary>
     /// Aligns, crops, and resizes a portrait to the requested standard without encoding it.
     /// </summary>
-    public async Task<Result<StandardPortraitAlignmentResult>> AlignAsync(
+    public async Task<Result<StandardPortraitAlignmentResult, PipelineError>> AlignAsync(
         Image<Rgba32> sourceImage,
         string standardName,
         float minConfidence,
         int minFaceSize,
         CancellationToken cancellationToken = default)
     {
+        var servicesResult = _processingServiceFactory.GetServices();
+        if (servicesResult.IsFailure)
+        {
+            return Result.Failure<StandardPortraitAlignmentResult, PipelineError>(servicesResult.Error);
+        }
+
+        var processingServices = servicesResult.Value;
         var standard = QualityAssessmentOptions.ForStandard(standardName).Standard;
         var profile = StandardPortraitProfile.ForStandard(standardName);
 
-        var detection = await _faceDetector.DetectFacesAsync(sourceImage).ConfigureAwait(false);
+        var detection = await processingServices.Detector.DetectFacesAsync(sourceImage).ConfigureAwait(false);
         if (detection.IsFailure)
         {
-            return Result.Failure<StandardPortraitAlignmentResult>(
-                $"Face detection failed: {detection.Error}");
+            return Result.Failure<StandardPortraitAlignmentResult, PipelineError>(detection.Error);
         }
 
         var faces = detection.Value
@@ -53,23 +70,25 @@ public sealed class StandardPortraitProcessorService(
 
         if (faces.Length == 0)
         {
-            return Result.Failure<StandardPortraitAlignmentResult>("No suitable faces found");
+            return Result.Failure<StandardPortraitAlignmentResult, PipelineError>(
+                new DetectionError("No suitable faces found", standardName));
         }
 
         if (profile.RequireSingleFace && faces.Length > 1)
         {
-            return Result.Failure<StandardPortraitAlignmentResult>(
-                $"Multiple faces detected ({faces.Length}), {profile.StandardName} requires single face");
+            return Result.Failure<StandardPortraitAlignmentResult, PipelineError>(
+                new DetectionError(
+                    $"Multiple faces detected ({faces.Length}), {profile.StandardName} requires single face",
+                    standardName));
         }
 
         var sourceFace = faces[0];
-        var sourceLandmarksResult = await _landmarkExtractor
+        var sourceLandmarksResult = await processingServices.LandmarkExtractor
             .ExtractLandmarksAsync(sourceImage, sourceFace.BoundingBox)
             .ConfigureAwait(false);
         if (sourceLandmarksResult.IsFailure)
         {
-            return Result.Failure<StandardPortraitAlignmentResult>(
-                $"Landmark extraction failed: {sourceLandmarksResult.Error}");
+            return Result.Failure<StandardPortraitAlignmentResult, PipelineError>(sourceLandmarksResult.Error);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -82,11 +101,15 @@ public sealed class StandardPortraitProcessorService(
             ? sourceImage.Clone(ctx => ctx.Rotate(rotation))
             : sourceImage.Clone();
 
-        var rotatedDetection = await _faceDetector.DetectFacesAsync(rotatedImage).ConfigureAwait(false);
+        var rotatedDetection = await processingServices.Detector
+            .DetectFacesAsync(rotatedImage)
+            .ConfigureAwait(false);
         if (rotatedDetection.IsFailure || rotatedDetection.Value.Count == 0)
         {
-            return Result.Failure<StandardPortraitAlignmentResult>(
-                "Failed to detect face after rotation");
+            return rotatedDetection.IsFailure
+                ? Result.Failure<StandardPortraitAlignmentResult, PipelineError>(rotatedDetection.Error)
+                : Result.Failure<StandardPortraitAlignmentResult, PipelineError>(
+                    new DetectionError("Failed to detect face after rotation", standardName));
         }
 
         var rotatedFace = rotatedDetection.Value
@@ -96,16 +119,16 @@ public sealed class StandardPortraitProcessorService(
             .FirstOrDefault();
         if (rotatedFace == null)
         {
-            return Result.Failure<StandardPortraitAlignmentResult>("No suitable rotated face found");
+            return Result.Failure<StandardPortraitAlignmentResult, PipelineError>(
+                new DetectionError("No suitable rotated face found", standardName));
         }
 
-        var rotatedLandmarksResult = await _landmarkExtractor
+        var rotatedLandmarksResult = await processingServices.LandmarkExtractor
             .ExtractLandmarksAsync(rotatedImage, rotatedFace.BoundingBox)
             .ConfigureAwait(false);
         if (rotatedLandmarksResult.IsFailure)
         {
-            return Result.Failure<StandardPortraitAlignmentResult>(
-                $"Landmark extraction failed after rotation: {rotatedLandmarksResult.Error}");
+            return Result.Failure<StandardPortraitAlignmentResult, PipelineError>(rotatedLandmarksResult.Error);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -135,7 +158,7 @@ public sealed class StandardPortraitProcessorService(
             standard.ExpectedDimensions.Height,
             rotation);
 
-        return Result.Success(new StandardPortraitAlignmentResult(
+        return Result.Success<StandardPortraitAlignmentResult, PipelineError>(new StandardPortraitAlignmentResult(
             processedImage,
             processedLandmarks,
             standard.ExpectedDimensions,
@@ -148,7 +171,7 @@ public sealed class StandardPortraitProcessorService(
     /// <summary>
     /// Aligns, crops, resizes, and JPEG 2000 encodes a portrait to the requested standard.
     /// </summary>
-    public async Task<Result<StandardPortraitResult>> ProcessAsync(
+    public async Task<Result<StandardPortraitResult, PipelineError>> ProcessAsync(
         Image<Rgba32> sourceImage,
         string standardName,
         float minConfidence,
@@ -164,7 +187,7 @@ public sealed class StandardPortraitProcessorService(
             cancellationToken).ConfigureAwait(false);
         if (alignmentResult.IsFailure)
         {
-            return Result.Failure<StandardPortraitResult>(alignmentResult.Error);
+            return Result.Failure<StandardPortraitResult, PipelineError>(alignmentResult.Error);
         }
 
         using var alignment = alignmentResult.Value;
@@ -183,11 +206,10 @@ public sealed class StandardPortraitProcessorService(
 
         if (encoded.IsFailure)
         {
-            return Result.Failure<StandardPortraitResult>(
-                $"JPEG 2000 encoding failed: {encoded.Error}");
+            return Result.Failure<StandardPortraitResult, PipelineError>(encoded.Error);
         }
 
-        return Result.Success(new StandardPortraitResult(
+        return Result.Success<StandardPortraitResult, PipelineError>(new StandardPortraitResult(
             alignment.ProcessedImage.Clone(),
             encoded.Value,
             alignment.ProcessedLandmarks,

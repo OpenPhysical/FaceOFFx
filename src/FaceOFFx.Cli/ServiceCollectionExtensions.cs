@@ -23,18 +23,7 @@ public static class ServiceCollectionExtensions
         // Note: Cannot log during service registration as services aren't built yet
         services.TryAddSingleton<IAnsiConsole>(AnsiConsole.Console);
 
-        // Register core services as Scoped to avoid early instantiation
-        services.AddScoped<IFaceDetector>(sp =>
-        {
-            var detectorLogger = sp.GetRequiredService<ILogger<RetinaFaceDetector>>();
-            return new RetinaFaceDetector(detectorLogger);
-        });
-
-        services.AddScoped<ILandmarkExtractor>(sp =>
-        {
-            var extractorLogger = sp.GetRequiredService<ILogger<OnnxLandmarkExtractor>>();
-            return new OnnxLandmarkExtractor(extractorLogger);
-        });
+        services.AddScoped<IFacialProcessingServiceFactory, OnnxFacialProcessingServiceFactory>();
 
         // Use Transient for Jpeg2000EncoderService to avoid static cleanup issues
         services.AddTransient<IJpeg2000Encoder>(sp =>

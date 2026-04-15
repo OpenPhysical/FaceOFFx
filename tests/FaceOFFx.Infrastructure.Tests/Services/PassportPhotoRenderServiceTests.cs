@@ -14,27 +14,26 @@ namespace FaceOFFx.Infrastructure.Tests.Services;
 [NonParallelizable]
 public class PassportPhotoRenderServiceTests : IntegrationTestBase
 {
-    private RetinaFaceDetector _faceDetector = null!;
-    private OnnxLandmarkExtractor _landmarkExtractor = null!;
+    private ILoggerFactory _loggerFactory = null!;
+    private OnnxFacialProcessingServiceFactory _processingServiceFactory = null!;
     private PassportPhotoRenderService _service = null!;
 
     [OneTimeSetUp]
     public override void OneTimeSetUp()
     {
         base.OneTimeSetUp();
-        _faceDetector = new RetinaFaceDetector(Substitute.For<ILogger<RetinaFaceDetector>>());
-        _landmarkExtractor = new OnnxLandmarkExtractor(Substitute.For<ILogger<OnnxLandmarkExtractor>>());
+        _loggerFactory = LoggerFactory.Create(builder => { });
+        _processingServiceFactory = new OnnxFacialProcessingServiceFactory(_loggerFactory);
         _service = new PassportPhotoRenderService(
-            _faceDetector,
-            _landmarkExtractor,
+            _processingServiceFactory,
             Substitute.For<ILogger<PassportPhotoRenderService>>());
     }
 
     [OneTimeTearDown]
     public override void OneTimeTearDown()
     {
-        _landmarkExtractor?.Dispose();
-        _faceDetector?.Dispose();
+        _processingServiceFactory?.Dispose();
+        _loggerFactory?.Dispose();
         base.OneTimeTearDown();
     }
 
@@ -42,9 +41,9 @@ public class PassportPhotoRenderServiceTests : IntegrationTestBase
     public async Task AlignAsync_Person01CanadaCitizenshipGrant_RoundTripsProjectedLandmarks()
     {
         using var image = await Image.LoadAsync<Rgba32>(PeopleCorpus.SubjectSource("person-01", "jpg"));
-        var document = DocumentCatalog.GetDocumentOrThrow("canada-citizenship-grant");
+        var document = DocumentCatalog.GetDocument("canada-citizenship-grant").Value;
         var deliverable = document.Variants["digital"].Deliverables[0];
-        var spec = DocumentCatalog.GetPassportPhotoSpecOrThrow(deliverable.ProductionDefaults["spec"]);
+        var spec = DocumentCatalog.GetPassportPhotoSpec(deliverable.ProductionDefaults["spec"]).Value;
 
         var result = await _service.AlignAsync(image, spec);
 

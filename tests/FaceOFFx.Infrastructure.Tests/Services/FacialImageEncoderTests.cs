@@ -1,4 +1,6 @@
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Infrastructure.Services;
 using FaceOFFx.Tests.Common;
@@ -41,7 +43,7 @@ public class FacialImageEncoderTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_WithDefaultOptions_ReturnsValidResult()
     {
-        var result = await FacialImageEncoder.ProcessAsync(_validImageData);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(_validImageData));
 
         result.Should().NotBeNull();
         result.ImageData.Should().NotBeEmpty();
@@ -59,7 +61,7 @@ public class FacialImageEncoderTests : IntegrationTestBase
     {
         var customOptions = ProcessingOptions.PivHigh with { MinFaceConfidence = 0.9f };
 
-        var result = await FacialImageEncoder.ProcessAsync(_validImageData, customOptions);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(_validImageData, customOptions));
 
         result.Should().NotBeNull();
         result.Metadata.TargetSize.Should().HaveValue();
@@ -72,7 +74,7 @@ public class FacialImageEncoderTests : IntegrationTestBase
     [Test]
     public async Task ProcessForTwicAsync_TargetsCorrectSize()
     {
-        var result = await FacialImageEncoder.ProcessForTwicAsync(_validImageData);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessForTwicAsync(_validImageData));
 
         result.Should().NotBeNull();
         (result.Metadata.FileSize <= 14000).Should().BeTrue();
@@ -86,7 +88,7 @@ public class FacialImageEncoderTests : IntegrationTestBase
     [Test]
     public async Task ProcessForPivAsync_TargetsCorrectSize()
     {
-        var result = await FacialImageEncoder.ProcessForPivAsync(_validImageData);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessForPivAsync(_validImageData));
 
         result.Should().NotBeNull();
         result.Metadata.TargetSize.HasValue.Should().BeTrue();
@@ -100,7 +102,7 @@ public class FacialImageEncoderTests : IntegrationTestBase
     public async Task ProcessToSizeAsync_WithCustomSize_TargetsSize()
     {
         var targetSize = 25000;
-        var result = await FacialImageEncoder.ProcessToSizeAsync(_validImageData, targetSize);
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessToSizeAsync(_validImageData, targetSize));
 
         result.Should().NotBeNull();
         (result.Metadata.FileSize <= targetSize).Should().BeTrue();
@@ -115,10 +117,10 @@ public class FacialImageEncoderTests : IntegrationTestBase
     public async Task ProcessWithRateAsync_WithCustomRate_UsesRate()
     {
         var compressionRate = 1.5f;
-        var result = await FacialImageEncoder.ProcessWithRateAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessWithRateAsync(
             _validImageData,
             compressionRate
-        );
+        ));
 
         result.Should().NotBeNull();
         result.Metadata.CompressionRate.Should().Be(compressionRate);
@@ -129,33 +131,33 @@ public class FacialImageEncoderTests : IntegrationTestBase
     /// Tests ProcessAsync fails gracefully with invalid image data
     /// </summary>
     [Test]
-    public async Task ProcessAsync_WithInvalidImageData_ThrowsException()
+    public async Task ProcessAsync_WithInvalidImageData_ReturnsFailure()
     {
-        var action = () => FacialImageEncoder.ProcessAsync(_invalidImageData);
-
-        await action.Should().ThrowAsync<ArgumentException>();
+        var result = await FacialImageEncoder.ProcessAsync(_invalidImageData);
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("input");
     }
 
     /// <summary>
     /// Tests ProcessAsync fails gracefully with empty image data
     /// </summary>
     [Test]
-    public async Task ProcessAsync_WithEmptyImageData_ThrowsException()
+    public async Task ProcessAsync_WithEmptyImageData_ReturnsFailure()
     {
-        var action = () => FacialImageEncoder.ProcessAsync(Array.Empty<byte>());
-
-        await action.Should().ThrowAsync<ArgumentException>();
+        var result = await FacialImageEncoder.ProcessAsync(Array.Empty<byte>());
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("input");
     }
 
     /// <summary>
     /// Tests ProcessAsync with null image data throws ArgumentException
     /// </summary>
     [Test]
-    public async Task ProcessAsync_WithNullImageData_ThrowsArgumentException()
+    public async Task ProcessAsync_WithNullImageData_ReturnsInputFailure()
     {
-        await AssertThrowsAsync<ArgumentNullException>(() =>
-            FacialImageEncoder.ProcessAsync(null!)
-        );
+        var result = await FacialImageEncoder.ProcessAsync(null!);
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("input");
     }
 
     /// <summary>
@@ -164,10 +166,10 @@ public class FacialImageEncoderTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_ValidImage_ReturnsCompleteMetadata()
     {
-        var result = await FacialImageEncoder.ProcessAsync(
+        var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(
             _validImageData,
             ProcessingOptions.Archival
-        );
+        ));
 
         result.Should().NotBeNull();
 
@@ -188,18 +190,18 @@ public class FacialImageEncoderTests : IntegrationTestBase
     [Test]
     public async Task ProcessAsync_DifferentPresets_ProduceDifferentSizes()
     {
-        var fastResult = await FacialImageEncoder.ProcessAsync(
+        var fastResult = ExpectSuccess(await FacialImageEncoder.ProcessAsync(
             _validImageData,
             ProcessingOptions.Fast
-        );
-        var standardResult = await FacialImageEncoder.ProcessAsync(
+        ));
+        var standardResult = ExpectSuccess(await FacialImageEncoder.ProcessAsync(
             _validImageData,
             ProcessingOptions.PivBalanced
-        );
-        var archivalResult = await FacialImageEncoder.ProcessAsync(
+        ));
+        var archivalResult = ExpectSuccess(await FacialImageEncoder.ProcessAsync(
             _validImageData,
             ProcessingOptions.Archival
-        );
+        ));
 
         fastResult.Should().NotBeNull();
         standardResult.Should().NotBeNull();
@@ -218,12 +220,9 @@ public class FacialImageEncoderTests : IntegrationTestBase
     [Test]
     public async Task ProcessToSizeAsync_WithVerySmallTarget_ReturnsFailure()
     {
-        var action = () => FacialImageEncoder.ProcessToSizeAsync(_validImageData, 1000); // Very small
-
-        await action
-            .Should()
-            .ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Cannot compress*");
+        var result = await FacialImageEncoder.ProcessToSizeAsync(_validImageData, 1000);
+        result.IsFailure.Should().BeTrue();
+        result.Error.Message.Should().Contain("Cannot compress");
     }
 
     /// <summary>
@@ -232,9 +231,9 @@ public class FacialImageEncoderTests : IntegrationTestBase
     [Test]
     public async Task ProcessWithRateAsync_WithInvalidRate_ReturnsFailure()
     {
-        var action = () => FacialImageEncoder.ProcessWithRateAsync(_validImageData, -1.0f); // Invalid rate
-
-        await action.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        var result = await FacialImageEncoder.ProcessWithRateAsync(_validImageData, -1.0f);
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("validation");
     }
 
     /// <summary>
@@ -255,11 +254,17 @@ public class FacialImageEncoderTests : IntegrationTestBase
 
         foreach (var preset in presets)
         {
-            var result = await FacialImageEncoder.ProcessAsync(_validImageData, preset);
+            var result = ExpectSuccess(await FacialImageEncoder.ProcessAsync(_validImageData, preset));
 
             result.Should().NotBeNull($"Preset {preset} should succeed");
             result.Metadata.OutputDimensions.Width.Should().Be(420);
             result.Metadata.OutputDimensions.Height.Should().Be(560);
         }
+    }
+
+    private static ProcessingResultDto ExpectSuccess(Result<ProcessingResultDto, PipelineError> result)
+    {
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Message : null);
+        return result.Value;
     }
 }

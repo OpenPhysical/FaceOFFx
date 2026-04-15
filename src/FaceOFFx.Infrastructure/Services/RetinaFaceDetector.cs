@@ -1,4 +1,5 @@
 using FaceOFFx.Models;
+using FaceOFFx.Core.Domain.Common;
 using JetBrains.Annotations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -28,17 +29,20 @@ public sealed class RetinaFaceDetector : IFaceDetector, IDisposable
     // Variance values for decoding
     private static readonly float[] Variances = { 0.1f, 0.2f };
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="RetinaFaceDetector"/> class.
-    /// </summary>
-    /// <param name="logger">The logger instance for diagnostic output.</param>
-    public RetinaFaceDetector(ILogger<RetinaFaceDetector> logger)
+    private RetinaFaceDetector(ILogger<RetinaFaceDetector> logger, InferenceSession session)
     {
         _logger = logger;
+        _session = session;
+    }
 
+    /// <summary>
+    /// Creates a new instance of the <see cref="RetinaFaceDetector"/> class.
+    /// </summary>
+    /// <param name="logger">The logger instance for diagnostic output.</param>
+    public static Result<RetinaFaceDetector, PipelineError> Create(ILogger<RetinaFaceDetector> logger)
+    {
         try
         {
-            // Create session options
             var sessionOptions = new SessionOptions
             {
                 GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
@@ -47,14 +51,20 @@ public sealed class RetinaFaceDetector : IFaceDetector, IDisposable
                 EnableMemoryPattern = true,
             };
 
-            // Load RetinaFace model
-            var modelBytes = ModelRegistry.GetModel(ModelRegistry.FaceDetector);
-            _session = new InferenceSession(modelBytes, sessionOptions);
+            var modelBytesResult = ModelRegistry.TryGetModel(ModelRegistry.FaceDetector);
+            if (modelBytesResult.IsFailure)
+            {
+                return Result.Failure<RetinaFaceDetector, PipelineError>(modelBytesResult.Error);
+            }
+
+            return Result.Success<RetinaFaceDetector, PipelineError>(
+                new RetinaFaceDetector(logger, new InferenceSession(modelBytesResult.Value, sessionOptions)));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize RetinaFace detector");
-            throw;
+            logger.LogError(ex, "Failed to initialize RetinaFace detector");
+            return Result.Failure<RetinaFaceDetector, PipelineError>(
+                new ConfigurationError($"Failed to initialize RetinaFace detector: {ex.Message}", "retinaface"));
         }
     }
 
@@ -71,7 +81,7 @@ public sealed class RetinaFaceDetector : IFaceDetector, IDisposable
     /// - 5-point facial landmarks (eyes, nose, mouth corners)
     /// The model processes images at 640x640 resolution.
     /// </remarks>
-    public async Task<Result<IReadOnlyList<DetectedFace>>> DetectFacesAsync(
+    public async Task<Result<IReadOnlyList<DetectedFace>, PipelineError>> DetectFacesAsync(
         Image<Rgba32> image,
         CancellationToken cancellationToken = default
     )
@@ -109,12 +119,19 @@ public sealed class RetinaFaceDetector : IFaceDetector, IDisposable
                 detections.Count
             );
 
-            return Result.Success<IReadOnlyList<DetectedFace>>(detections);
+            return Result.Success<IReadOnlyList<DetectedFace>, PipelineError>(detections);
         }
         catch (OperationCanceledException)
         {
             _logger.LogDebug("Face detection was cancelled");
-            return Result.Failure<IReadOnlyList<DetectedFace>>("Face detection was cancelled");
+            return Result.Failure<IReadOnlyList<DetectedFace>, PipelineError>(
+                new DetectionError("Face detection was cancelled", "retinaface"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Face detection failed");
+            return Result.Failure<IReadOnlyList<DetectedFace>, PipelineError>(
+                new DetectionError($"Face detection failed: {ex.Message}", "retinaface"));
         }
     }
 

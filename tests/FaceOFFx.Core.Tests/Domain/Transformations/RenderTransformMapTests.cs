@@ -28,7 +28,15 @@ public class RenderTransformMapTests
         var crop = new Rectangle(cropX, cropY, cropWidth, cropHeight);
         var output = new ImageDimensions(outputWidth, outputHeight);
 
-        var map = RenderTransformMapBuilder.CreateRotateCropResize(source, rotationDegrees, rotated, crop, output);
+        var mapResult = RenderTransformMapBuilder.CreateRotateCropResize(
+            source,
+            rotationDegrees,
+            rotated,
+            crop,
+            output);
+
+        mapResult.IsSuccess.Should().BeTrue();
+        var map = mapResult.Value;
 
         var corners = new[]
         {

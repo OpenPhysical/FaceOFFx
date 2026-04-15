@@ -34,7 +34,7 @@ public sealed class CanonicalFaceGeometryPipelineTests
             detectedFace,
             new StubLandmarkExtractor());
 
-        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error : string.Empty);
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Message : string.Empty);
         var geometry = result.Value;
         var corners = new[]
         {
@@ -73,7 +73,7 @@ public sealed class CanonicalFaceGeometryPipelineTests
             detectedFace,
             new StubLandmarkExtractor());
 
-        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error : string.Empty);
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Message : string.Empty);
         var geometry = result.Value;
         var corners = new[]
         {
@@ -94,7 +94,7 @@ public sealed class CanonicalFaceGeometryPipelineTests
 
     private sealed class StubLandmarkExtractor : ILandmarkExtractor
     {
-        public Task<Result<FaceLandmarks68>> ExtractLandmarksAsync(
+        public Task<Result<FaceLandmarks68, PipelineError>> ExtractLandmarksAsync(
             Image<Rgba32> image,
             FaceBox faceBox,
             CancellationToken cancellationToken = default)
@@ -105,7 +105,7 @@ public sealed class CanonicalFaceGeometryPipelineTests
                     20f + ((index / 8) * 9f)))
                 .ToArray();
 
-            return Task.FromResult(Result.Success(new FaceLandmarks68(points)));
+            return Task.FromResult(Result.Success<FaceLandmarks68, PipelineError>(new FaceLandmarks68(points)));
         }
     }
 }

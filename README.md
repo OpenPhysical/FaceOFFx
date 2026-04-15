@@ -40,9 +40,14 @@ using FaceOFFx.Infrastructure.Services;
 // Simplest: Default PIV processing (20KB target)
 byte[] imageData = File.ReadAllBytes("photo.jpg");
 var result = await FacialImageEncoder.ProcessAsync(imageData);
+if (result.IsFailure)
+{
+    Console.WriteLine(result.Error.Message);
+    return;
+}
 
-File.WriteAllBytes("output.png", result.ImageData);
-Console.WriteLine($"Size: {result.Metadata.FileSize:N0} bytes");
+File.WriteAllBytes("output.png", result.Value.ImageData);
+Console.WriteLine($"Size: {result.Value.Metadata.FileSize:N0} bytes");
 
 // TWIC processing (14KB maximum for card compatibility)
 var twicResult = await FacialImageEncoder.ProcessForTwicAsync(imageData);
@@ -53,15 +58,15 @@ var customResult = await FacialImageEncoder.ProcessToSizeAsync(imageData, 25000)
 // Fixed compression rate
 var rateResult = await FacialImageEncoder.ProcessWithRateAsync(imageData, 1.5f);
 
-// Try pattern for error handling
-var (success, result, error) = await FacialImageEncoder.TryProcessAsync(imageData);
-if (success)
+// Reuse the typed result directly
+var retry = await FacialImageEncoder.TryProcessAsync(imageData);
+if (retry.IsFailure)
 {
-    Console.WriteLine($"Processed to {result!.Metadata.FileSize} bytes");
+    Console.WriteLine($"Processing failed: {retry.Error.Message}");
 }
 else
 {
-    Console.WriteLine($"Processing failed: {error}");
+    Console.WriteLine($"Processed to {retry.Value.Metadata.FileSize} bytes");
 }
 ```
 
@@ -394,37 +399,21 @@ Each document command writes a provenance JSON file alongside the outputs. The p
 ### Error Handling
 
 ```csharp
-// Standard try-catch pattern
-try
+var result = await FacialImageEncoder.ProcessAsync(imageData);
+if (result.IsFailure)
 {
-    var result = await FacialImageEncoder.ProcessAsync(imageData);
-    Console.WriteLine($"Processed size: {result.Metadata.FileSize} bytes");
-    
-    // Check optional values
-    if (result.Metadata.TargetSize.HasValue)
-    {
-        Console.WriteLine($"Target size was: {result.Metadata.TargetSize.Value}");
-    }
-}
-catch (ArgumentNullException ex)
-{
-    Console.WriteLine($"Invalid input: {ex.Message}");
-}
-catch (InvalidOperationException ex)
-{
-    Console.WriteLine($"Processing failed: {ex.Message}");
-}
-
-// Or use the Try pattern
-var (success, result, error) = await FacialImageEncoder.TryProcessAsync(imageData);
-if (!success)
-{
-    Console.WriteLine($"Failed: {error}");
+    Console.WriteLine($"Processing failed: [{result.Error.Code}] {result.Error.Message}");
     return;
 }
 
+Console.WriteLine($"Processed size: {result.Value.Metadata.FileSize} bytes");
+if (result.Value.Metadata.TargetSize.HasValue)
+{
+    Console.WriteLine($"Target size was: {result.Value.Metadata.TargetSize.Value}");
+}
+
 // Additional processing based on file size
-if (result!.Metadata.FileSize > 25000)
+if (result.Value.Metadata.FileSize > 25000)
 {
     // Try with higher compression
     result = await FacialImageEncoder.ProcessWithRateAsync(imageData, 0.5f);

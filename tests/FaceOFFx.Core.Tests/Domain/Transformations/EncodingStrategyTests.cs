@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using FaceOFFx.Core.Abstractions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Transformations;
 using NSubstitute;
@@ -77,7 +78,7 @@ public class EncodingStrategyTests
         var testData = new byte[] { 1, 2, 3, 4, 5 };
         _mockEncoder
             .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), Arg.Any<FacialRoiSet>(), 2.0f, 3, true, false)
-            .Returns(Result.Success(testData));
+            .Returns(SuccessBytes(testData));
 
         var strategy = new FixedRateStrategy(2.0f);
         var result = strategy.Execute(_testImage, _testRoiSet, _mockEncoder, _testOptions);
@@ -105,13 +106,13 @@ public class EncodingStrategyTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>()
             )
-            .Returns(Result.Failure<byte[]>("Encoding failed"));
+            .Returns(FailureBytes("Encoding failed"));
 
         var strategy = new FixedRateStrategy(1.0f);
         var result = strategy.Execute(_testImage, _testRoiSet, _mockEncoder, _testOptions);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Should().Be("Encoding failed");
+        result.Error.Should().Contain("Encoding failed");
     }
 
     /// <summary>
@@ -134,10 +135,10 @@ public class EncodingStrategyTests
                 true,
                 false
             )
-            .Returns(Result.Success(new byte[25000])); // Too big
+            .Returns(SuccessBytes(new byte[25000])); // Too big
         _mockEncoder
             .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), _testRoiSet, 0.68f, 3, true, false)
-            .Returns(Result.Success(testData));
+            .Returns(SuccessBytes(testData));
 
         var strategy = new TargetSizeStrategy(targetSize);
         var result = strategy.Execute(_testImage, _testRoiSet, _mockEncoder, _testOptions);
@@ -161,13 +162,13 @@ public class EncodingStrategyTests
         // Using actual rates from CompressionSteps array
         _mockEncoder
             .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), _testRoiSet, 0.36f, 3, true, false)
-            .Returns(Result.Success(new byte[12000])); // Too small
+            .Returns(SuccessBytes(new byte[12000])); // Too small
         _mockEncoder
             .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), _testRoiSet, 0.46f, 3, true, false)
-            .Returns(Result.Success(new byte[14500])); // Best fit under target
+            .Returns(SuccessBytes(new byte[14500])); // Best fit under target
         _mockEncoder
             .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), _testRoiSet, 0.55f, 3, true, false)
-            .Returns(Result.Success(new byte[17000])); // Too big
+            .Returns(SuccessBytes(new byte[17000])); // Too big
         // Mock all other rates to return too big
         _mockEncoder
             .EncodeWithRoi(
@@ -178,7 +179,7 @@ public class EncodingStrategyTests
                 true,
                 false
             )
-            .Returns(Result.Success(new byte[20000])); // Too big
+            .Returns(SuccessBytes(new byte[20000])); // Too big
 
         var strategy = new TargetSizeStrategy(targetSize);
         var result = strategy.Execute(_testImage, _testRoiSet, _mockEncoder, _testOptions);
@@ -207,7 +208,7 @@ public class EncodingStrategyTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>()
             )
-            .Returns(Result.Success(new byte[10000])); // All too big
+            .Returns(SuccessBytes(new byte[10000])); // All too big
 
         var strategy = new TargetSizeStrategy(targetSize);
         var result = strategy.Execute(_testImage, _testRoiSet, _mockEncoder, _testOptions);
@@ -228,13 +229,13 @@ public class EncodingStrategyTests
         // Using actual rates from CompressionSteps array
         _mockEncoder
             .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), _testRoiSet, 0.85f, 3, true, false)
-            .Returns(Result.Failure<byte[]>("First failure"));
+            .Returns(FailureBytes("First failure"));
         _mockEncoder
             .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), _testRoiSet, 0.75f, 3, true, false)
-            .Returns(Result.Failure<byte[]>("Second failure"));
+            .Returns(FailureBytes("Second failure"));
         _mockEncoder
             .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), _testRoiSet, 0.68f, 3, true, false)
-            .Returns(Result.Success(new byte[18000])); // Success under target
+            .Returns(SuccessBytes(new byte[18000])); // Success under target
         // Mock lower rates to return smaller sizes
         _mockEncoder
             .EncodeWithRoi(
@@ -245,7 +246,7 @@ public class EncodingStrategyTests
                 true,
                 false
             )
-            .Returns(Result.Success(new byte[15000]));
+            .Returns(SuccessBytes(new byte[15000]));
 
         var strategy = new TargetSizeStrategy(targetSize);
         var result = strategy.Execute(_testImage, _testRoiSet, _mockEncoder, _testOptions);
@@ -284,7 +285,7 @@ public class EncodingStrategyTests
                 Arg.Any<bool>(),
                 Arg.Any<bool>()
             )
-            .Returns(Result.Success(new byte[25000])); // Always too big
+            .Returns(SuccessBytes(new byte[25000])); // Always too big
 
         var strategy = new TargetSizeStrategy(targetSize);
         var result = strategy.Execute(_testImage, _testRoiSet, _mockEncoder, _testOptions);
@@ -300,4 +301,10 @@ public class EncodingStrategyTests
                 .EncodeWithRoi(Arg.Any<Image<Rgba32>>(), _testRoiSet, rate, 3, true, false);
         }
     }
+
+    private static Result<byte[], PipelineError> SuccessBytes(byte[] data) =>
+        Result.Success<byte[], PipelineError>(data);
+
+    private static Result<byte[], PipelineError> FailureBytes(string message) =>
+        Result.Failure<byte[], PipelineError>(new RenderError(message, "test"));
 }

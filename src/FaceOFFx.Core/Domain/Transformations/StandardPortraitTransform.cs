@@ -17,7 +17,7 @@ public static class StandardPortraitTransform
     /// <summary>
     /// Projects source landmarks into the final output portrait geometry for the requested standard.
     /// </summary>
-    public static Result<StandardPortraitTransformResult> Transform(
+    public static Result<StandardPortraitTransformResult, PipelineError> Transform(
         ImageDimensions sourceDimensions,
         FaceLandmarks68 sourceLandmarks,
         ImageDimensions targetDimensions,
@@ -25,17 +25,24 @@ public static class StandardPortraitTransform
     {
         if (sourceLandmarks is null || !sourceLandmarks.IsValid)
         {
-            return Result.Failure<StandardPortraitTransformResult>(
-                "Valid facial landmarks are required for output portrait transformation");
+            return Result.Failure<StandardPortraitTransformResult, PipelineError>(
+                new GeometryError(
+                    "Valid facial landmarks are required for output portrait transformation",
+                    "standard-portrait"));
         }
 
         if (sourceDimensions.Width <= 0 || sourceDimensions.Height <= 0)
         {
-            return Result.Failure<StandardPortraitTransformResult>(
-                $"Invalid source dimensions {sourceDimensions.Width}x{sourceDimensions.Height}");
+            return Result.Failure<StandardPortraitTransformResult, PipelineError>(
+                new ValidationError(
+                    $"Invalid source dimensions {sourceDimensions.Width}x{sourceDimensions.Height}",
+                    "standard-portrait"));
         }
 
-        var rotationDegrees = CalculateRotation(sourceLandmarks.LeftEyeCenter, sourceLandmarks.RightEyeCenter, maxRotationDegrees);
+        var rotationDegrees = CalculateRotation(
+            sourceLandmarks.LeftEyeCenter,
+            sourceLandmarks.RightEyeCenter,
+            maxRotationDegrees);
         var rotatedLandmarks = RotateLandmarks(
             sourceLandmarks,
             rotationDegrees,
@@ -47,22 +54,27 @@ public static class StandardPortraitTransform
             sourceDimensions.Height,
             rotationDegrees);
 
-        var cropRectangle = CalculateCropRectangle(
+        var cropRectangleResult = CalculateCropRectangle(
             rotatedLandmarks,
             rotatedDimensions.Width,
             rotatedDimensions.Height,
             targetDimensions);
+        if (cropRectangleResult.IsFailure)
+        {
+            return Result.Failure<StandardPortraitTransformResult, PipelineError>(cropRectangleResult.Error);
+        }
 
         var transformedLandmarks = TransformLandmarksToOutputSpace(
             rotatedLandmarks,
-            cropRectangle,
+            cropRectangleResult.Value,
             targetDimensions);
 
-        return Result.Success(new StandardPortraitTransformResult(
-            transformedLandmarks,
-            targetDimensions,
-            rotationDegrees,
-            cropRectangle));
+        return Result.Success<StandardPortraitTransformResult, PipelineError>(
+            new StandardPortraitTransformResult(
+                transformedLandmarks,
+                targetDimensions,
+                rotationDegrees,
+                cropRectangleResult.Value));
     }
 
     internal static float CalculateRotation(Point2D leftEye, Point2D rightEye, float maxRotationDegrees)
@@ -73,7 +85,7 @@ public static class StandardPortraitTransform
         return Math.Clamp(rotationDegrees, -maxRotationDegrees, maxRotationDegrees);
     }
 
-    internal static Rectangle CalculateCropRectangle(
+    internal static Result<Rectangle, PipelineError> CalculateCropRectangle(
         FaceLandmarks68 landmarks,
         int imageWidth,
         int imageHeight,
@@ -83,7 +95,10 @@ public static class StandardPortraitTransform
         var faceWidth = faceContour.Max(point => point.X) - faceContour.Min(point => point.X);
         if (faceWidth <= 0f)
         {
-            throw new InvalidOperationException("Unable to calculate portrait crop from zero-width landmarks");
+            return Result.Failure<Rectangle, PipelineError>(
+                new GeometryError(
+                    "Unable to calculate portrait crop from zero-width landmarks",
+                    "standard-portrait"));
         }
 
         var desiredWidth = faceWidth / TargetFaceWidthRatio;
@@ -115,7 +130,7 @@ public static class StandardPortraitTransform
         var x = Math.Clamp((int)Math.Round(cropX), 0, Math.Max(0, imageWidth - width));
         var y = Math.Clamp((int)Math.Round(cropY), 0, Math.Max(0, imageHeight - height));
 
-        return new Rectangle(x, y, width, height);
+        return Result.Success<Rectangle, PipelineError>(new Rectangle(x, y, width, height));
     }
 
     private static FaceLandmarks68 RotateLandmarks(

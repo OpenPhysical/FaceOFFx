@@ -34,247 +34,282 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace FaceOFFx.Core.Domain.Quality;
 
 /// <summary>
-/// Assessment mode determines which image processing stages are used
+/// Selects whether compliance is evaluated on the raw input image or the rendered output portrait.
 /// </summary>
 [PublicAPI]
 public enum AssessmentMode
 {
     /// <summary>
-    /// Input validation - assess raw photos for processing suitability
+    /// Assess the source image before any portrait rendering.
     /// </summary>
     InputValidation,
-    
+
     /// <summary>
-    /// Output validation - assess final credentials for compliance
+    /// Assess the final aligned output portrait.
     /// </summary>
     OutputValidation
 }
 
 /// <summary>
-/// Pipeline for performing compliance assessment with stage-appropriate testing
+/// Performs stage-appropriate compliance analysis and returns typed pipeline failures.
 /// </summary>
 [PublicAPI]
 public static class ComplianceAssessmentPipeline
 {
     /// <summary>
-    /// Performs multi-stage compliance assessment optimized for accuracy
+    /// Assesses compliance for a raw input image without requiring an aligned portrait.
     /// </summary>
-    public static async Task<Result<ComplianceAssessment>> AssessComplianceAsync(
+    public static Task<Result<ComplianceAssessment, PipelineError>> AssessInputComplianceAsync(
         Image<Rgba32> image,
         DetectedFace face,
         FaceLandmarks68 landmarks,
-        string standardName = "PIV",
-        AssessmentMode mode = AssessmentMode.InputValidation,
-        OutputPortraitAssessmentInput? outputPortrait = null)
-    {
-        // Get compliance rules for standard and mode
-        var rules = GetRulesForMode(standardName, mode);
-        
-        // Step 1: Stage 1 - Raw image assessments
-        var stage1Task = Task.Run(() => PerformStage1AssessmentsAsync(image, face, landmarks));
-        var stage1Result = await stage1Task;
-        
-        if (stage1Result.IsFailure)
-        {
-            return Result.Failure<ComplianceAssessment>($"Stage 1 assessments failed: {stage1Result.Error}");
-        }
-        
-        // Step 2: Stage 2 - Pre-aligned assessments (if needed for symmetry)
-        SymmetryMeasurement? symmetryMeasurement = null;
-        if (mode == AssessmentMode.OutputValidation)
-        {
-            if (outputPortrait == null)
-            {
-                return Result.Failure<ComplianceAssessment>(
-                    "Output validation requires aligned portrait data");
-            }
-
-            var stage2Task = Task.Run(() => PerformStage2AssessmentsAsync(
-                outputPortrait.Image,
-                outputPortrait.Landmarks));
-            var stage2Result = await stage2Task;
-
-            if (stage2Result.IsFailure)
-            {
-                return Result.Failure<ComplianceAssessment>($"Stage 2 assessments failed: {stage2Result.Error}");
-            }
-
-            symmetryMeasurement = stage2Result.Value;
-        }
-        else
-        {
-            var stage2Task = Task.Run(() => PerformStage2AssessmentsAsync(image, landmarks));
-            var stage2Result = await stage2Task;
-            if (stage2Result.IsFailure)
-            {
-                return Result.Failure<ComplianceAssessment>($"Stage 2 assessments failed: {stage2Result.Error}");
-            }
-
-            symmetryMeasurement = stage2Result.Value;
-        }
-        
-        // Step 3: Stage 3 - output-mode geometry uses the final transformed portrait geometry.
-        GeometryMeasurement geometryMeasurement;
-        if (mode == AssessmentMode.OutputValidation)
-        {
-            geometryMeasurement = MeasureOutputGeometry(outputPortrait!);
-        }
-        else
-        {
-            geometryMeasurement = stage1Result.Value.Geometry;
-        }
-        
-        // Step 4: Evaluate compliance against rules
-        var assessment = ComplianceEvaluators.AssessCompliance(
-            symmetryMeasurement,
-            stage1Result.Value.Sharpness,
-            geometryMeasurement,
-            rules,
-            symmetryCountsTowardsCompliance: mode == AssessmentMode.OutputValidation,
-            ipdCountsTowardsCompliance: mode == AssessmentMode.OutputValidation
-        );
-        
-        return Result.Success(assessment);
-    }
-
-    private static GeometryMeasurement MeasureOutputGeometry(OutputPortraitAssessmentInput outputPortrait)
-    {
-        return GeometryAssessor.MeasureGeometry(
-            new ImageDimensions(outputPortrait.Image.Width, outputPortrait.Image.Height),
-            outputPortrait.Landmarks).Value;
-    }
+        string standardName = "PIV") =>
+        AssessComplianceAsync(
+            image,
+            face,
+            landmarks,
+            standardName,
+            AssessmentMode.InputValidation,
+            Maybe<OutputPortraitAssessmentInput>.None);
 
     /// <summary>
-    /// Stage 1: Raw image assessments (sharpness, head size, centering)
+    /// Assesses compliance for a rendered output portrait using output-space geometry and symmetry.
     /// </summary>
-    private static async Task<Result<Stage1Measurements>> PerformStage1AssessmentsAsync(
+    public static Task<Result<ComplianceAssessment, PipelineError>> AssessOutputComplianceAsync(
+        Image<Rgba32> image,
+        DetectedFace face,
+        FaceLandmarks68 landmarks,
+        OutputPortraitAssessmentInput outputPortrait,
+        string standardName = "PIV") =>
+        AssessComplianceAsync(
+            image,
+            face,
+            landmarks,
+            standardName,
+            AssessmentMode.OutputValidation,
+            Maybe<OutputPortraitAssessmentInput>.From(outputPortrait));
+
+    /// <summary>
+    /// Returns only the pass/fail outcome for raw-input compliance.
+    /// </summary>
+    public static Task<Result<bool, PipelineError>> QuickInputComplianceCheckAsync(
+        Image<Rgba32> image,
+        DetectedFace face,
+        FaceLandmarks68 landmarks,
+        string standardName = "PIV") =>
+        AssessInputComplianceAsync(image, face, landmarks, standardName)
+            .MapAsync(assessment => assessment.IsCompliant);
+
+    /// <summary>
+    /// Returns only the pass/fail outcome for rendered-output compliance.
+    /// </summary>
+    public static Task<Result<bool, PipelineError>> QuickOutputComplianceCheckAsync(
+        Image<Rgba32> image,
+        DetectedFace face,
+        FaceLandmarks68 landmarks,
+        OutputPortraitAssessmentInput outputPortrait,
+        string standardName = "PIV") =>
+        AssessOutputComplianceAsync(image, face, landmarks, outputPortrait, standardName)
+            .MapAsync(assessment => assessment.IsCompliant);
+
+    /// <summary>
+    /// Produces the raw measurements used by the compliance evaluators.
+    /// </summary>
+    public static async Task<Result<RawMeasurements, PipelineError>> PerformRawMeasurementsAsync(
         Image<Rgba32> image,
         DetectedFace face,
         FaceLandmarks68 landmarks)
     {
-        // Run Stage 1 measurements in parallel for better performance
-        // For sharpness, analyze only the face region
+        var stage1 = await PerformStage1AssessmentsAsync(image, face, landmarks).ConfigureAwait(false);
+        if (stage1.IsFailure)
+        {
+            return Result.Failure<RawMeasurements, PipelineError>(stage1.Error);
+        }
+
+        var symmetry = await PerformStage2AssessmentsAsync(image, landmarks).ConfigureAwait(false);
+        if (symmetry.IsFailure)
+        {
+            return Result.Failure<RawMeasurements, PipelineError>(symmetry.Error);
+        }
+
+        return Result.Success<RawMeasurements, PipelineError>(new RawMeasurements(
+            symmetry.Value,
+            stage1.Value.Sharpness,
+            stage1.Value.Geometry));
+    }
+
+    private static async Task<Result<ComplianceAssessment, PipelineError>> AssessComplianceAsync(
+        Image<Rgba32> image,
+        DetectedFace face,
+        FaceLandmarks68 landmarks,
+        string standardName,
+        AssessmentMode mode,
+        Maybe<OutputPortraitAssessmentInput> outputPortrait)
+    {
+        var rules = GetRulesForMode(standardName, mode);
+
+        var stage1Result = await PerformStage1AssessmentsAsync(image, face, landmarks).ConfigureAwait(false);
+        if (stage1Result.IsFailure)
+        {
+            return Result.Failure<ComplianceAssessment, PipelineError>(stage1Result.Error);
+        }
+
+        var stage2Result = mode == AssessmentMode.OutputValidation
+            ? await AssessOutputSymmetryAsync(outputPortrait, standardName).ConfigureAwait(false)
+            : await PerformStage2AssessmentsAsync(image, landmarks).ConfigureAwait(false);
+        if (stage2Result.IsFailure)
+        {
+            return Result.Failure<ComplianceAssessment, PipelineError>(stage2Result.Error);
+        }
+
+        var geometryResult = mode == AssessmentMode.OutputValidation
+            ? MeasureOutputGeometry(outputPortrait, standardName)
+            : Result.Success<GeometryMeasurement, PipelineError>(stage1Result.Value.Geometry);
+        if (geometryResult.IsFailure)
+        {
+            return Result.Failure<ComplianceAssessment, PipelineError>(geometryResult.Error);
+        }
+
+        return Result.Success<ComplianceAssessment, PipelineError>(ComplianceEvaluators.AssessCompliance(
+            stage2Result.Value,
+            stage1Result.Value.Sharpness,
+            geometryResult.Value,
+            rules,
+            symmetryCountsTowardsCompliance: mode == AssessmentMode.OutputValidation,
+            ipdCountsTowardsCompliance: mode == AssessmentMode.OutputValidation));
+    }
+
+    private static async Task<Result<SymmetryMeasurement, PipelineError>> AssessOutputSymmetryAsync(
+        Maybe<OutputPortraitAssessmentInput> outputPortrait,
+        string standardName)
+    {
+        var portrait = outputPortrait.ToPipelineResult(
+            new ValidationError("Output validation requires aligned portrait data", standardName));
+        if (portrait.IsFailure)
+        {
+            return Result.Failure<SymmetryMeasurement, PipelineError>(portrait.Error);
+        }
+
+        return await PerformStage2AssessmentsAsync(
+                portrait.Value.Image,
+                portrait.Value.Landmarks)
+            .ConfigureAwait(false);
+    }
+
+    private static Result<GeometryMeasurement, PipelineError> MeasureOutputGeometry(
+        Maybe<OutputPortraitAssessmentInput> outputPortrait,
+        string standardName)
+    {
+        var portrait = outputPortrait.ToPipelineResult(
+            new ValidationError("Output validation requires aligned portrait data", standardName));
+        if (portrait.IsFailure)
+        {
+            return Result.Failure<GeometryMeasurement, PipelineError>(portrait.Error);
+        }
+
+        return GeometryAssessor.MeasureGeometry(
+                new ImageDimensions(portrait.Value.Image.Width, portrait.Value.Image.Height),
+                portrait.Value.Landmarks)
+            .ToPipelineResult(error => new ValidationError($"Output geometry assessment failed: {error}", standardName));
+    }
+
+    private static async Task<Result<Stage1Measurements, PipelineError>> PerformStage1AssessmentsAsync(
+        Image<Rgba32> image,
+        DetectedFace face,
+        FaceLandmarks68 landmarks)
+    {
         var faceRectangle = new Rectangle(
             (int)face.BoundingBox.X,
             (int)face.BoundingBox.Y,
             (int)face.BoundingBox.Width,
-            (int)face.BoundingBox.Height
-        );
+            (int)face.BoundingBox.Height);
+
         var sharpnessTask = Task.Run(() => SharpnessAssessor.MeasureSharpness(image, faceRectangle));
         var geometryTask = Task.Run(() => GeometryAssessor.MeasureGeometry(
             new ImageDimensions(image.Width, image.Height), landmarks));
-        
-        await Task.WhenAll(sharpnessTask, geometryTask);
-        
-        var sharpnessResult = await sharpnessTask;
-        var geometryResult = await geometryTask;
-        
-        // Combine results
-        return Result.Combine(sharpnessResult, geometryResult)
-            .Map(() => new Stage1Measurements(
-                sharpnessResult.Value,
-                geometryResult.Value
-            ));
+
+        await Task.WhenAll(sharpnessTask, geometryTask).ConfigureAwait(false);
+
+        var sharpnessResult = (await sharpnessTask.ConfigureAwait(false))
+            .ToPipelineResult(error => new ValidationError($"Stage 1 sharpness assessment failed: {error}"));
+        if (sharpnessResult.IsFailure)
+        {
+            return Result.Failure<Stage1Measurements, PipelineError>(sharpnessResult.Error);
+        }
+
+        var geometryResult = (await geometryTask.ConfigureAwait(false))
+            .ToPipelineResult(error => new ValidationError($"Stage 1 geometry assessment failed: {error}"));
+        if (geometryResult.IsFailure)
+        {
+            return Result.Failure<Stage1Measurements, PipelineError>(geometryResult.Error);
+        }
+
+        return Result.Success<Stage1Measurements, PipelineError>(new Stage1Measurements(
+            sharpnessResult.Value,
+            geometryResult.Value));
     }
 
-    /// <summary>
-    /// Stage 2: Pre-aligned assessments (symmetry with horizontal eyes)
-    /// </summary>
-    private static async Task<Result<SymmetryMeasurement>> PerformStage2AssessmentsAsync(
+    private static async Task<Result<SymmetryMeasurement, PipelineError>> PerformStage2AssessmentsAsync(
         Image<Rgba32> image,
         FaceLandmarks68 landmarks)
     {
-        return await Task.Run(() => SymmetryAssessor.MeasureAsymmetry(image, landmarks));
+        return (await Task.Run(() => SymmetryAssessor.MeasureAsymmetry(image, landmarks)).ConfigureAwait(false))
+            .ToPipelineResult(error => new ValidationError($"Stage 2 symmetry assessment failed: {error}"));
     }
 
-    /// <summary>
-    /// Gets compliance rules appropriate for the assessment mode
-    /// </summary>
     private static ComplianceRules GetRulesForMode(string standardName, AssessmentMode mode)
     {
         var isInputValidation = mode == AssessmentMode.InputValidation;
-        
-        // Try to get dual rules first (preferred)
         var rules = ComplianceStandards.GetRulesForMode(standardName, isInputValidation);
         if (rules != null)
         {
             return rules;
         }
-        
-        // Fallback to legacy single-threshold rules
+
         var baseRules = ComplianceStandards.GetRulesOrDefault(standardName);
-        
         if (mode == AssessmentMode.InputValidation)
         {
-            // More lenient thresholds for input validation (legacy fallback)
             return baseRules with
             {
-                MinHeadSizePercent = 25f, // More lenient than 35%
-                MaxHeadSizePercent = 85f, // More lenient than 80%
-                MinSymmetryPercent = 40f, // More lenient than 60%
-                MinSharpnessPercent = 15f, // More lenient than 25%
-                MinIpdPixels = 60f,       // More lenient range for input
+                MinHeadSizePercent = 25f,
+                MaxHeadSizePercent = 85f,
+                MinSymmetryPercent = 40f,
+                MinSharpnessPercent = 15f,
+                MinIpdPixels = 60f,
                 MaxIpdPixels = 200f
             };
         }
-        
-        return baseRules; // Use strict rules for output validation
-    }
 
-    /// <summary>
-    /// Fast compliance check - returns pass/fail without detailed analysis
-    /// </summary>
-    public static async Task<Result<bool>> QuickComplianceCheckAsync(
-        Image<Rgba32> image,
-        DetectedFace face,
-        FaceLandmarks68 landmarks,
-        string standardName = "PIV",
-        AssessmentMode mode = AssessmentMode.InputValidation,
-        OutputPortraitAssessmentInput? outputPortrait = null)
-    {
-        var assessment = await AssessComplianceAsync(image, face, landmarks, standardName, mode, outputPortrait);
-        return assessment.Map(a => a.IsCompliant);
-    }
-
-    /// <summary>
-    /// Legacy method for backwards compatibility
-    /// </summary>
-    public static async Task<Result<RawMeasurements>> PerformRawMeasurementsAsync(
-        Image<Rgba32> image,
-        DetectedFace face,
-        FaceLandmarks68 landmarks)
-    {
-        var stage1 = await PerformStage1AssessmentsAsync(image, face, landmarks);
-        var symmetry = await PerformStage2AssessmentsAsync(image, landmarks);
-        
-        return Result.Combine(stage1, symmetry)
-            .Map(() => new RawMeasurements(
-                symmetry.Value,
-                stage1.Value.Sharpness,
-                stage1.Value.Geometry
-            ));
+        return baseRules;
     }
 }
 
 /// <summary>
-/// Aligned portrait data used for output-mode compliance assessment.
+/// Carries an already-rendered portrait plus its output-space landmarks for output validation.
 /// </summary>
+/// <param name="Image">The rendered portrait image in final output dimensions.</param>
+/// <param name="Landmarks">The facial landmarks measured in output image coordinates.</param>
 [PublicAPI]
 public sealed record OutputPortraitAssessmentInput(
     Image<Rgba32> Image,
     FaceLandmarks68 Landmarks);
 
 /// <summary>
-/// Container for Stage 1 assessment results (raw image assessments)
+/// Holds the stage-1 measurements produced from the raw image.
 /// </summary>
+/// <param name="Sharpness">The raw-image sharpness measurement.</param>
+/// <param name="Geometry">The raw-image geometry measurement.</param>
 [PublicAPI]
 public record Stage1Measurements(
     SharpnessMeasurement Sharpness,
     GeometryMeasurement Geometry);
 
 /// <summary>
-/// Container for raw measurement results before compliance evaluation
+/// Holds the complete set of raw measurements gathered before compliance evaluation.
 /// </summary>
+/// <param name="Symmetry">The symmetry measurement.</param>
+/// <param name="Sharpness">The sharpness measurement.</param>
+/// <param name="Geometry">The geometry measurement.</param>
 [PublicAPI]
 public record RawMeasurements(
     SymmetryMeasurement Symmetry,
@@ -282,23 +317,21 @@ public record RawMeasurements(
     GeometryMeasurement Geometry);
 
 /// <summary>
-/// Compliance requirement strictness levels
+/// Controls how compliance findings are interpreted by callers.
 /// </summary>
 [PublicAPI]
 public enum ComplianceRequirement
 {
     /// <summary>
-    /// Strict compliance - fail fast on any violation
+    /// Treat every violation as a hard failure.
     /// </summary>
     Strict,
-    
     /// <summary>
-    /// Lenient compliance - collect all violations but continue processing
+    /// Collect violations while still returning the full assessment.
     /// </summary>
     Lenient,
-    
     /// <summary>
-    /// Advisory only - show violations but don't block processing
+    /// Report findings for informational use only.
     /// </summary>
     Advisory
 }
