@@ -14,6 +14,42 @@ internal static class CliAppConfiguration
         config.ValidateExamples();
 
         config
+            .AddCommand<PivCommand>("piv")
+            .WithDescription("Run the spec-backed PIV document workflow")
+            .WithExample("piv", "photo.jpg")
+            .WithExample("piv", "photo.jpg", "--variant", "card-only")
+            .WithExample("piv", "photo.jpg", "--json")
+            .WithExample("piv", "photo.jpg", "--explain");
+
+        config
+            .AddCommand<UsPassportCommand>("us-passport")
+            .WithDescription("Run the U.S. passport document workflow")
+            .WithExample("us-passport", "photo.jpg")
+            .WithExample("us-passport", "photo.jpg", "--variant", "online-renewal-digital");
+
+        config
+            .AddCommand<UsPermanentResidentPhotoCommand>("us-pr-photo")
+            .WithDescription("Run the U.S. permanent resident application photo workflow")
+            .WithExample("us-pr-photo", "photo.jpg")
+            .WithExample("us-pr-photo", "photo.jpg", "--variant", "digital-upload");
+
+        config
+            .AddCommand<CanadaPassportCommand>("canada-passport")
+            .WithDescription("Run the Canada passport document workflow")
+            .WithExample("canada-passport", "photo.jpg")
+            .WithExample("canada-passport", "photo.jpg", "--variant", "online-renewal-digital");
+
+        config
+            .AddCommand<CanadaPermanentResidentCardCommand>("canada-pr-card")
+            .WithDescription("Run the Canada permanent resident card photo workflow")
+            .WithExample("canada-pr-card", "photo.jpg");
+
+        config
+            .AddCommand<DocumentsCommand>("documents")
+            .WithDescription("List the supported spec-backed document workflows")
+            .WithExample("documents");
+
+        config
             .AddCommand<ProcessCommand>("process")
             .WithDescription("Process images for PIV compliance (supports JP2, JPEG, PNG, TIFF output)")
             .WithExample("process", "photo.jpg")

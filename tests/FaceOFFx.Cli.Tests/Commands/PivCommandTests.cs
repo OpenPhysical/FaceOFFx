@@ -8,7 +8,7 @@ namespace FaceOFFx.Cli.Tests.Commands;
 
 [TestFixture]
 [NonParallelizable]
-public class ProgramOutputTests : IntegrationTestBase
+public class PivCommandTests : IntegrationTestBase
 {
     private string _cliAssemblyPath = null!;
     private string _testImagePath = null!;
@@ -48,35 +48,31 @@ public class ProgramOutputTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task QualityCommand_WithJsonFormat_WritesPureJsonToStdout()
+    public async Task PivRecipe_WithValidImage_WritesArtifactAndProvenance()
     {
-        var processInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = $"\"{_cliAssemblyPath}\" quality --input \"{_testImagePath}\" --format json",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+        var outputDir = Path.Combine(TempDirectory, "piv-job");
+        Directory.CreateDirectory(outputDir);
 
-        using var process = Process.Start(processInfo)
-            ?? throw new InvalidOperationException("Failed to start process");
+        var exitCode = await RunCliCommand(
+            $"piv \"{_testImagePath}\" --output-dir \"{outputDir}\"");
 
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        exitCode.Should().Be(0);
+        File.Exists(Path.Combine(outputDir, "generic_guy.piv.jp2")).Should().BeTrue();
+        File.Exists(Path.Combine(outputDir, "generic_guy.piv.print.jpg")).Should().BeTrue();
+        File.Exists(Path.Combine(outputDir, "generic_guy.piv.provenance.json")).Should().BeTrue();
 
-        stdout.Should().NotContain("FaceOFFx");
-        stdout.Should().NotContain("PIV · ICAO · TWIC Biometrics");
+        var provenance = await File.ReadAllTextAsync(
+            Path.Combine(outputDir, "generic_guy.piv.provenance.json"));
 
-        using var json = JsonDocument.Parse(stdout);
-        json.RootElement.GetProperty("OverallScore").Should().NotBeNull();
+        provenance.Should().Contain("sp800-76-2-table12-note4");
+        provenance.Should().Contain("fips201-3-4.2.3.1");
+        provenance.Should().Contain("piv-output-geometry");
     }
 
     [Test]
-    public async Task PivCommand_WithJsonFormat_WritesPureJsonToStdout()
+    public async Task PivRecipe_WithJson_WritesMachineReadableStdout()
     {
-        var outputDir = Path.Combine(TempDirectory, "piv-program-output");
+        var outputDir = Path.Combine(TempDirectory, "piv-json-job");
         Directory.CreateDirectory(outputDir);
 
         var processInfo = new ProcessStartInfo
@@ -95,35 +91,44 @@ public class ProgramOutputTests : IntegrationTestBase
         var stdout = await process.StandardOutput.ReadToEndAsync();
         await process.WaitForExitAsync();
 
+        process.ExitCode.Should().Be(0);
         stdout.Should().NotContain("PIV · ICAO · TWIC Biometrics");
         using var json = JsonDocument.Parse(stdout);
         json.RootElement.GetProperty("Document").GetString().Should().Be("piv");
+        json.RootElement.GetProperty("ProvenancePath").GetString().Should().Contain(".provenance.json");
+        json.RootElement.GetProperty("Deliverables")[0].GetProperty("Passed").GetBoolean().Should().BeTrue();
     }
 
     [Test]
-    public async Task UsPassportCommand_WithJsonFormat_WritesPureJsonToStdout()
+    public void DocumentsCommand_ListsSupportedDocumentWorkflows()
     {
-        var outputDir = Path.Combine(TempDirectory, "us-passport-program-output");
-        Directory.CreateDirectory(outputDir);
+        var tester = CliTestHarness.Create();
 
+        var result = tester.Run("documents");
+
+        result.ExitCode.Should().Be(0);
+        result.Output.Should().Contain("piv");
+        result.Output.Should().Contain("us-passport");
+        result.Output.Should().Contain("canada-pr-card");
+    }
+
+    private async Task<int> RunCliCommand(string arguments)
+    {
         var processInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"\"{_cliAssemblyPath}\" us-passport \"{_testImagePath}\" --output-dir \"{outputDir}\" --json",
+            Arguments = $"\"{_cliAssemblyPath}\" {arguments}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
 
-        using var process = Process.Start(processInfo)
+        using var process =
+            Process.Start(processInfo)
             ?? throw new InvalidOperationException("Failed to start process");
 
-        var stdout = await process.StandardOutput.ReadToEndAsync();
         await process.WaitForExitAsync();
-
-        stdout.Should().NotContain("PIV · ICAO · TWIC Biometrics");
-        using var json = JsonDocument.Parse(stdout);
-        json.RootElement.GetProperty("Document").GetString().Should().Be("us-passport");
+        return process.ExitCode;
     }
 }

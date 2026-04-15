@@ -16,6 +16,12 @@ internal static class StructuredOutputDetector
         }
 
         var command = args[commandIndex];
+        if (IsDocumentCommand(command))
+        {
+            return args.Skip(commandIndex + 1)
+                .Any(arg => string.Equals(arg, "--json", StringComparison.OrdinalIgnoreCase));
+        }
+
         if (!string.Equals(command, "quality", StringComparison.OrdinalIgnoreCase))
         {
             return false;
@@ -38,4 +44,11 @@ internal static class StructuredOutputDetector
 
         return false;
     }
+
+    private static bool IsDocumentCommand(string command) =>
+        string.Equals(command, "piv", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(command, "us-passport", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(command, "us-pr-photo", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(command, "canada-passport", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(command, "canada-pr-card", StringComparison.OrdinalIgnoreCase);
 }

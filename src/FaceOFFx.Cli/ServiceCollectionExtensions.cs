@@ -52,9 +52,16 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<StandardPortraitProcessorService>();
+        services.AddScoped<DocumentJobRunner>();
         services.AddScoped<StandardPortraitProcessor>();
 
         // Register CLI commands
+        services.AddTransient<PivCommand>();
+        services.AddTransient<UsPassportCommand>();
+        services.AddTransient<UsPermanentResidentPhotoCommand>();
+        services.AddTransient<CanadaPassportCommand>();
+        services.AddTransient<CanadaPermanentResidentCardCommand>();
+        services.AddTransient<DocumentsCommand>();
         services.AddTransient<ProcessCommand>();
         services.AddTransient<RoiCommand>();
         services.AddTransient<QualityCommand>();

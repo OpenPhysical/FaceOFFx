@@ -13,6 +13,8 @@ public class StructuredOutputDetectorTests
         StructuredOutputDetector.RequiresCleanStdout(new[] { "quality", "--format", "json" }).Should().BeTrue();
         StructuredOutputDetector.RequiresCleanStdout(new[] { "--debug", "quality", "--format", "json" }).Should().BeTrue();
         StructuredOutputDetector.RequiresCleanStdout(new[] { "quality", "--format=json" }).Should().BeTrue();
+        StructuredOutputDetector.RequiresCleanStdout(new[] { "piv", "photo.jpg", "--json" }).Should().BeTrue();
+        StructuredOutputDetector.RequiresCleanStdout(new[] { "us-passport", "photo.jpg", "--json" }).Should().BeTrue();
     }
 
     [Test]

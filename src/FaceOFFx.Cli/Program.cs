@@ -9,6 +9,7 @@ using Spectre.Console.Cli.Extensions.DependencyInjection;
 // Configure services
 var services = new ServiceCollection();
 var console = AnsiConsole.Console;
+var requiresCleanStdout = StructuredOutputDetector.RequiresCleanStdout(args);
 
 // Configure logging - check for --debug flag in args
 var hasDebugFlag = args.Contains("--debug");
@@ -26,7 +27,7 @@ services.AddLogging(builder =>
     }
     else
     {
-        builder.SetMinimumLevel(LogLevel.Warning);
+        builder.SetMinimumLevel(requiresCleanStdout ? LogLevel.Error : LogLevel.Warning);
     }
 
     // Use simple console logging for now
@@ -42,11 +43,11 @@ services.AddLogging(builder =>
 services.AddSingleton<IAnsiConsole>(console);
 services.AddFaceOffxCli();
 
-if (!StructuredOutputDetector.RequiresCleanStdout(args))
+if (!requiresCleanStdout)
 {
     console.MarkupLine(" [grey]╭───╮[/]   [bold blue]Face[/][bold]OFF[/][bold yellow]x[/]");
     console.MarkupLine(" [grey]│[/][bold cyan]◉ ◉[/][grey]│[/]   [grey]──────────────────────────[/]");
-    console.MarkupLine(" [grey]│[/][white]╰─╯[/][grey]│[/]   [grey]PIV · ICAO · TWIC Biometrics[/]");
+    console.MarkupLine(" [grey]│[/][white]╰─╯[/][grey]│[/]   [grey]PIV · Passport · PR Photos[/]");
     console.MarkupLine(" [grey]╰───╯[/]   [dim]\"I want to take his face... off.\"[/]");
     console.WriteLine();
 }
