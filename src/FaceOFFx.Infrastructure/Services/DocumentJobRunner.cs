@@ -152,17 +152,74 @@ public sealed class DocumentJobRunner(
         return Result.Success(jobResult);
     }
 
-    private async Task<Result<ComplianceAssessment>> EvaluateInputAsync(DocumentDefinition document, byte[] inputBytes)
+    private async Task<Result<AutomatedDocumentInputResult>> EvaluateInputAsync(DocumentDefinition document, byte[] inputBytes)
     {
-        var standardName = document.Id.Equals("piv", StringComparison.OrdinalIgnoreCase) ? "piv" : "icao";
-        var result = await inputBytes.ValidateComplianceAsync(
-            standardName,
-            logger: _logger,
-            mode: AssessmentMode.InputValidation).ConfigureAwait(false);
+        if (document.WorkflowFamily == DocumentWorkflowFamily.Piv)
+        {
+            var result = await inputBytes.ValidateComplianceAsync(
+                "piv",
+                logger: _logger,
+                mode: AssessmentMode.InputValidation).ConfigureAwait(false);
 
-        return result.IsFailure
-            ? Result.Failure<ComplianceAssessment>($"Input analysis failed: {result.Error}")
-            : Result.Success(result.Value);
+            return result.IsFailure
+                ? Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {result.Error}")
+                : Result.Success(new AutomatedDocumentInputResult(
+                    result.Value.IsCompliant,
+                    result.Value.Summary,
+                    1f));
+        }
+
+        using var image = Image.Load<Rgba32>(inputBytes);
+        var profile = DocumentCatalog.GetInputProfileOrThrow(document.InputProfileId);
+        var facesResult = await _faceDetector.DetectFacesAsync(image).ConfigureAwait(false);
+        if (facesResult.IsFailure)
+        {
+            return Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {facesResult.Error}");
+        }
+
+        var faces = facesResult.Value
+            .Where(face => face.Confidence >= 0.8f)
+            .OrderByDescending(face => face.Confidence)
+            .ToArray();
+
+        if (faces.Length == 0)
+        {
+            return Result.Success(new AutomatedDocumentInputResult(
+                false,
+                $"{profile.DisplayName} rejected: no suitable face was detected.",
+                0f));
+        }
+
+        if (profile.RequireSingleFace && faces.Length > 1)
+        {
+            return Result.Success(new AutomatedDocumentInputResult(
+                false,
+                $"{profile.DisplayName} rejected: multiple faces were detected.",
+                faces[0].Confidence));
+        }
+
+        var qualityOptions = QualityAssessmentOptions.ForStandard(profile.QualityStandard) with
+        {
+            EnforceCompliance = false,
+            MinQualityThreshold = profile.MinimumOverallScore
+        };
+
+        var qualityResult = await inputBytes.AssessQualityAsync(qualityOptions).ConfigureAwait(false);
+        if (qualityResult.IsFailure)
+        {
+            return Result.Failure<AutomatedDocumentInputResult>($"Input analysis failed: {qualityResult.Error}");
+        }
+
+        var assessment = qualityResult.Value;
+        var accepted = assessment.Overall >= profile.MinimumOverallScore;
+        var summary = accepted
+            ? $"{profile.DisplayName} accepted: overall quality {assessment.Overall:F2} meets the automated suitability floor."
+            : $"{profile.DisplayName} rejected: overall quality {assessment.Overall:F2} is below the automated suitability floor of {profile.MinimumOverallScore:F2}.";
+
+        return Result.Success(new AutomatedDocumentInputResult(
+            accepted,
+            summary,
+            faces[0].Confidence));
     }
 
     private async Task<Result<DeliverableResult>> RenderDeliverableAsync(
@@ -173,20 +230,17 @@ public sealed class DocumentJobRunner(
         string outputDirectory,
         CancellationToken cancellationToken)
     {
-        return deliverable.RendererKey switch
+        return (document.WorkflowFamily, deliverable.Kind) switch
         {
-            "piv-card" => await RenderPivCardAsync(document, deliverable, inputPath, sourceImage, outputDirectory),
-            "piv-print" => await RenderPivPrintAsync(document, deliverable, inputPath, sourceImage, outputDirectory),
-            "us-paper" => await RenderPassportStyleJpegAsync(document, deliverable, inputPath, sourceImage, outputDirectory, 1200, 1200, 0.60f, 0.625f, 600, 0.492f, 0.689f, 0.551f, 0.689f, digitalTechnicalCheck: false),
-            "us-digital" => await RenderPassportStyleJpegAsync(document, deliverable, inputPath, sourceImage, outputDirectory, 600, 600, 0.60f, 0.625f, null, 0.50f, 0.69f, 0.56f, 0.69f, digitalTechnicalCheck: true),
-            "canada-paper" => await RenderPassportStyleJpegAsync(document, deliverable, inputPath, sourceImage, outputDirectory, 1181, 1654, 0.48f, 0.62f, 600, 31f / 70f, 36f / 70f, 0.55f, 0.72f, digitalTechnicalCheck: false),
-            "canada-digital" => await RenderPassportStyleJpegAsync(document, deliverable, inputPath, sourceImage, outputDirectory, 1200, 1800, 0.48f, 0.62f, null, 31f / 70f, 36f / 70f, 0.55f, 0.72f, digitalTechnicalCheck: true),
-            _ => Result.Failure<DeliverableResult>($"Renderer '{deliverable.RendererKey}' is not implemented.")
+            (DocumentWorkflowFamily.Piv, DeliverableKind.PivCardImage) => await RenderPivCardAsync(deliverable, inputPath, sourceImage, outputDirectory),
+            (DocumentWorkflowFamily.Piv, DeliverableKind.PivPrintedPhoto) => await RenderPivPrintAsync(deliverable, inputPath, sourceImage, outputDirectory),
+            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.PaperPhoto) => await RenderPassportStyleJpegAsync(deliverable, inputPath, sourceImage, outputDirectory),
+            (DocumentWorkflowFamily.PassportStyle, DeliverableKind.DigitalUploadPhoto) => await RenderPassportStyleJpegAsync(deliverable, inputPath, sourceImage, outputDirectory),
+            _ => Result.Failure<DeliverableResult>($"Deliverable kind '{deliverable.Kind}' is not implemented for '{document.WorkflowFamily}'.")
         };
     }
 
     private async Task<Result<DeliverableResult>> RenderPivCardAsync(
-        DocumentDefinition document,
         DeliverableDefinition deliverable,
         string inputPath,
         Image<Rgba32> sourceImage,
@@ -232,7 +286,6 @@ public sealed class DocumentJobRunner(
     }
 
     private async Task<Result<DeliverableResult>> RenderPivPrintAsync(
-        DocumentDefinition document,
         DeliverableDefinition deliverable,
         string inputPath,
         Image<Rgba32> sourceImage,
@@ -299,28 +352,23 @@ public sealed class DocumentJobRunner(
     }
 
     private async Task<Result<DeliverableResult>> RenderPassportStyleJpegAsync(
-        DocumentDefinition document,
         DeliverableDefinition deliverable,
         string inputPath,
         Image<Rgba32> sourceImage,
-        string outputDirectory,
-        int targetWidth,
-        int targetHeight,
-        float targetHeadHeightRatio,
-        float targetEyeFromBottomRatio,
-        int? dpi,
-        float minHeadHeightRatio,
-        float maxHeadHeightRatio,
-        float minEyeFromBottomRatio,
-        float maxEyeFromBottomRatio,
-        bool digitalTechnicalCheck)
+        string outputDirectory)
     {
+        if (!deliverable.ProductionDefaults.TryGetValue("spec", out var specId))
+        {
+            return Result.Failure<DeliverableResult>($"Deliverable '{deliverable.Id}' is missing a passport-style spec.");
+        }
+
+        var spec = DocumentCatalog.GetPassportPhotoSpecOrThrow(specId);
         var alignment = await AlignPortraitAsync(
             sourceImage,
-            targetWidth,
-            targetHeight,
-            targetHeadHeightRatio,
-            targetEyeFromBottomRatio).ConfigureAwait(false);
+            spec.TargetWidth,
+            spec.TargetHeight,
+            spec.TargetHeadHeightRatio,
+            spec.TargetEyeFromBottomRatio).ConfigureAwait(false);
         if (alignment.IsFailure)
         {
             return Result.Failure<DeliverableResult>(
@@ -330,19 +378,19 @@ public sealed class DocumentJobRunner(
         using var alignedPortrait = alignment.Value.Image;
         var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
 
-        var quality = digitalTechnicalCheck ? 88 : 94;
-        var fileBytes = await EncodeJpegAsync(alignedPortrait, quality, dpi).ConfigureAwait(false);
-        if (digitalTechnicalCheck && deliverable.ValidatorKey.StartsWith("us-", StringComparison.OrdinalIgnoreCase))
+        var quality = deliverable.Kind == DeliverableKind.DigitalUploadPhoto ? 88 : 94;
+        var fileBytes = await EncodeJpegAsync(alignedPortrait, quality, spec.Dpi).ConfigureAwait(false);
+        if (spec.MaxFileSizeBytes.HasValue)
         {
-            fileBytes = await ShrinkJpegToMaxBytesAsync(alignedPortrait, 245_760, dpi).ConfigureAwait(false);
+            fileBytes = await ShrinkJpegToMaxBytesAsync(alignedPortrait, spec.MaxFileSizeBytes.Value, spec.Dpi).ConfigureAwait(false);
         }
 
         await File.WriteAllBytesAsync(outputPath, fileBytes).ConfigureAwait(false);
 
         var measurements = MeasurePassportComposition(
             alignment.Value.Landmarks,
-            targetWidth,
-            targetHeight);
+            spec.TargetWidth,
+            spec.TargetHeight);
 
         using var reloaded = Image.Load<Rgba32>(fileBytes);
         var checks = new List<AutomatedCheckResult>();
@@ -350,18 +398,16 @@ public sealed class DocumentJobRunner(
         {
             var passed = check.Id switch
             {
-                "us-paper-composition" => measurements.HeadHeightRatio >= minHeadHeightRatio
-                    && measurements.HeadHeightRatio <= maxHeadHeightRatio
-                    && measurements.EyeFromBottomRatio >= minEyeFromBottomRatio
-                    && measurements.EyeFromBottomRatio <= maxEyeFromBottomRatio,
-                "us-digital-technical" => reloaded.Width == reloaded.Height
-                    && reloaded.Width >= 600
-                    && reloaded.Width <= 1200
-                    && fileBytes.Length <= 245_760,
-                "canada-paper-composition" => measurements.HeadHeightRatio >= minHeadHeightRatio
-                    && measurements.HeadHeightRatio <= maxHeadHeightRatio,
-                "canada-digital-technical" => reloaded.Width >= 1200
-                    && reloaded.Height >= 1800
+                "us-paper-composition" or "canada-paper-composition" => measurements.HeadHeightRatio >= spec.MinHeadHeightRatio
+                    && measurements.HeadHeightRatio <= spec.MaxHeadHeightRatio
+                    && measurements.EyeFromBottomRatio >= spec.MinEyeFromBottomRatio
+                    && measurements.EyeFromBottomRatio <= spec.MaxEyeFromBottomRatio,
+                "us-digital-technical" or "canada-digital-technical" => (!spec.RequireSquare || reloaded.Width == reloaded.Height)
+                    && reloaded.Width >= spec.MinWidth
+                    && reloaded.Width <= spec.MaxWidth
+                    && reloaded.Height >= spec.MinHeight
+                    && reloaded.Height <= spec.MaxHeight
+                    && (!spec.MaxFileSizeBytes.HasValue || fileBytes.Length <= spec.MaxFileSizeBytes.Value)
                     && string.Equals(Path.GetExtension(outputPath), ".jpg", StringComparison.OrdinalIgnoreCase),
                 _ => false
             };
@@ -375,8 +421,8 @@ public sealed class DocumentJobRunner(
                     ? $"Rendered JPEG is {reloaded.Width}x{reloaded.Height} and {fileBytes.Length:N0} bytes."
                     : $"Rendered digital file does not meet the cited square/JPEG/size limits ({reloaded.Width}x{reloaded.Height}, {fileBytes.Length:N0} bytes).",
                 "canada-paper-composition" => passed
-                    ? $"Rendered paper photo keeps chin-to-crown height at {measurements.HeadHeightRatio:P0} of the image height."
-                    : $"Rendered paper photo is outside the 31-36 mm head-height equivalent range ({measurements.HeadHeightRatio:P0}).",
+                    ? $"Rendered paper photo keeps chin-to-crown height at {measurements.HeadHeightRatio:P0} and eye line at {measurements.EyeFromBottomRatio:P0} from the bottom."
+                    : $"Rendered paper photo is outside the cited composition range (head {measurements.HeadHeightRatio:P0}, eyes {measurements.EyeFromBottomRatio:P0} from bottom).",
                 "canada-digital-technical" => passed
                     ? $"Rendered digital file is {reloaded.Width}x{reloaded.Height} JPEG."
                     : $"Rendered digital file does not meet the published Canada digital upload dimensions.",
@@ -611,4 +657,9 @@ public sealed class DocumentJobRunner(
     private readonly record struct PassportCompositionMeasurements(
         float HeadHeightRatio,
         float EyeFromBottomRatio);
+
+    private readonly record struct AutomatedDocumentInputResult(
+        bool IsCompliant,
+        string Summary,
+        float Confidence);
 }

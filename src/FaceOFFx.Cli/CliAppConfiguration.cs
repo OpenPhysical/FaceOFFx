@@ -51,7 +51,7 @@ internal static class CliAppConfiguration
 
         config
             .AddCommand<ProcessCommand>("process")
-            .WithDescription("Process images for PIV compliance (supports JP2, JPEG, PNG, TIFF output)")
+            .WithDescription("Deprecated expert command. Use document commands such as piv or us-passport for user-facing workflows.")
             .WithExample("process", "photo.jpg")
             .WithExample("process", "photo.jpg", "--output", "result.jp2")
             .WithExample("process", "photo.jpg", "--verbose")
@@ -71,7 +71,7 @@ internal static class CliAppConfiguration
 
         config
             .AddCommand<QualityCommand>("quality")
-            .WithDescription("Assess facial image quality according to ISO/IEC 19794-5")
+            .WithDescription("Deprecated expert command. Use document commands for user-facing workflows.")
             .WithExample("quality", "--input", "photo.jpg")
             .WithExample("quality", "--input", "photo.jpg", "--standard", "piv", "--format", "json")
             .WithExample("quality", "--input", "photo.jpg", "--threshold", "0.8", "--strict")
@@ -85,7 +85,7 @@ internal static class CliAppConfiguration
 
         config
             .AddCommand<ValidateCommand>("validate")
-            .WithDescription("Quick compliance validation - pass/fail without processing")
+            .WithDescription("Deprecated expert command. Use document commands for user-facing workflows.")
             .WithExample("validate", "photo.jpg")
             .WithExample("validate", "photo.jpg", "--standard", "icao")
             .WithExample("validate", "photo.jpg", "--standard", "piv", "--detailed")

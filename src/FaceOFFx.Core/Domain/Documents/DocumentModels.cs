@@ -19,6 +19,48 @@ public enum DocumentCheckStage
 }
 
 /// <summary>
+/// Internal workflow family used to render and validate a document.
+/// </summary>
+public enum DocumentWorkflowFamily
+{
+    /// <summary>
+    /// PIV-specific workflow using PIV crop and compliance validation.
+    /// </summary>
+    Piv,
+
+    /// <summary>
+    /// Passport-style workflow using head-height and eye-line composition rules.
+    /// </summary>
+    PassportStyle
+}
+
+/// <summary>
+/// Concrete artifact kind produced by a document workflow.
+/// </summary>
+public enum DeliverableKind
+{
+    /// <summary>
+    /// PIV JPEG 2000 card image.
+    /// </summary>
+    PivCardImage,
+
+    /// <summary>
+    /// PIV printed Zone 1F image.
+    /// </summary>
+    PivPrintedPhoto,
+
+    /// <summary>
+    /// Passport-style printed photo.
+    /// </summary>
+    PaperPhoto,
+
+    /// <summary>
+    /// Passport-style digital upload photo.
+    /// </summary>
+    DigitalUploadPhoto
+}
+
+/// <summary>
 /// Exact normative citation attached to a shipped document workflow.
 /// </summary>
 /// <param name="Id">Stable citation identifier.</param>
@@ -68,8 +110,7 @@ public sealed record ManualChecklistItemDefinition(
 /// <param name="DisplayName">Human-readable deliverable name.</param>
 /// <param name="Format">Output format identifier.</param>
 /// <param name="FileSuffix">Filename suffix used for the artifact.</param>
-/// <param name="RendererKey">Internal renderer selector.</param>
-/// <param name="ValidatorKey">Internal validator selector.</param>
+/// <param name="Kind">Concrete artifact kind used by the internal workflow.</param>
 /// <param name="ProductionDefaults">Recorded production defaults such as DPI or nominal size.</param>
 /// <param name="OutputChecks">Automated checks applied to this artifact.</param>
 public sealed record DeliverableDefinition(
@@ -77,8 +118,7 @@ public sealed record DeliverableDefinition(
     string DisplayName,
     string Format,
     string FileSuffix,
-    string RendererKey,
-    string ValidatorKey,
+    DeliverableKind Kind,
     IReadOnlyDictionary<string, string> ProductionDefaults,
     IReadOnlyList<AutomatedCheckDefinition> OutputChecks);
 
@@ -100,6 +140,8 @@ public sealed record VariantDefinition(
 /// <param name="DisplayName">Human-readable document name.</param>
 /// <param name="Description">Short description of the supported workflow.</param>
 /// <param name="PrimaryVariantId">Default variant used when the caller does not choose one.</param>
+/// <param name="WorkflowFamily">Internal workflow family that renders and validates the document.</param>
+/// <param name="InputProfileId">Input suitability profile used for the document capture checks.</param>
 /// <param name="Citations">Top-level citations for the workflow.</param>
 /// <param name="InputChecks">Automated checks run on the source capture.</param>
 /// <param name="ManualChecklist">Manual items that must still be reviewed by an operator.</param>
@@ -109,10 +151,62 @@ public sealed record DocumentDefinition(
     string DisplayName,
     string Description,
     string PrimaryVariantId,
+    DocumentWorkflowFamily WorkflowFamily,
+    string InputProfileId,
     IReadOnlyList<SpecificationCitation> Citations,
     IReadOnlyList<AutomatedCheckDefinition> InputChecks,
     IReadOnlyList<ManualChecklistItemDefinition> ManualChecklist,
     IReadOnlyDictionary<string, VariantDefinition> Variants);
+
+/// <summary>
+/// Input-stage capture suitability profile for a document workflow.
+/// </summary>
+/// <param name="Id">Stable profile identifier.</param>
+/// <param name="DisplayName">Human-readable profile name.</param>
+/// <param name="QualityStandard">Underlying quality standard used for scoring.</param>
+/// <param name="MinimumOverallScore">Minimum overall quality score required for automated acceptance.</param>
+/// <param name="RequireSingleFace">Whether multiple faces should fail the check.</param>
+public sealed record InputProfileDefinition(
+    string Id,
+    string DisplayName,
+    string QualityStandard,
+    float MinimumOverallScore,
+    bool RequireSingleFace);
+
+/// <summary>
+/// Passport-style rendering and validation specification for paper or digital photo outputs.
+/// </summary>
+/// <param name="TargetWidth">Output width in pixels.</param>
+/// <param name="TargetHeight">Output height in pixels.</param>
+/// <param name="TargetHeadHeightRatio">Target chin-to-crown ratio used while cropping.</param>
+/// <param name="TargetEyeFromBottomRatio">Target eye-line placement from the bottom used while cropping.</param>
+/// <param name="Dpi">Optional output DPI metadata.</param>
+/// <param name="MinHeadHeightRatio">Minimum allowed head-height ratio in the final output.</param>
+/// <param name="MaxHeadHeightRatio">Maximum allowed head-height ratio in the final output.</param>
+/// <param name="MinEyeFromBottomRatio">Minimum allowed eye-line ratio from the bottom in the final output.</param>
+/// <param name="MaxEyeFromBottomRatio">Maximum allowed eye-line ratio from the bottom in the final output.</param>
+/// <param name="RequireSquare">Whether the final image must be square.</param>
+/// <param name="MinWidth">Minimum allowed output width in pixels.</param>
+/// <param name="MaxWidth">Maximum allowed output width in pixels.</param>
+/// <param name="MinHeight">Minimum allowed output height in pixels.</param>
+/// <param name="MaxHeight">Maximum allowed output height in pixels.</param>
+/// <param name="MaxFileSizeBytes">Maximum file size in bytes, if any.</param>
+public sealed record PassportPhotoSpec(
+    int TargetWidth,
+    int TargetHeight,
+    float TargetHeadHeightRatio,
+    float TargetEyeFromBottomRatio,
+    int? Dpi,
+    float MinHeadHeightRatio,
+    float MaxHeadHeightRatio,
+    float MinEyeFromBottomRatio,
+    float MaxEyeFromBottomRatio,
+    bool RequireSquare,
+    int MinWidth,
+    int MaxWidth,
+    int MinHeight,
+    int MaxHeight,
+    int? MaxFileSizeBytes);
 
 /// <summary>
 /// Request to execute a document workflow.

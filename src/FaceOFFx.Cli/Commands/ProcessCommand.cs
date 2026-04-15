@@ -205,6 +205,8 @@ internal sealed class ProcessCommand(
     {
         try
         {
+            _console.MarkupLine("[yellow]Deprecated:[/] `process` is an expert command. Use document commands such as `piv`, `us-passport`, or `canada-passport` for product workflows.");
+
             // Validate input
             if (!File.Exists(settings.InputPath))
             {

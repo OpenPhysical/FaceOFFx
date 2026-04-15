@@ -65,6 +65,35 @@ else
 }
 ```
 
+### Document Workflows
+
+The primary CLI surface is now document-specific. These commands analyze the source photo, render the requested artifact set, validate the actual outputs, and write a provenance JSON file with the cited rules that were applied.
+
+```bash
+# Federal PIV issuance bundle
+faceoffx piv photo.jpg
+
+# U.S. passport paper photo
+faceoffx us-passport photo.jpg
+
+# U.S. passport online-renewal digital photo
+faceoffx us-passport photo.jpg --variant online-renewal-digital
+
+# U.S. permanent resident photo
+faceoffx us-pr-photo photo.jpg
+
+# Canadian passport paper photo
+faceoffx canada-passport photo.jpg
+
+# Canadian permanent resident card photo
+faceoffx canada-pr-card photo.jpg
+
+# Discover shipped document workflows and variants
+faceoffx documents
+```
+
+Human-facing workflows should use the document commands above. The legacy `process`, `quality`, and `validate` commands still exist as deprecated expert tools for engineering and diagnostics.
+
 #### Available Presets
 
 | Preset                          | Target Size | Use Case                   |
@@ -294,50 +323,61 @@ var fastOptions = PivProcessingOptions.Fast;
 
 ## CLI Usage
 
-### Basic Commands
+### Primary Commands
 
 ```bash
-# Process image with default settings (20KB, ROI enabled)
-faceoffx process photo.jpg
-
-# Specify output file
-faceoffx process photo.jpg --output id_photo.png
-
-# Generate ROI visualization
-faceoffx roi photo.jpg --show-piv-lines
+faceoffx piv photo.jpg
+faceoffx us-passport photo.jpg
+faceoffx us-pr-photo photo.jpg
+faceoffx canada-passport photo.jpg
+faceoffx canada-pr-card photo.jpg
+faceoffx documents
 ```
 
-### Advanced Options
+### Variants
 
 ```bash
-# Custom file size target (24KB)
-faceoffx process photo.jpg --rate 0.8
+# PIV card image only
+faceoffx piv photo.jpg --variant card-only
 
-# Disable ROI for uniform quality
-faceoffx process photo.jpg --no-roi
+# PIV printed Zone 1F photo only
+faceoffx piv photo.jpg --variant print-only
 
-# Different ROI quality levels
-faceoffx process photo.jpg --roi-level 0  # Aggressive
-faceoffx process photo.jpg --roi-level 2  # Conservative
+# U.S. passport online-renewal digital upload
+faceoffx us-passport photo.jpg --variant online-renewal-digital
 
-# Enable ROI alignment (may create harsh boundaries)
-faceoffx process photo.jpg --align
+# U.S. permanent resident digital upload
+faceoffx us-pr-photo photo.jpg --variant digital-upload
 
-# Verbose output with debugging
-faceoffx process photo.jpg --verbose --debug
+# Canadian passport online-renewal digital upload
+faceoffx canada-passport photo.jpg --variant online-renewal-digital
 ```
 
-### CLI Option Reference
+### Machine-Readable Output
 
-| Option                | Description                | Default     |
-|-----------------------|----------------------------|-------------|
-| `--output <PATH>`     | Output file path           | `input.png` |
-| `--rate <RATE>`       | Compression rate (0.6-1.0) | `0.7`       |
-| `--roi-level <LEVEL>` | ROI priority (0-3)         | `3`         |
-| `--no-roi`            | Disable ROI encoding       | ROI enabled |
-| `--align`             | Enable ROI block alignment | Disabled    |
-| `--verbose`           | Show detailed information  | Off         |
-| `--debug`             | Enable debug logging       | Off         |
+```bash
+faceoffx piv photo.jpg --json
+faceoffx us-passport photo.jpg --json
+faceoffx canada-passport photo.jpg --json
+```
+
+`--json` writes a clean JSON job summary to stdout. Rendered artifacts and the provenance file are written to the output directory.
+
+### Provenance and Explanation
+
+```bash
+# Write outputs to a specific directory
+faceoffx piv photo.jpg --output-dir ./out
+
+# Show the cited clauses used by the workflow
+faceoffx piv photo.jpg --explain
+```
+
+Each document command writes a provenance JSON file alongside the outputs. The provenance file records the selected document, variant, automated checks, manual checklist items, production defaults, and exact citations used by the workflow.
+
+### Deprecated Expert Commands
+
+`process`, `quality`, and `validate` remain available for diagnostics and engineering work. They are no longer the primary user-facing workflow and may emit deprecation guidance in human-readable mode.
 
 ### Error Handling
 

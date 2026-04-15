@@ -172,13 +172,31 @@ public static class DocumentCatalog
         "Confirm the back of one printed photo includes the subject name and date of birth, studio details, and the date taken.",
         new[] { CanadaPrGuide });
 
+    private static readonly IReadOnlyDictionary<string, InputProfileDefinition> InputProfiles =
+        new Dictionary<string, InputProfileDefinition>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["piv-capture"] = new("piv-capture", "PIV Capture", "piv", 0.60f, true),
+            ["us-passport-capture"] = new("us-passport-capture", "U.S. Passport Capture", "icao", 0.60f, true),
+            ["us-pr-capture"] = new("us-pr-capture", "U.S. Permanent Resident Capture", "icao", 0.60f, true),
+            ["canada-passport-capture"] = new("canada-passport-capture", "Canada Passport Capture", "icao", 0.60f, true),
+            ["canada-pr-capture"] = new("canada-pr-capture", "Canada PR Capture", "icao", 0.60f, true)
+        };
+
+    private static readonly IReadOnlyDictionary<string, PassportPhotoSpec> PassportPhotoSpecs =
+        new Dictionary<string, PassportPhotoSpec>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["us-paper"] = new(1200, 1200, 0.60f, 0.625f, 600, 0.492f, 0.689f, 0.551f, 0.689f, true, 1200, 1200, 1200, 1200, null),
+            ["us-digital"] = new(600, 600, 0.60f, 0.625f, null, 0.50f, 0.69f, 0.56f, 0.69f, true, 600, 1200, 600, 1200, 245_760),
+            ["canada-paper"] = new(1181, 1654, 0.48f, 0.62f, 600, 31f / 70f, 36f / 70f, 0.55f, 0.72f, false, 1181, 1181, 1654, 1654, null),
+            ["canada-digital"] = new(1200, 1800, 0.48f, 0.62f, null, 31f / 70f, 36f / 70f, 0.55f, 0.72f, false, 1200, int.MaxValue, 1800, int.MaxValue, null)
+        };
+
     private static readonly DeliverableDefinition PivCardDeliverable = new(
         "piv-card-image",
         "PIV Card Facial Image",
         "jp2",
         ".piv.jp2",
-        "piv-card",
-        "piv-card",
+        DeliverableKind.PivCardImage,
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["format"] = "jp2",
@@ -191,8 +209,7 @@ public static class DocumentCatalog
         "PIV Printed Zone 1F Photo",
         "jpg",
         ".piv.print.jpg",
-        "piv-print",
-        "piv-print",
+        DeliverableKind.PivPrintedPhoto,
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["format"] = "jpg",
@@ -205,12 +222,12 @@ public static class DocumentCatalog
         "U.S. Paper Photo",
         "jpg",
         ".us-passport.jpg",
-        "us-paper",
-        "us-paper",
+        DeliverableKind.PaperPhoto,
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["format"] = "jpg",
             ["dpi"] = "600",
+            ["spec"] = "us-paper",
             ["size"] = "2x2in"
         },
         new[] { UsPaperComposition });
@@ -220,11 +237,11 @@ public static class DocumentCatalog
         "U.S. Digital Upload Photo",
         "jpg",
         ".us-passport.digital.jpg",
-        "us-digital",
-        "us-digital",
+        DeliverableKind.DigitalUploadPhoto,
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["format"] = "jpg",
+            ["spec"] = "us-digital",
             ["pixels"] = "600x600",
             ["maxBytes"] = "245760"
         },
@@ -235,12 +252,12 @@ public static class DocumentCatalog
         "Canada Paper Photo",
         "jpg",
         ".canada-paper.jpg",
-        "canada-paper",
-        "canada-paper",
+        DeliverableKind.PaperPhoto,
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["format"] = "jpg",
             ["dpi"] = "600",
+            ["spec"] = "canada-paper",
             ["size"] = "50x70mm"
         },
         new[] { CanadaPaperComposition });
@@ -250,11 +267,11 @@ public static class DocumentCatalog
         "Canada Digital Upload Photo",
         "jpg",
         ".canada-passport.digital.jpg",
-        "canada-digital",
-        "canada-digital",
+        DeliverableKind.DigitalUploadPhoto,
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["format"] = "jpg",
+            ["spec"] = "canada-digital",
             ["pixels"] = "1200x1800"
         },
         new[] { CanadaPaperComposition, CanadaDigitalTechnical });
@@ -267,6 +284,8 @@ public static class DocumentCatalog
                 "PIV",
                 "Federal PIV facial image and printed Zone 1F photo.",
                 "standard",
+                DocumentWorkflowFamily.Piv,
+                "piv-capture",
                 new[] { FipsBiometricStorage, FipsPrintedPhoto, Sp80076Capture, Sp80076FullFrontal, Incits385Geometry },
                 new[] { PivInputCapture },
                 Array.Empty<ManualChecklistItemDefinition>(),
@@ -281,6 +300,8 @@ public static class DocumentCatalog
                 "U.S. Passport",
                 "U.S. passport photo with paper default and digital upload variant.",
                 "paper",
+                DocumentWorkflowFamily.PassportStyle,
+                "us-passport-capture",
                 new[] { UsPhotoOverview, UsCompositionTemplate, UsDigitalRequirements },
                 new[] { UsInputCapture },
                 new[] { UsManualChecklist },
@@ -294,6 +315,8 @@ public static class DocumentCatalog
                 "U.S. Permanent Resident Application Photo",
                 "Passport-style U.S. permanent resident application photo.",
                 "paper",
+                DocumentWorkflowFamily.PassportStyle,
+                "us-pr-capture",
                 new[] { UsPhotoOverview, UsCompositionTemplate, UsDigitalRequirements },
                 new[] { UsInputCapture },
                 new[] { UsManualChecklist },
@@ -307,6 +330,8 @@ public static class DocumentCatalog
                 "Canada Passport",
                 "Canadian passport photo with paper default and online digital variant.",
                 "paper",
+                DocumentWorkflowFamily.PassportStyle,
+                "canada-passport-capture",
                 new[] { CanadaPassportPhotoSpec, CanadaPassportDigitalSpec },
                 new[] { CanadaInputCapture },
                 new[] { CanadaPassportManualChecklist },
@@ -320,6 +345,8 @@ public static class DocumentCatalog
                 "Canada Permanent Resident Card",
                 "Canadian permanent resident card paper photo.",
                 "paper",
+                DocumentWorkflowFamily.PassportStyle,
+                "canada-pr-capture",
                 new[] { CanadaPrPhotoSpec, CanadaPrGuide },
                 new[] { CanadaInputCapture },
                 new[] { CanadaPrManualChecklist },
@@ -333,6 +360,32 @@ public static class DocumentCatalog
     /// Gets all shipped document workflows.
     /// </summary>
     public static IReadOnlyCollection<DocumentDefinition> GetAll() => Documents.Values.ToArray();
+
+    /// <summary>
+    /// Gets an input capture profile used by a shipped document.
+    /// </summary>
+    public static InputProfileDefinition GetInputProfileOrThrow(string profileId)
+    {
+        if (InputProfiles.TryGetValue(profileId, out var profile))
+        {
+            return profile;
+        }
+
+        throw new InvalidOperationException($"Unknown input profile '{profileId}'.");
+    }
+
+    /// <summary>
+    /// Gets a passport-style spec used by a shipped deliverable.
+    /// </summary>
+    public static PassportPhotoSpec GetPassportPhotoSpecOrThrow(string specId)
+    {
+        if (PassportPhotoSpecs.TryGetValue(specId, out var spec))
+        {
+            return spec;
+        }
+
+        throw new InvalidOperationException($"Unknown passport photo spec '{specId}'.");
+    }
 
     /// <summary>
     /// Looks up a document workflow by identifier.

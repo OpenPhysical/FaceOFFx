@@ -116,6 +116,8 @@ internal sealed class ValidateCommand(
     {
         try
         {
+            AnsiConsole.MarkupLine("[yellow]Deprecated:[/] `validate` is an expert command. Use document commands such as `piv`, `us-passport`, or `canada-passport` for product workflows.");
+
             // Validate input
             if (!File.Exists(settings.InputPath))
             {

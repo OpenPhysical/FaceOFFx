@@ -56,6 +56,11 @@ internal sealed class QualityCommand(IAnsiConsole console) : AsyncCommand<Qualit
         CancellationToken cancellationToken
     )
     {
+        if (!string.Equals(settings.OutputFormat, "json", StringComparison.OrdinalIgnoreCase))
+        {
+            _console.MarkupLine("[yellow]Deprecated:[/] `quality` is an expert command. Use document commands for product workflows.");
+        }
+
         // Validate input
         if (!File.Exists(settings.InputPath))
         {
