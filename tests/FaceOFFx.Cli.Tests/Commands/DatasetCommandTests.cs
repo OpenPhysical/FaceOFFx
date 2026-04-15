@@ -1,7 +1,7 @@
 using System.Text.Json;
 using FaceOFFx.Cli.Tests;
 using FaceOFFx.Tests.Common;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;

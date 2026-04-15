@@ -3,7 +3,7 @@ using System.Text.Json;
 using FaceOFFx.Cli.Commands;
 using FaceOFFx.Cli.Tests;
 using FaceOFFx.Tests.Common;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 
 namespace FaceOFFx.Cli.Tests.Commands;

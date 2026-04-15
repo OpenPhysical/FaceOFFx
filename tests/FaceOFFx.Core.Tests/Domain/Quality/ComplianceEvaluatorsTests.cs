@@ -1,5 +1,5 @@
 using FaceOFFx.Core.Domain.Quality;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 
 namespace FaceOFFx.Core.Tests.Domain.Quality;

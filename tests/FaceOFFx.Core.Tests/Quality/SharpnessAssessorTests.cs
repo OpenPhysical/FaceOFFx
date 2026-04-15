@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 using FaceOFFx.Core.Domain.Quality.Assessors;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;

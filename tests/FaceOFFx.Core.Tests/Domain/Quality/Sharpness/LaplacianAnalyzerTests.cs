@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 using FaceOFFx.Core.Domain.Quality.Sharpness;
-using FluentAssertions;
+using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using SixLabors.ImageSharp;

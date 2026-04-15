@@ -1,7 +1,7 @@
 using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Transformations;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 
 namespace FaceOFFx.Core.Tests.Domain.Transformations;

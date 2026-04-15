@@ -5,7 +5,7 @@ using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Quality;
 using FaceOFFx.Core.Domain.Quality.Assessors;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;

@@ -1,7 +1,7 @@
 using CSharpFunctionalExtensions;
 using FaceOFFx.Core.Domain.Quality;
 using FaceOFFx.Core.Domain.Transformations;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 
 namespace FaceOFFx.Core.Tests.Domain.Quality;

@@ -1,5 +1,5 @@
 using FaceOFFx.Cli;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 
 namespace FaceOFFx.Cli.Tests;

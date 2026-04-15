@@ -2,7 +2,7 @@ using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Detection;
 using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Infrastructure.Services;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 
 namespace FaceOFFx.Cli.Tests.Services;

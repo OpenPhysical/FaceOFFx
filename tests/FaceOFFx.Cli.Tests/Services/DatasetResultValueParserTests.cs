@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FaceOFFx.Cli.Services;
-using FluentAssertions;
+using AwesomeAssertions;
 using NUnit.Framework;
 
 namespace FaceOFFx.Cli.Tests.Services;
