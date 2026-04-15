@@ -191,10 +191,22 @@ public static class ComplianceEvaluators
     /// </summary>
     public static IpdCompliance EvaluateIpdCompliance(
         float ipdPixels,
-        ComplianceRules rules)
+        ComplianceRules rules,
+        bool countsTowardsCompliance = true)
     {
         var standard = rules.ToStandard();
         var passed = ipdPixels >= rules.MinIpdPixels && ipdPixels <= rules.MaxIpdPixels;
+
+        if (!countsTowardsCompliance)
+        {
+            return new IpdCompliance(
+                Passed: true,
+                DistancePixels: ipdPixels,
+                MinPixels: rules.MinIpdPixels,
+                MaxPixels: rules.MaxIpdPixels,
+                Rejection: null,
+                CountsTowardsCompliance: false);
+        }
         
         RejectionReason? rejection = null;
         if (ipdPixels < rules.MinIpdPixels)
@@ -225,7 +237,8 @@ public static class ComplianceEvaluators
             DistancePixels: ipdPixels,
             MinPixels: rules.MinIpdPixels,
             MaxPixels: rules.MaxIpdPixels,
-            Rejection: rejection
+            Rejection: rejection,
+            CountsTowardsCompliance: true
         );
     }
 
@@ -234,13 +247,19 @@ public static class ComplianceEvaluators
     /// </summary>
     public static GeometryCompliance EvaluateGeometryCompliance(
         GeometryMeasurement measurement,
-        ComplianceRules rules)
+        ComplianceRules rules,
+        bool ipdCountsTowardsCompliance = true)
     {
         var headSizeCompliance = EvaluateHeadSizeCompliance(measurement.HeadSizePercent, rules);
         var centeringCompliance = EvaluateCenteringCompliance(measurement.CenteringPercent, rules);
-        var ipdCompliance = EvaluateIpdCompliance(measurement.IpdPixels, rules);
+        var ipdCompliance = EvaluateIpdCompliance(
+            measurement.IpdPixels,
+            rules,
+            ipdCountsTowardsCompliance);
         
-        var allPassed = headSizeCompliance.Passed && centeringCompliance.Passed && ipdCompliance.Passed;
+        var allPassed = headSizeCompliance.Passed
+            && centeringCompliance.Passed
+            && (!ipdCompliance.CountsTowardsCompliance || ipdCompliance.Passed);
         
         // Use the first rejection found as the primary geometry rejection
         var rejection = headSizeCompliance.Rejection ?? centeringCompliance.Rejection ?? ipdCompliance.Rejection;
@@ -262,14 +281,18 @@ public static class ComplianceEvaluators
         SharpnessMeasurement sharpnessMeasurement,
         GeometryMeasurement geometryMeasurement,
         ComplianceRules rules,
-        bool symmetryCountsTowardsCompliance = true)
+        bool symmetryCountsTowardsCompliance = true,
+        bool ipdCountsTowardsCompliance = true)
     {
         var symmetryCompliance = EvaluateSymmetryCompliance(
             symmetryMeasurement,
             rules,
             symmetryCountsTowardsCompliance);
         var sharpnessCompliance = EvaluateSharpnessCompliance(sharpnessMeasurement, rules);
-        var geometryCompliance = EvaluateGeometryCompliance(geometryMeasurement, rules);
+        var geometryCompliance = EvaluateGeometryCompliance(
+            geometryMeasurement,
+            rules,
+            ipdCountsTowardsCompliance);
         
         // Collect all rejections
         var rejections = new List<RejectionReason>();

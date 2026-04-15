@@ -218,7 +218,8 @@ public record IpdCompliance(
     float DistancePixels,
     float MinPixels,
     float MaxPixels,
-    RejectionReason? Rejection = null);
+    RejectionReason? Rejection = null,
+    bool CountsTowardsCompliance = true);
 
 /// <summary>
 /// Geometry compliance assessment combining all geometric metrics

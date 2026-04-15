@@ -130,7 +130,8 @@ public static class ComplianceAssessmentPipeline
             stage1Result.Value.Sharpness,
             geometryMeasurement,
             rules,
-            symmetryCountsTowardsCompliance: mode == AssessmentMode.OutputValidation
+            symmetryCountsTowardsCompliance: mode == AssessmentMode.OutputValidation,
+            ipdCountsTowardsCompliance: mode == AssessmentMode.OutputValidation
         );
         
         return Result.Success(assessment);

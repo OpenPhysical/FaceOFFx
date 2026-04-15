@@ -49,6 +49,28 @@ public class ComplianceAssessmentPipelineTests
         outputAssessment.Value.Geometry.InterPupillaryDistance.DistancePixels.Should().BeApproximately(100f, 1.5f);
     }
 
+    [Test]
+    public async Task AssessComplianceAsync_InputValidation_DoesNotGateOnRawIpd()
+    {
+        using var image = new Image<Rgba32>(1024, 1536, Color.White);
+
+        var faceBox = FaceBox.Create(350, 420, 320, 420).Value;
+        var landmarks = CreateLandmarks(new ImageDimensions(image.Width, image.Height), 210f);
+        var detectedFace = new DetectedFace(faceBox, 0.99f, Maybe<FaceLandmarks5>.None);
+
+        var assessment = await ComplianceAssessmentPipeline.AssessComplianceAsync(
+            image,
+            detectedFace,
+            landmarks,
+            "PIV",
+            AssessmentMode.InputValidation);
+
+        assessment.IsSuccess.Should().BeTrue();
+        assessment.Value.Geometry.InterPupillaryDistance.CountsTowardsCompliance.Should().BeFalse();
+        assessment.Value.Geometry.InterPupillaryDistance.Passed.Should().BeTrue();
+        assessment.Value.Geometry.InterPupillaryDistance.DistancePixels.Should().BeApproximately(210f, 1.5f);
+    }
+
     private static FaceLandmarks68 CreateLandmarks(ImageDimensions dims, float eyeDistance)
     {
         var centerX = dims.Width / 2f;
