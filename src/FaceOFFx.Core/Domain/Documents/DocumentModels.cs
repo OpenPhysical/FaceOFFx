@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using CSharpFunctionalExtensions;
+
 namespace FaceOFFx.Core.Domain.Documents;
 
 /// <summary>
@@ -241,13 +243,15 @@ public sealed record PassportPhotoSpec(
 /// <param name="OutputDirectory">Optional output directory.</param>
 /// <param name="Json">Whether the caller expects machine-readable stdout.</param>
 /// <param name="Explain">Whether the caller wants cited clauses echoed in human output.</param>
+/// <param name="FileSizeTargetId">Optional named file-size target for workflows that support one.</param>
 public sealed record DocumentJobRequest(
     string InputPath,
     string DocumentId,
     string? VariantId = null,
     string? OutputDirectory = null,
     bool Json = false,
-    bool Explain = false);
+    bool Explain = false,
+    Maybe<string> FileSizeTargetId = default);
 
 /// <summary>
 /// Result of evaluating one automated check.

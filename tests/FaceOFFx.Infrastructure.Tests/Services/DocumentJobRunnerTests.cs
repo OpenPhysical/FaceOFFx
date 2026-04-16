@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using FaceOFFx.Core.Domain.Documents;
 using FaceOFFx.Infrastructure.Services;
 using FaceOFFx.Tests.Common;
@@ -14,9 +15,9 @@ public class DocumentJobRunnerTests : IntegrationTestBase
 {
     private ILoggerFactory _loggerFactory = null!;
     private OnnxFacialProcessingServiceFactory _processingServiceFactory = null!;
-    private Jpeg2000EncoderService _jpeg2000Encoder = null!;
     private PassportPhotoRenderService _passportPhotoRenderService = null!;
     private FaceGeometryPipeline _faceGeometryPipeline = null!;
+    private ProfileEncoder _profileEncoder = null!;
     private DocumentRenderService _documentRenderService = null!;
     private DocumentJobRunner _runner = null!;
 
@@ -28,17 +29,20 @@ public class DocumentJobRunnerTests : IntegrationTestBase
 
         _loggerFactory = LoggerFactory.Create(builder => { });
         _processingServiceFactory = new OnnxFacialProcessingServiceFactory(_loggerFactory);
-        _jpeg2000Encoder = new Jpeg2000EncoderService(Substitute.For<ILogger<Jpeg2000EncoderService>>());
         _passportPhotoRenderService = new PassportPhotoRenderService(
             _processingServiceFactory,
             Substitute.For<ILogger<PassportPhotoRenderService>>());
         _faceGeometryPipeline = new FaceGeometryPipeline(
             _processingServiceFactory,
             Substitute.For<ILogger<FaceGeometryPipeline>>());
+        _profileEncoder = new ProfileEncoder(
+            _faceGeometryPipeline,
+            _processingServiceFactory,
+            Substitute.For<ILogger<ProfileEncoder>>());
         _documentRenderService = new DocumentRenderService(
             _faceGeometryPipeline,
             _passportPhotoRenderService,
-            _jpeg2000Encoder,
+            _profileEncoder,
             Substitute.For<ILogger<DocumentRenderService>>());
         _runner = new DocumentJobRunner(
             _documentRenderService,
@@ -67,6 +71,39 @@ public class DocumentJobRunnerTests : IntegrationTestBase
         result.Value.Deliverables.Should().HaveCount(2);
         result.Value.Deliverables.Select(d => Path.GetExtension(d.OutputPath)).Should().Contain(new[] { ".jp2", ".jpg" });
         File.Exists(result.Value.ProvenancePath).Should().BeTrue();
+    }
+
+    [Test]
+    public async Task RunAsync_PivDigital_WithMinimumFileSizeTarget_WritesSmallCardArtifactAndRecordsTarget()
+    {
+        var result = await _runner.RunAsync(new DocumentJobRequest(
+            _genericGuyPath,
+            "piv",
+            VariantId: "digital",
+            OutputDirectory: TempDirectory,
+            FileSizeTargetId: Maybe<string>.From("minimum")));
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Deliverables.Should().ContainSingle();
+
+        var deliverable = result.Value.Deliverables[0];
+        deliverable.FileSizeBytes.Should().BeLessThanOrEqualTo(12000);
+        deliverable.ProductionDefaults["fileSizeTarget"].Should().Be("minimum");
+        deliverable.ProductionDefaults["maxFileSizeBytes"].Should().Be("12000");
+    }
+
+    [Test]
+    public async Task RunAsync_PivPrint_WithFileSizeTarget_ReturnsConfigurationFailure()
+    {
+        var result = await _runner.RunAsync(new DocumentJobRequest(
+            _genericGuyPath,
+            "piv",
+            VariantId: "print",
+            OutputDirectory: TempDirectory,
+            FileSizeTargetId: Maybe<string>.From("minimum")));
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().BeOfType<FaceOFFx.Core.Domain.Common.ConfigurationError>();
     }
 
     [Test]

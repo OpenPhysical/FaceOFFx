@@ -20,13 +20,11 @@ public static class QualityExtensions
     /// <summary>
     /// Processes an image with quality assessment
     /// </summary>
-    public static async Task<Result<(ProcessingResultDto Result, Iso19794Assessment Quality), PipelineError>> 
+    public static async Task<Result<(ProfileEncodingResult Result, Iso19794Assessment Quality), PipelineError>> 
         ProcessWithQualityAsync(
             this byte[] imageData,
-            ProcessingOptions processingOptions,
+            ProfileSpecification profile,
             QualityAssessmentOptions qualityOptions,
-            string format = "jp2",
-            int jpegQuality = 85,
             ILogger? logger = null)
     {
         logger ??= NullLogger.Instance;
@@ -37,7 +35,7 @@ public static class QualityExtensions
             var servicesResult = FacialProcessingServices.Create(logger);
             if (servicesResult.IsFailure)
             {
-                return Result.Failure<(ProcessingResultDto, Iso19794Assessment), PipelineError>(
+                return Result.Failure<(ProfileEncodingResult, Iso19794Assessment), PipelineError>(
                     servicesResult.Error);
             }
 
@@ -47,14 +45,14 @@ public static class QualityExtensions
             var faceResult = await services.Detector.DetectFacesAsync(image);
             if (faceResult.IsFailure)
             {
-                return Result.Failure<(ProcessingResultDto, Iso19794Assessment), PipelineError>(
+                return Result.Failure<(ProfileEncodingResult, Iso19794Assessment), PipelineError>(
                     new DetectionError($"Face detection failed: {faceResult.Error.Message}", "quality"));
             }
             
             var faces = faceResult.Value;
             if (!faces.Any())
             {
-                return Result.Failure<(ProcessingResultDto, Iso19794Assessment), PipelineError>(
+                return Result.Failure<(ProfileEncodingResult, Iso19794Assessment), PipelineError>(
                     new DetectionError("No faces detected in the image", "quality"));
             }
             
@@ -65,7 +63,7 @@ public static class QualityExtensions
                 .ExtractLandmarksAsync(image, primaryFace.BoundingBox);
             if (landmarksResult.IsFailure)
             {
-                return Result.Failure<(ProcessingResultDto, Iso19794Assessment), PipelineError>(
+                return Result.Failure<(ProfileEncodingResult, Iso19794Assessment), PipelineError>(
                     landmarksResult.Error);
             }
             
@@ -81,7 +79,7 @@ public static class QualityExtensions
             
             if (qualityResult.IsFailure)
             {
-                return Result.Failure<(ProcessingResultDto, Iso19794Assessment), PipelineError>(
+                return Result.Failure<(ProfileEncodingResult, Iso19794Assessment), PipelineError>(
                     qualityResult.Error);
             }
             
@@ -90,7 +88,7 @@ public static class QualityExtensions
             // Step 4: Check if quality meets threshold
             if (qualityOptions.EnforceCompliance && !quality.IsCompliant)
             {
-                return Result.Failure<(ProcessingResultDto, Iso19794Assessment), PipelineError>(
+                return Result.Failure<(ProfileEncodingResult, Iso19794Assessment), PipelineError>(
                     new ValidationError(
                         $"Image quality {quality.Overall} does not meet compliance requirements. Critical violations: {quality.Violations.Count(v => v.Severity == ViolationSeverity.Critical)}",
                         "quality"));
@@ -98,25 +96,26 @@ public static class QualityExtensions
             
             if (quality.Overall.Value < qualityOptions.MinQualityThreshold)
             {
-                return Result.Failure<(ProcessingResultDto, Iso19794Assessment), PipelineError>(
+                return Result.Failure<(ProfileEncodingResult, Iso19794Assessment), PipelineError>(
                     new ValidationError(
                         $"Image quality {quality.Overall} is below minimum threshold {qualityOptions.MinQualityThreshold:P0}",
                         "quality"));
             }
             
             // Step 5: Process the image
-            var processingResult = await FacialImageEncoder.ProcessAsync(
-                imageData,
-                processingOptions,
-                format,
-                jpegQuality,
-                logger);
+            var profileEncoder = new ProfileEncoder(
+                new FaceGeometryPipeline(
+                    new SharedFacialProcessingServiceFactory(services),
+                    logger as ILogger<FaceGeometryPipeline> ?? NullLogger<FaceGeometryPipeline>.Instance),
+                new SharedFacialProcessingServiceFactory(services),
+                logger as ILogger<ProfileEncoder> ?? NullLogger<ProfileEncoder>.Instance);
+            var processingResult = await profileEncoder.ProcessAsync(imageData, profile);
             
             return processingResult.Map(result => (result, quality));
         }
         catch (Exception ex)
         {
-            return Result.Failure<(ProcessingResultDto, Iso19794Assessment), PipelineError>(
+            return Result.Failure<(ProfileEncodingResult, Iso19794Assessment), PipelineError>(
                 new RenderError($"Processing with quality assessment failed: {ex.Message}", "quality"));
         }
     }
@@ -244,28 +243,37 @@ public static class QualityExtensions
 
                 if (mode == AssessmentMode.OutputValidation)
                 {
-                    var portraitLogger = NullLogger<StandardPortraitProcessorService>.Instance;
-                    var portraitProcessor = new StandardPortraitProcessorService(
-                        services.Detector,
-                        services.LandmarkExtractor,
-                        services.Encoder,
-                        portraitLogger);
-
-                    var alignmentResult = await portraitProcessor.AlignAsync(
-                        image,
-                        standardName,
-                        minConfidence,
-                        minFaceSize: 50);
-
-                    if (alignmentResult.IsFailure)
+                    var profile = standardName.ToUpperInvariant() switch
                     {
-                        return Result.Failure<ComplianceAssessment, PipelineError>(alignmentResult.Error);
+                        "TWIC" => ProfileSpecifications.Twic,
+                        "ICAO" => ProfileSpecifications.Icao,
+                        "CAC" => ProfileSpecifications.Cac,
+                        _ => ProfileSpecifications.Piv,
+                    };
+                    var profileEncoder = new ProfileEncoder(
+                        new FaceGeometryPipeline(
+                            new SharedFacialProcessingServiceFactory(services),
+                            NullLogger<FaceGeometryPipeline>.Instance),
+                        new SharedFacialProcessingServiceFactory(services),
+                        NullLogger<ProfileEncoder>.Instance);
+                    var geometryResult = await CanonicalFaceGeometryPipeline
+                        .ExtractAsync(image, primaryFace, services.LandmarkExtractor)
+                        .ConfigureAwait(false);
+                    if (geometryResult.IsFailure)
+                    {
+                        return Result.Failure<ComplianceAssessment, PipelineError>(geometryResult.Error);
                     }
 
-                    using var alignedPortrait = alignmentResult.Value;
+                    var portraitResult = profileEncoder.RenderPortrait(image, geometryResult.Value, profile);
+                    if (portraitResult.IsFailure)
+                    {
+                        return Result.Failure<ComplianceAssessment, PipelineError>(portraitResult.Error);
+                    }
+
+                    using var alignedPortrait = portraitResult.Value.Image;
                     outputPortrait = Maybe<OutputPortraitAssessmentInput>.From(new OutputPortraitAssessmentInput(
-                        alignedPortrait.ProcessedImage.Clone(),
-                        alignedPortrait.ProcessedLandmarks));
+                        alignedPortrait.Clone(),
+                        portraitResult.Value.Landmarks));
                 }
 
                 return mode == AssessmentMode.OutputValidation

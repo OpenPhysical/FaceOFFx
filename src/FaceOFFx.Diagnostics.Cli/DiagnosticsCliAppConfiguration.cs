@@ -24,6 +24,16 @@ public static class DiagnosticsCliAppConfiguration
             .WithExample("detect", "--corpus", "people", "--output", "artifacts/diagnostics/detect")
             .WithExample("detect", "tests/test-images/people/generic-guy/source.png", "--output", "artifacts/diagnostics/detect");
 
+        config.AddBranch("docs", docs =>
+        {
+            docs.SetDescription("README sample asset generation");
+
+            docs
+                .AddCommand<DocsSamplesCommand>("samples")
+                .WithDescription("Generate README sample thumbnails, encoded previews, and metrics")
+                .WithExample("docs", "samples", "--output", "docs/samples");
+        });
+
         config.AddBranch("sharpness", sharpness =>
         {
             sharpness.SetDescription("Sharpness calibration and generated-image tooling");

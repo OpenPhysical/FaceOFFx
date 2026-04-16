@@ -24,6 +24,7 @@ public static class CliAppConfiguration
             .WithDescription("Run the spec-backed PIV document workflow")
             .WithExample("piv", "photo.jpg")
             .WithExample("piv", "photo.jpg", "--variant", "digital")
+            .WithExample("piv", "photo.jpg", "--variant", "digital", "--filesize-target", "minimum")
             .WithExample("piv", "photo.jpg", "--json")
             .WithExample("piv", "photo.jpg", "--explain");
 

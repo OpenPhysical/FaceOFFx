@@ -116,7 +116,8 @@ public sealed class DocumentJobRunner(
                 inputResult.Value.InputBytes,
                 sourceImage,
                 requestContext.OutputDirectory,
-                inputCheckResult.Value).ConfigureAwait(false);
+                inputCheckResult.Value,
+                requestContext.PivFileSizeTarget).ConfigureAwait(false);
             if (renderResult.IsFailure)
             {
                 return Result.Failure<DocumentJobResult, PipelineError>(renderResult.Error);
@@ -159,12 +160,32 @@ public sealed class DocumentJobRunner(
                 new ConfigurationError($"Unsupported variant '{variantId}' for document '{document.Id}'."));
         }
 
+        var pivFileSizeTarget = Maybe<ProfileFileSizeTarget>.None;
+        if (request.FileSizeTargetId.HasValue)
+        {
+            if (!variant.Deliverables.Any(deliverable => deliverable.Kind == DeliverableKind.PivCardImage))
+            {
+                return Result.Failure<RequestContext, PipelineError>(
+                    new ConfigurationError(
+                        $"File size target '{request.FileSizeTargetId.Value}' is only supported for PIV card image deliverables.",
+                        document.Id));
+            }
+
+            var targetResult = ProfileFileSizeTargets.ResolveForProfile(ProfileSpecifications.Piv.Id, request.FileSizeTargetId.Value);
+            if (targetResult.IsFailure)
+            {
+                return Result.Failure<RequestContext, PipelineError>(targetResult.Error);
+            }
+
+            pivFileSizeTarget = Maybe<ProfileFileSizeTarget>.From(targetResult.Value);
+        }
+
         var outputDirectory = request.OutputDirectory
             ?? Path.GetDirectoryName(Path.GetFullPath(request.InputPath))
             ?? Directory.GetCurrentDirectory();
         Directory.CreateDirectory(outputDirectory);
 
-        return Result.Success<RequestContext, PipelineError>(new RequestContext(document, variant, outputDirectory));
+        return Result.Success<RequestContext, PipelineError>(new RequestContext(document, variant, outputDirectory, pivFileSizeTarget));
     }
 
     private static async Task<Result<LoadedInput, PipelineError>> LoadInputAsync(
@@ -245,11 +266,12 @@ public sealed class DocumentJobRunner(
         byte[] inputBytes,
         Image<Rgba32> sourceImage,
         string outputDirectory,
-        InputEvaluationState inputState)
+        InputEvaluationState inputState,
+        Maybe<ProfileFileSizeTarget> pivFileSizeTarget)
     {
         return (document.WorkflowFamily, deliverable.Kind) switch
         {
-            (DocumentWorkflowFamily.Piv, DeliverableKind.PivCardImage) => await RenderPivCardAsync(deliverable, inputPath, sourceImage, outputDirectory),
+            (DocumentWorkflowFamily.Piv, DeliverableKind.PivCardImage) => await RenderPivCardAsync(deliverable, inputPath, sourceImage, outputDirectory, pivFileSizeTarget),
             (DocumentWorkflowFamily.Piv, DeliverableKind.PivPrintedPhoto) => await RenderPivPrintAsync(deliverable, inputPath, sourceImage, outputDirectory),
             (DocumentWorkflowFamily.PassportStyle, DeliverableKind.PaperPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory, inputState),
             (DocumentWorkflowFamily.PassportStyle, DeliverableKind.DigitalUploadPhoto) => await RenderPortraitDeliverableAsync(deliverable, inputPath, inputBytes, sourceImage, outputDirectory, inputState),
@@ -261,7 +283,8 @@ public sealed class DocumentJobRunner(
         DeliverableDefinition deliverable,
         string inputPath,
         Image<Rgba32> sourceImage,
-        string outputDirectory)
+        string outputDirectory,
+        Maybe<ProfileFileSizeTarget> pivFileSizeTarget)
     {
         var profileResult = DocumentCatalog.GetInputProfile("piv-capture");
         if (profileResult.IsFailure)
@@ -279,10 +302,18 @@ public sealed class DocumentJobRunner(
                 new RenderError($"Failed to render deliverable '{deliverable.Id}': {geometryResult.Error.Message}", deliverable.Id));
         }
 
-        var pivResult = _documentRenderService.RenderPivCard(
+        var outputProfileResult = pivFileSizeTarget.HasValue
+            ? ProfileSpecifications.Piv.WithFileSizeTarget(pivFileSizeTarget.Value)
+            : Result.Success<ProfileSpecification, PipelineError>(ProfileSpecifications.Piv);
+        if (outputProfileResult.IsFailure)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(outputProfileResult.Error);
+        }
+
+        var pivResult = await _documentRenderService.EncodeProfileAsync(
             sourceImage,
             geometryResult.Value,
-            PivProcessingOptions.Default);
+            outputProfileResult.Value).ConfigureAwait(false);
         if (pivResult.IsFailure)
         {
             return Result.Failure<DeliverableResult, PipelineError>(
@@ -299,7 +330,17 @@ public sealed class DocumentJobRunner(
             return Result.Failure<DeliverableResult, PipelineError>(new PersistenceError(ex.Message, outputPath));
         }
 
-        var validation = pivResult.Value.Geometry.ComplianceValidation;
+        var pivLinesResult = pivResult.Value.OutputLandmarks.CalculatePivLines();
+        if (pivLinesResult.IsFailure)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new GeometryError(pivLinesResult.Error.Message, deliverable.Id));
+        }
+
+        var validation = PivComplianceValidation.Validate(
+            pivLinesResult.Value,
+            pivResult.Value.OutputDimensions.Width,
+            pivResult.Value.OutputDimensions.Height);
 
         var checks = deliverable.OutputChecks
             .Select(check => new AutomatedCheckResult(
@@ -320,7 +361,8 @@ public sealed class DocumentJobRunner(
             pivResult.Value.ImageData.Length,
             checks,
             null,
-            null));
+            null,
+            BuildPivCardProductionDefaults(deliverable, pivResult.Value.Encoding)));
     }
 
     private async Task<Result<DeliverableResult, PipelineError>> RenderPivPrintAsync(
@@ -345,18 +387,28 @@ public sealed class DocumentJobRunner(
                 new RenderError($"Failed to render deliverable '{deliverable.Id}': {geometryResult.Error.Message}", deliverable.Id));
         }
 
-        var pivResult = _documentRenderService.RenderPiv(
+        var pivResult = _documentRenderService.RenderProfile(
             sourceImage,
             geometryResult.Value,
-            PivProcessingOptions.Default);
+            ProfileSpecifications.Piv);
         if (pivResult.IsFailure)
         {
             return Result.Failure<DeliverableResult, PipelineError>(
                 new RenderError($"Failed to render deliverable '{deliverable.Id}': {pivResult.Error.Message}", deliverable.Id));
         }
 
-        var validation = pivResult.Value.ComplianceValidation;
-        using var printableImage = pivResult.Value.PivImage.Clone();
+        var pivLinesResult = pivResult.Value.Landmarks.CalculatePivLines();
+        if (pivLinesResult.IsFailure)
+        {
+            return Result.Failure<DeliverableResult, PipelineError>(
+                new GeometryError(pivLinesResult.Error.Message, deliverable.Id));
+        }
+
+        var validation = PivComplianceValidation.Validate(
+            pivLinesResult.Value,
+            pivResult.Value.Plan.OutputDimensions.Width,
+            pivResult.Value.Plan.OutputDimensions.Height);
+        using var printableImage = pivResult.Value.Image.Clone();
         var outputPath = BuildOutputPath(inputPath, outputDirectory, deliverable.FileSuffix);
         var fileBytes = await EncodeJpegAsync(printableImage, 92, 300).ConfigureAwait(false);
         try
@@ -712,7 +764,8 @@ public sealed class DocumentJobRunner(
         int fileSizeBytes,
         IReadOnlyList<AutomatedCheckResult> checks,
         string? supportingInfoPath,
-        bool? originalFileRequirementSatisfied)
+        bool? originalFileRequirementSatisfied,
+        IReadOnlyDictionary<string, string>? productionDefaults = null)
     {
         var blockingFailures = checks
             .Where(check => check.Disposition == DocumentCheckDisposition.Blocking && !check.Passed)
@@ -737,8 +790,27 @@ public sealed class DocumentJobRunner(
             fileSizeBytes,
             supportingInfoPath,
             originalFileRequirementSatisfied,
-            deliverable.ProductionDefaults,
+            productionDefaults ?? deliverable.ProductionDefaults,
             checks);
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildPivCardProductionDefaults(
+        DeliverableDefinition deliverable,
+        EncodingDecision encoding)
+    {
+        var defaults = new Dictionary<string, string>(deliverable.ProductionDefaults, StringComparer.OrdinalIgnoreCase);
+
+        if (encoding.TargetFileSizeId.HasValue)
+        {
+            defaults["fileSizeTarget"] = encoding.TargetFileSizeId.Value;
+        }
+
+        if (encoding.TargetFileSize.HasValue)
+        {
+            defaults["maxFileSizeBytes"] = encoding.TargetFileSize.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return defaults;
     }
 
     private static string BuildOutputPath(string inputPath, string outputDirectory, string suffix) =>
@@ -779,7 +851,11 @@ public sealed class DocumentJobRunner(
 
     private readonly record struct PortraitMeasurements(float HeadHeightRatio, float EyeFromBottomRatio);
 
-    private sealed record RequestContext(DocumentDefinition Document, VariantDefinition Variant, string OutputDirectory);
+    private sealed record RequestContext(
+        DocumentDefinition Document,
+        VariantDefinition Variant,
+        string OutputDirectory,
+        Maybe<ProfileFileSizeTarget> PivFileSizeTarget);
     private sealed record LoadedInput(byte[] InputBytes, Image<Rgba32> SourceImage);
 
     private abstract record InputEvaluationState(string Summary)

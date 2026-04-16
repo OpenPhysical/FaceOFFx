@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using CSharpFunctionalExtensions;
 using FaceOFFx.Core.Domain.Documents;
 using FaceOFFx.Infrastructure.Services;
 using Spectre.Console;
@@ -8,51 +9,37 @@ using Spectre.Console.Cli;
 namespace FaceOFFx.Cli.Commands;
 
 [Description("Run a document photo workflow and write outputs plus provenance.")]
-internal abstract class DocumentIssuanceCommandBase(
+internal abstract class DocumentIssuanceCommandBase<TSettings>(
     DocumentJobRunner jobRunner,
-    IAnsiConsole console) : AsyncCommand<DocumentIssuanceCommandBase.Settings>
+    IAnsiConsole console) : AsyncCommand<TSettings>
+    where TSettings : DocumentIssuanceCommandSettings
 {
     protected abstract string DocumentId { get; }
     protected abstract string DocumentDisplayName { get; }
+    protected virtual bool SupportsFileSizeTargetOption => false;
 
     protected readonly DocumentJobRunner JobRunner = jobRunner;
     protected readonly IAnsiConsole Console = console;
 
-    internal class Settings : CommandSettings
+    public override ValidationResult Validate(CommandContext context, TSettings settings)
     {
-        [CommandArgument(0, "<INPUT>")]
-        [Description("Input image file path")]
-        public string InputPath { get; set; } = string.Empty;
+        if (!SupportsFileSizeTargetOption
+            && context.Arguments.Any(argument =>
+                argument.Equals("--filesize-target", StringComparison.OrdinalIgnoreCase)
+                || argument.StartsWith("--filesize-target=", StringComparison.OrdinalIgnoreCase)))
+        {
+            return ValidationResult.Error("--filesize-target is only supported by the piv command.");
+        }
 
-        [CommandOption("-o|--output-dir <DIR>")]
-        [Description("Directory for the rendered artifacts and provenance")]
-        public string? OutputDirectory { get; set; }
-
-        [CommandOption("-v|--variant <VARIANT>")]
-        [Description("Named document variant, such as print or digital")]
-        public string? Variant { get; set; }
-
-        [CommandOption("--json")]
-        [Description("Write a machine-readable job summary to stdout")]
-        public bool Json { get; set; }
-
-        [CommandOption("--explain")]
-        [Description("Show the cited clauses used by this document workflow")]
-        public bool Explain { get; set; }
+        return ValidationResult.Success();
     }
 
     public override async Task<int> ExecuteAsync(
         CommandContext context,
-        Settings settings,
+        TSettings settings,
         CancellationToken cancellationToken)
     {
-        var request = new DocumentJobRequest(
-            settings.InputPath,
-            DocumentId,
-            VariantId: settings.Variant,
-            OutputDirectory: settings.OutputDirectory,
-            Json: settings.Json,
-            Explain: settings.Explain);
+        var request = CreateRequest(settings);
 
         StringWriter? swallowedStdout = null;
         TextWriter? originalStdout = null;
@@ -170,4 +157,37 @@ internal abstract class DocumentIssuanceCommandBase(
         target.WriteLine(JsonSerializer.Serialize(payload));
         target.Flush();
     }
+
+    protected virtual DocumentJobRequest CreateRequest(TSettings settings) =>
+        new(
+            settings.InputPath,
+            DocumentId,
+            VariantId: settings.Variant,
+            OutputDirectory: settings.OutputDirectory,
+            Json: settings.Json,
+            Explain: settings.Explain,
+            FileSizeTargetId: Maybe<string>.None);
+}
+
+internal class DocumentIssuanceCommandSettings : CommandSettings
+{
+    [CommandArgument(0, "<INPUT>")]
+    [Description("Input image file path")]
+    public string InputPath { get; set; } = string.Empty;
+
+    [CommandOption("-o|--output-dir <DIR>")]
+    [Description("Directory for the rendered artifacts and provenance")]
+    public string? OutputDirectory { get; set; }
+
+    [CommandOption("-v|--variant <VARIANT>")]
+    [Description("Named document variant, such as print or digital")]
+    public string? Variant { get; set; }
+
+    [CommandOption("--json")]
+    [Description("Write a machine-readable job summary to stdout")]
+    public bool Json { get; set; }
+
+    [CommandOption("--explain")]
+    [Description("Show the cited clauses used by this document workflow")]
+    public bool Explain { get; set; }
 }

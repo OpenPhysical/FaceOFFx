@@ -95,4 +95,47 @@ public class DiagnosticsCommandTests : IntegrationTestBase
         subject.GetProperty("FineSourcePath").GetString().Should().Be("50-fine-source.png");
         subject.GetProperty("Error").ValueKind.Should().Be(JsonValueKind.Null);
     }
+
+    [Test]
+    public async Task DocsSamples_WritesReadmeAssetsAndManifest()
+    {
+        var app = DiagnosticsCliTestHarness.Create();
+        var outputDir = Path.Combine(TempDirectory, "docs-samples");
+
+        var result = await app.RunAsync(
+        [
+            "docs",
+            "samples",
+            "--output", outputDir
+        ]);
+
+        result.ExitCode.Should().Be(0, result.Output);
+
+        using var source = await Image.LoadAsync<Rgba32>(Path.Combine(outputDir, "original", "generic_guy_420w.jpg"));
+        source.Width.Should().Be(420);
+
+        using var piv = await Image.LoadAsync<Rgba32>(Path.Combine(outputDir, "processed", "generic_guy_piv.png"));
+        piv.Width.Should().Be(420);
+        piv.Height.Should().Be(560);
+
+        using var icao = await Image.LoadAsync<Rgba32>(Path.Combine(outputDir, "processed", "starmer_icao.png"));
+        icao.Width.Should().Be(413);
+        icao.Height.Should().Be(531);
+
+        using var canadaPr = await Image.LoadAsync<Rgba32>(Path.Combine(outputDir, "processed", "starmer_canada_pr.png"));
+        canadaPr.Width.Should().Be(420);
+        canadaPr.Height.Should().BeGreaterThan(560);
+
+        foreach (var rate in new[] { "036", "068", "096", "170", "400" })
+        {
+            File.Exists(Path.Combine(outputDir, "processed", $"starmer_rate_{rate}.png")).Should().BeTrue();
+        }
+
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(outputDir, "manifest.json")));
+        var assets = manifest.RootElement.GetProperty("Assets").EnumerateArray().ToArray();
+        assets.Should().Contain(asset =>
+            asset.GetProperty("Label").GetString() == "PIV"
+            && asset.GetProperty("Bytes").GetInt32() > 0
+            && asset.GetProperty("Rate").GetSingle() > 0);
+    }
 }

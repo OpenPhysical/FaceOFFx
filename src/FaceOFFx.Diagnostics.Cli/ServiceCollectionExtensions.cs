@@ -25,10 +25,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFacialProcessingServiceFactory, OnnxFacialProcessingServiceFactory>();
 
         services.AddScoped<FaceGeometryPipeline>();
+        services.AddScoped<ProfileEncoder>();
+        services.AddScoped<PassportPhotoRenderService>();
+        services.AddScoped<DocumentRenderService>();
         services.AddScoped<DiagnosticsCorpusService>();
         services.AddScoped<DiagnosticsBatchService>();
 
         services.AddTransient<DetectCommand>();
+        services.AddTransient<DocsSamplesCommand>();
         services.AddTransient<SharpnessBlurCommand>();
         services.AddTransient<SharpnessMeasureCommand>();
         services.AddTransient<SharpnessCleanCommand>();

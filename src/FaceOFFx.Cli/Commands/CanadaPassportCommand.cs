@@ -7,7 +7,7 @@ namespace FaceOFFx.Cli.Commands;
 [Description("Run the Canada passport photo workflow.")]
 internal sealed class CanadaPassportCommand(
     DocumentJobRunner jobRunner,
-    IAnsiConsole console) : DocumentIssuanceCommandBase(jobRunner, console)
+    IAnsiConsole console) : DocumentIssuanceCommandBase<DocumentIssuanceCommandSettings>(jobRunner, console)
 {
     protected override string DocumentId => "canada-passport";
     protected override string DocumentDisplayName => "Canada Passport";

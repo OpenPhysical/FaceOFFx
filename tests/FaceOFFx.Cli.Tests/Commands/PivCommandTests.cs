@@ -96,6 +96,60 @@ public class PivCommandTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task PivRecipe_WithMinimumFileSizeTarget_WritesTargetInJson()
+    {
+        var outputDir = Path.Combine(TempDirectory, "piv-minimum-json-job");
+        Directory.CreateDirectory(outputDir);
+
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = $"\"{_cliAssemblyPath}\" piv \"{_testImagePath}\" --variant digital --output-dir \"{outputDir}\" --filesize-target minimum --json",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(processInfo)
+            ?? throw new InvalidOperationException("Failed to start process");
+
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        process.ExitCode.Should().Be(0);
+        using var json = JsonDocument.Parse(stdout);
+        var deliverable = json.RootElement.GetProperty("Deliverables")[0];
+        deliverable.GetProperty("FileSizeBytes").GetInt32().Should().BeLessThanOrEqualTo(12000);
+        deliverable.GetProperty("ProductionDefaults").GetProperty("fileSizeTarget").GetString().Should().Be("minimum");
+        deliverable.GetProperty("ProductionDefaults").GetProperty("maxFileSizeBytes").GetString().Should().Be("12000");
+    }
+
+    [Test]
+    public async Task PivRecipe_PrintVariantWithFileSizeTarget_ReturnsFailure()
+    {
+        var outputDir = Path.Combine(TempDirectory, "piv-print-target-job");
+        Directory.CreateDirectory(outputDir);
+
+        var exitCode = await RunCliCommand(
+            $"piv \"{_testImagePath}\" --variant print --output-dir \"{outputDir}\" --filesize-target minimum");
+
+        exitCode.Should().NotBe(0);
+    }
+
+    [Test]
+    public async Task NonPivRecipe_WithFileSizeTargetOption_ReturnsFailure()
+    {
+        var outputDir = Path.Combine(TempDirectory, "non-piv-target-job");
+        Directory.CreateDirectory(outputDir);
+
+        var exitCode = await RunCliCommand(
+            $"us-passport \"{_testImagePath}\" --output-dir \"{outputDir}\" --filesize-target minimum");
+
+        exitCode.Should().NotBe(0);
+    }
+
+    [Test]
     public void DocumentsCommand_ListsSupportedDocumentWorkflows()
     {
         var tester = CliTestHarness.Create();
