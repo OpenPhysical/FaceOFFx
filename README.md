@@ -20,8 +20,8 @@ FaceOFFx extends its capabilities with PIV-specific transformations, FIPS 201-3 
 
 ### Key Features
 
-- **PIV/TWIC Compatibility** - FIPS 201-3 compatible 420×560 output
-- **JPEG 2000 ROI Encoding** - Smart compression with exact target size limits
+- **PIV Card Compatibility** - FIPS 201-3 compatible 420×560 output
+- **JPEG 2000 ROI Encoding** - Smart compression with profile-defined hard caps or explicit rates
 - **68-Point Landmark Detection** - Precise facial feature mapping
 - **High Performance** - Direct ONNX Runtime integration
 - **Cross-Platform** - Windows, Linux, macOS via .NET 8, 9, and 10
@@ -30,45 +30,48 @@ FaceOFFx extends its capabilities with PIV-specific transformations, FIPS 201-3 
 
 ## Quick Start
 
-### v3.0 Simplified API
+### Profile Encoding API
 
-The v3.0 API provides automatic service management with standard .NET error handling:
+The public library API is profile-first. Choose a `ProfileSpecification`, pass source image bytes to
+`ProfileEncoder`, and handle the typed railway result:
 
 ```csharp
 using FaceOFFx.Infrastructure.Services;
+using FaceOFFx.Core.Domain.Transformations;
+using Microsoft.Extensions.Logging.Abstractions;
 
-// Simplest: Default PIV processing (20KB target)
 byte[] imageData = File.ReadAllBytes("photo.jpg");
-var result = await FacialImageEncoder.ProcessAsync(imageData);
+
+using var loggerFactory = NullLoggerFactory.Instance;
+using var serviceFactory = new OnnxFacialProcessingServiceFactory(loggerFactory);
+
+var geometryPipeline = new FaceGeometryPipeline(
+    serviceFactory,
+    NullLogger<FaceGeometryPipeline>.Instance);
+
+var encoder = new ProfileEncoder(
+    geometryPipeline,
+    serviceFactory,
+    NullLogger<ProfileEncoder>.Instance);
+
+var result = await encoder.ProcessAsync(imageData, ProfileSpecifications.Piv);
 if (result.IsFailure)
 {
-    Console.WriteLine(result.Error.Message);
+    Console.WriteLine($"Processing failed: [{result.Error.Code}] {result.Error.Message}");
     return;
 }
 
-File.WriteAllBytes("output.png", result.Value.ImageData);
-Console.WriteLine($"Size: {result.Value.Metadata.FileSize:N0} bytes");
-
-// TWIC processing (14KB maximum for card compatibility)
-var twicResult = await FacialImageEncoder.ProcessForTwicAsync(imageData);
-
-// Custom target size
-var customResult = await FacialImageEncoder.ProcessToSizeAsync(imageData, 25000);
-
-// Fixed compression rate
-var rateResult = await FacialImageEncoder.ProcessWithRateAsync(imageData, 1.5f);
-
-// Reuse the typed result directly
-var retry = await FacialImageEncoder.TryProcessAsync(imageData);
-if (retry.IsFailure)
-{
-    Console.WriteLine($"Processing failed: {retry.Error.Message}");
-}
-else
-{
-    Console.WriteLine($"Processed to {retry.Value.Metadata.FileSize} bytes");
-}
+File.WriteAllBytes("piv.jp2", result.Value.ImageData);
+Console.WriteLine($"Profile: {result.Value.Profile.DisplayName}");
+Console.WriteLine($"Output: {result.Value.OutputDimensions.Width}x{result.Value.OutputDimensions.Height}");
+Console.WriteLine($"Size: {result.Value.Encoding.FileSize:N0} bytes");
+Console.WriteLine($"Rate: {result.Value.Encoding.CompressionRate:F2} bpp");
 ```
+
+The PIV profile renders a 420×560 card portrait, preserves the facial ROI at higher quality,
+and solves for the highest-quality JPEG 2000 candidate under the named `preferred` 22KB
+card-image cap. Use the named `minimum` target when the raw JP2 output must leave room for
+later card-container wrapping and signing overhead.
 
 ### Document Workflows
 
@@ -77,6 +80,9 @@ The primary CLI surface is now document-specific. These commands analyze the sou
 ```bash
 # Federal PIV issuance bundle
 faceoffx piv photo.jpg
+
+# Federal PIV digital card image using the minimum-capacity target
+faceoffx piv photo.jpg --variant digital --filesize-target minimum
 
 # U.S. passport paper photo
 faceoffx us-passport photo.jpg
@@ -109,17 +115,56 @@ faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detec
 faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
 ```
 
-#### Available Presets
+`faceoffx-diagnostics detect` writes one folder per subject plus a root `manifest.json`. Each
+subject folder contains an ordered set of PNGs that shows the human-detection pipeline step
+by step:
 
-| Preset                          | Target Size | Use Case                   |
-|---------------------------------|-------------|----------------------------|
-| `ProcessingOptions.TwicMax`     | 14KB        | TWIC cards maximum size    |
-| `ProcessingOptions.PivMin`      | 12KB        | PIV minimum size           |
-| `ProcessingOptions.PivBalanced` | 22KB        | Standard PIV compatibility |
-| `ProcessingOptions.PivHigh`     | 30KB        | Enhanced PIV quality       |
-| `ProcessingOptions.PivVeryHigh` | 50KB        | Premium quality            |
-| `ProcessingOptions.Archival`    | 4.0 bpp     | Long-term preservation     |
-| `ProcessingOptions.Fast`        | 0.5 bpp     | Minimal file size          |
+- `00-original.png`: Source image with no overlays
+- `10-coarse.png`: RetinaFace detector box and 5-point landmarks
+- `20-chip-locate.png`: Projected chip footprint on the source image
+- `30-chip.png`: Canonical extracted chip
+- `40-fine-chip.png`: Fine 68-point landmarks on the chip
+- `50-fine-source.png`: Fine 68-point landmarks projected back into source coordinates
+
+Example:
+
+```bash
+faceoffx-diagnostics detect --corpus people --output /tmp/faceoffx-human-detect-stages
+open -a Finder /tmp/faceoffx-human-detect-stages
+```
+
+The output layout looks like this:
+
+```text
+artifacts/diagnostics/detect/
+├── manifest.json
+├── generic-guy/
+│   ├── 00-original.png
+│   ├── 10-coarse.png
+│   ├── 20-chip-locate.png
+│   ├── 30-chip.png
+│   ├── 40-fine-chip.png
+│   └── 50-fine-source.png
+└── person-01/
+    ├── 00-original.png
+    ├── 10-coarse.png
+    ├── 20-chip-locate.png
+    ├── 30-chip.png
+    ├── 40-fine-chip.png
+    └── 50-fine-source.png
+```
+
+#### Profile Encoding Goals
+
+PIV encoding is specified by the profile, not by caller-side option bags:
+
+- PIV uses the named `preferred` 22KB hard cap for the card facial image by default.
+- PIV also exposes a named `minimum` 12KB target for minimum-capacity card workflows that need room below the SP 800-73 cardholder facial-image container minimum for CBEFF, signing, and wrapping overhead.
+- The encoding solver chooses the highest-quality JPEG 2000 candidate that fits under the cap.
+- ROI behavior is part of the `EncodingSpecification` attached to the profile.
+
+The `minimum` target caps the raw JP2 profile output. FaceOFFx does not claim to size a final
+CBEFF-wrapped or signed card object unless that wrapping is performed and measured by the caller.
 
 #### JPEG 2000 Compression Guidelines
 
@@ -127,13 +172,11 @@ For 420×560 images:
 
 | Rate (bpp) | Approx. Size | Quality Level |
 |------------|--------------|---------------|
-| 0.40       | 12KB         | PIV minimum   |
-| 0.48       | 14KB         | TWIC maximum  |
-| 0.70       | 20KB         | PIV standard  |
-| 1.00       | 29KB         | Enhanced      |
-| 1.50       | 45KB         | High quality  |
-| 2.00       | 60KB         | Premium       |
-| 4.00       | 118KB        | Archival      |
+| 0.36       | 11.6KB       | Small card image |
+| 0.68       | 20.6KB       | PIV card output |
+| 0.96       | 29.5KB       | More texture detail |
+| 1.70       | 49.8KB       | High-detail comparison |
+| 4.00       | 82.1KB       | Very high-detail comparison |
 
 ## Installation
 
@@ -165,44 +208,55 @@ Install-Package FaceOFFx
 
 ## Sample Gallery
 
-See the low-level PIV processing capabilities of FaceOFFx with these reference examples. Additional samples are available in the `docs/samples/` directory.
+These assets are generated from the canonical people corpus with the v3 diagnostics CLI:
 
-| Quality Preset            | Original                                                                                                                          | PIV Processed                                                                                                                          | ROI Visualization                                                                                                      |
-|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| **PIV High** (28.8KB)     | ![Generic Guy Original](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/generic_guy_420w.jpg) | ![Generic Guy PIV High](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/generic_guy_piv_high.png) | ![Generic Guy ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/generic_guy_roi.jpg) |
-| **PIV Balanced** (20.6KB) | ![Bush Original](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/bush_420w.jpg)               | ![Bush PIV Balanced](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/bush_piv_balanced.png)       | ![Bush ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/bush_roi.jpg)               |
-| **PIV Minimum** (11.8KB)  | ![Carter Original](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/carter_420w.jpg)           | ![Carter PIV Minimum](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/carter_piv_min.png)         | ![Carter ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/carter_roi.jpg)           |
-| **Minimum** (8.8KB)       | ![Johnson Original](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/johnson_420w.jpg)         | ![Johnson Minimum](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/johnson_minimum.png)           | ![Johnson ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/johnson_roi.jpg)         |
+```bash
+tests/regenerate_docs_images.sh
+```
 
+The source images shown here are 420px-wide display thumbnails. Processing uses the full-resolution
+test inputs, then writes decoded PNG previews of the actual JPEG 2000 outputs.
 
-### Quality Comparison - Keir Starmer
+| Subject | Source | PIV Output | ROI Visualization | Encoded Size |
+|---------|--------|------------|-------------------|--------------|
+| Generic Guy | ![Generic Guy Source](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/generic_guy_420w.jpg) | ![Generic Guy PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/generic_guy_piv.png) | ![Generic Guy ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/generic_guy_roi.jpg) | 20,612 bytes at 0.68 bpp |
+| Bush | ![Bush Source](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/bush_420w.jpg) | ![Bush PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/bush_piv.png) | ![Bush ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/bush_roi.jpg) | 20,451 bytes at 0.68 bpp |
+| Carter | ![Carter Source](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/carter_420w.jpg) | ![Carter PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/carter_piv.png) | ![Carter ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/carter_roi.jpg) | 20,641 bytes at 0.68 bpp |
+| Johnson | ![Johnson Source](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/johnson_420w.jpg) | ![Johnson PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/johnson_piv.png) | ![Johnson ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/johnson_roi.jpg) | 20,481 bytes at 0.68 bpp |
 
-See how JPEG 2000 compression quality affects the final image, from lowest to highest quality:
+### File Size Comparison - Keir Starmer
 
-#### Row 1: Low-bitrate Quality
+This comparison uses the same PIV crop and ROI. Only the JPEG 2000 rate changes, so the table shows
+how small the encoded file can get and what extra bytes buy visually.
 
-| **Minimum** (8.8KB)                                                                                                  | **PIV Minimum** (11.8KB)                                                                                             | **PIV Balanced** (20.7KB)                                                                                                      |
-|----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
-| ![Minimum](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_minimum.png) | ![PIV Min](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_piv_min.png) | ![PIV Balanced](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_piv_balanced.png) |
-| **Size**: 8,845 bytes                                                                                                | **Size**: 11,789 bytes                                                                                               | **Size**: 17,723 bytes                                                                                                         |
-| **Rate**: 0.35 bpp                                                                                                   | **Rate**: 0.36 bpp                                                                                                   | **Rate**: 0.55 bpp                                                                                                             |
-| Bare minimum quality                                                                                                 | PIV/TWIC compliant                                                                                                   | Standard PIV quality                                                                                                           |
+| **0.36 bpp** | **0.68 bpp** | **0.96 bpp** |
+|--------------|--------------|--------------|
+| ![Starmer 0.36 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_036.png) | ![Starmer 0.68 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_068.png) | ![Starmer 0.96 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_096.png) |
+| **Size**: 11,648 bytes | **Size**: 20,610 bytes | **Size**: 29,479 bytes |
+| Small card image | PIV card output | More texture detail |
 
-#### Row 2: High-bitrate Quality
+| **1.70 bpp** | **4.00 bpp** |
+|--------------|--------------|
+| ![Starmer 1.70 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_170.png) | ![Starmer 4.00 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_400.png) |
+| **Size**: 49,765 bytes | **Size**: 82,111 bytes |
+| High-detail comparison | Very high-detail comparison |
 
-| **PIV High** (28.8KB)                                                                                                  | **PIV Very High** (48.6KB)                                                                                                      | **PIV Archival** (80.2KB)                                                                                              |
-|------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| ![PIV High](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_piv_high.png) | ![PIV Very High](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_piv_veryhigh.png) | ![Archival](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_archival.png) |
-| **Size**: 29,485 bytes                                                                                                 | **Size**: 49,732 bytes                                                                                                          | **Size**: 82,127 bytes                                                                                                 |
-| **Rate**: 0.96 bpp                                                                                                     | **Rate**: 1.70 bpp                                                                                                              | **Rate**: 4.00 bpp                                                                                                     |
-| Enhanced PIV quality                                                                                                   | High quality                                                                                                                    | Long-term preservation                                                                                                 |
+### Document Crop Comparison
+
+FaceOFFx uses the same detected face geometry to render different document crops. The README keeps
+this comparison compact so the PIV path remains the main example.
+
+| PIV Card | ICAO Portrait | Canada PR Card |
+|----------|---------------|----------------|
+| ![Starmer PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_piv.png) | ![Starmer ICAO](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_icao.png) | ![Starmer Canada PR](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_canada_pr.png) |
+| 420×560, 20,610 bytes | 413×531, 54,493 bytes | 50mm × 70mm crop, 420px display preview |
 
 ### Understanding the Visualizations
 
 - **Red Box**: ROI region with highest quality preservation
 - **Blue Line (AA)**: Vertical center alignment
 - **Green Line (BB)**: Horizontal eye line (should be 55-60% from bottom)
-- **Purple Line (CC)**: Head width measurement (minimum 240px)
+- **Purple Line (CC)**: Head width measurement used by PIV crop solving
 
 ### Head Width Measurement (Line CC)
 
@@ -223,118 +277,53 @@ ear. We then create a level line at the average Y-position of these widest point
 - True head width at the temples/ears may be wider
 - This is a fundamental limitation of the 68-point model
 
-**PIV Compatibility**: The key requirement is that Line CC width ≥ 240 pixels. The exact vertical position is less critical
-than ensuring the face is large enough in the frame.
+**PIV Compatibility**: The current PIV solver targets the accepted card head-width band on a 420px output.
+It tries 235px, 225px, 215px, and 210px candidates in order and keeps the first candidate that also satisfies
+eye-line, margin, rotation, and inter-pupillary-distance constraints.
 
 ## API Reference
 
-### Direct Service Usage (Advanced)
-
-For advanced scenarios where you need direct control over the services:
+### Profile Encoder
 
 ```csharp
-// Initialize services (typically done via DI)
-var faceDetector = new RetinaFaceDetector(modelPath);
-var landmarkExtractor = new OnnxLandmarkExtractor(modelPath);
-var jpeg2000Encoder = new Jpeg2000EncoderService();
+var profile = ProfileSpecifications.Piv;
+var result = await encoder.ProcessAsync(imageData, profile);
 
-// Load source image
-using var sourceImage = await Image.LoadAsync<Rgba32>("photo.jpg");
-
-// Process with default settings
-var result = await PivProcessor.ProcessAsync(
-    sourceImage,
-    faceDetector,
-    landmarkExtractor,
-    jpeg2000Encoder);
-
-if (result.IsSuccess)
+if (result.IsFailure)
 {
-    // Save the processed image
-    await File.WriteAllBytesAsync("output.png", result.Value.ImageData);
-    Console.WriteLine($"Processing succeeded: {result.Value.ProcessingSummary}");
+    Console.WriteLine(result.Error.Message);
+    return;
 }
-else
-{
-    Console.WriteLine($"Processing failed: {result.Error}");
-}
+
+await File.WriteAllBytesAsync("piv.jp2", result.Value.ImageData);
 ```
 
-### Custom Processing Options with Direct Services
+`ProfileEncodingResult` contains the encoded bytes plus the decisions made by the pipeline:
 
 ```csharp
-// Configure processing options
-var options = new PivProcessingOptions
-{
-    BaseRate = 0.8f,        // 24KB target
-    RoiStartLevel = 2,      // Conservative ROI
-    MinFaceConfidence = 0.9f
-};
-
-// Process with custom settings
-var result = await PivProcessor.ProcessAsync(
-    sourceImage,
-    faceDetector,
-    landmarkExtractor,
-    jpeg2000Encoder,
-    options,
-    logger);  // ROI enabled by default, no alignment by default
-
-// Handle result
-if (result.IsSuccess)
-{
-    var pivResult = result.Value;
-    
-    // Transformation details
-    Console.WriteLine($"Rotation: {pivResult.AppliedTransform.RotationDegrees}°");
-    Console.WriteLine($"Scale: {pivResult.AppliedTransform.ScaleFactor}x");
-
-    // Compliance validation
-    var validation = pivResult.Metadata["ComplianceValidation"] as PivComplianceValidation;
-    Console.WriteLine($"Head width: {validation?.HeadWidthPixels}px");
-    Console.WriteLine($"Eye position: {validation?.BBFromBottom:P0} from bottom");
-}
-else
-{
-    Console.WriteLine($"Processing failed: {result.Error}");
-}
+var output = result.Value;
+Console.WriteLine(output.Profile.Id);
+Console.WriteLine(output.Encoding.FileSize);
+Console.WriteLine(output.Encoding.CompressionRate);
+Console.WriteLine(output.RotationDegrees);
+Console.WriteLine(output.CandidateTraces.Count);
 ```
 
 ## Configuration
 
-### Processing Options
+### Profile Specifications
 
-| Option                 | Type  | Default | Description                                   |
-|------------------------|-------|---------|-----------------------------------------------|
-| `BaseRate`             | float | 0.7     | Compression rate in bits/pixel (0.6-1.0)      |
-| `RoiStartLevel`        | int   | 3       | ROI quality level (0=aggressive, 3=smoothest) |
-| `MinFaceConfidence`    | float | 0.8     | Minimum face detection confidence (0-1)       |
-| `RequireSingleFace`    | bool  | true    | Fail if multiple faces detected               |
-| `PreserveExifMetadata` | bool  | false   | Keep EXIF data in output                      |
+Profiles are plain immutable domain records. A profile defines:
 
-### Preset Configurations
+- face-selection requirements
+- portrait dimensions and crop candidate ladder
+- head-width, eye-line, margin, rotation, and IPD constraints
+- JPEG 2000 ROI settings
+- encoding goal
 
-```csharp
-// Optimized for ~20KB files with smooth quality transitions
-var defaultOptions = PivProcessingOptions.Default;
+`ProfileSpecifications.Piv` uses a hard byte cap. The encoding solver tests a bounded, deterministic compression ladder and accepts the first candidate that fits, which is the highest-quality accepted candidate for that ladder.
 
-// Maximum quality for archival (larger files)
-var highQualityOptions = PivProcessingOptions.HighQuality;
-
-// Fast processing with smaller files
-var fastOptions = PivProcessingOptions.Fast;
-```
-
-### File Size Tuning
-
-| Preset        | Target Size | Actual Size | Compression Rate | Use Case                                                           |
-|---------------|-------------|-------------|------------------|--------------------------------------------------------------------|
-| PIV Archival  | -           | ~82KB       | 4.00 bpp         | Long-term preservation and archival storage                        |
-| PIV Very High | 50KB        | ~49.7KB     | 1.70 bpp         | Premium quality with excellent detail preservation                 |
-| PIV High      | 30KB        | ~29.4KB     | 0.96 bpp         | Enhanced quality for applications requiring superior detail        |
-| PIV Balanced  | 22KB        | ~20.6KB     | 0.68 bpp         | **Default** - Optimal quality/size balance for ID cards            |
-| PIV Minimum   | 12KB        | ~11.8KB     | 0.36 bpp         | Minimum acceptable quality, works for both PIV and TWIC (14KB max) |
-| Minimum       | 10KB        | ~8.8KB      | 0.35 bpp         | Smallest possible file size                                        |
+Other document crops use the same canonical face geometry and their own immutable specifications. The compact crop comparison above shows where ICAO and Canada permanent resident card output differ from the PIV card render.
 
 ## CLI Usage
 
@@ -398,24 +387,17 @@ Each document command writes a provenance JSON file alongside the outputs. The p
 ### Error Handling
 
 ```csharp
-var result = await FacialImageEncoder.ProcessAsync(imageData);
+var result = await encoder.ProcessAsync(imageData, ProfileSpecifications.Piv);
 if (result.IsFailure)
 {
     Console.WriteLine($"Processing failed: [{result.Error.Code}] {result.Error.Message}");
     return;
 }
 
-Console.WriteLine($"Processed size: {result.Value.Metadata.FileSize} bytes");
-if (result.Value.Metadata.TargetSize.HasValue)
+Console.WriteLine($"Processed size: {result.Value.Encoding.FileSize} bytes");
+if (result.Value.Encoding.TargetFileSize.HasValue)
 {
-    Console.WriteLine($"Target size was: {result.Value.Metadata.TargetSize.Value}");
-}
-
-// Additional processing based on file size
-if (result.Value.Metadata.FileSize > 25000)
-{
-    // Try with higher compression
-    result = await FacialImageEncoder.ProcessWithRateAsync(imageData, 0.5f);
+    Console.WriteLine($"Target cap was: {result.Value.Encoding.TargetFileSize.Value}");
 }
 ```
 
@@ -458,7 +440,7 @@ FaceOFFx/
 FaceOFFx ensures compatibility with government standards:
 
 - **Output**: 420×560 pixels (3:4 aspect ratio)
-- **Face Width**: Minimum 240 pixels
+- **Face Width**: PIV card head-width candidate solving for the accepted 210-240px band
 - **Eye Position**: 55-60% from bottom of image
 - **Rotation**: Maximum ±5° correction
 - **Centering**: Face properly centered with margins
@@ -482,16 +464,20 @@ FaceOFFx uses two specialized ONNX models for facial processing, each optimized 
 **Input**: 640×640×3 RGB image, normalized to [0,1]
 **Output**: Face bounding boxes with confidence scores and 5 key facial points
 
-The RetinaFace model performs initial face detection and provides coarse facial landmarks:
+The RetinaFace model performs the first stage of human detection and provides the coarse geometry
+used to seed the rest of the pipeline:
 
 - **Bounding boxes**: Precise face region coordinates
 - **Confidence scores**: Detection confidence (typically >0.8 for processing)
 - **5-point landmarks**: Eyes (2), nose tip (1), mouth corners (2)
 - **Frontal face filtering**: Optimized for government ID photo orientations
 
-**Pre-processing**: Images are resized to 640×640 with letterboxing to maintain aspect ratio, then normalized to floating-point values between 0 and 1.
+**Pre-processing**: Images are resized to 640×640 with padding to maintain aspect ratio, then
+converted into the tensor format expected by the detector.
 
-**Post-processing**: Non-maximum suppression filters overlapping detections, retaining only the highest confidence frontal face for PIV processing.
+**Post-processing**: Non-maximum suppression filters overlapping detections. The highest-confidence
+usable face becomes the canonical face candidate for downstream chip extraction and fine landmark
+solving.
 
 ### Landmark Detection Model (PFLD)
 
@@ -500,7 +486,21 @@ The RetinaFace model performs initial face detection and provides coarse facial 
 **Input**: 112×112×3 RGB face crop, normalized to [0,1]
 **Output**: 136 floats (68 landmarks × 2 coordinates)
 
-The PFLD model extracts precise 68-point facial landmarks using the standard iBUG annotation scheme:
+The PFLD model extracts precise 68-point facial landmarks using the standard iBUG annotation scheme.
+In FaceOFFx it is not run over the whole image. It is run over a normalized 112×112 chip derived
+from the coarse RetinaFace solve, and the resulting fine landmarks are then projected back into the
+original source-image coordinate system.
+
+#### Why There Are Two Landmark Stages
+
+- **Coarse stage**: RetinaFace gives a detection box plus 5 facial keypoints.
+- **Canonical chip stage**: FaceOFFx uses those coarse landmarks to build a stable chip transform.
+- **Fine stage**: PFLD runs on that canonical chip and returns precise 68-point landmarks.
+- **Back-projection stage**: The chip transform is inverted so the fine landmarks line up with the
+  original source image and with all later crop/render transforms.
+
+This split is what the diagnostics visualizer shows in `10-coarse.png`, `20-chip-locate.png`,
+`30-chip.png`, `40-fine-chip.png`, and `50-fine-source.png`.
 
 #### Landmark Layout
 
@@ -514,7 +514,9 @@ The PFLD model extracts precise 68-point facial landmarks using the standard iBU
 - **Outer mouth** (48-59): Clockwise from left corner
 - **Inner mouth** (60-67): Clockwise from left corner
 
-**Coordinate System**: All landmarks are normalized to [0,1] relative to the 112×112 input crop and must be transformed back to full image coordinates for PIV processing.
+**Coordinate System**: The PFLD output is normalized to the 112×112 chip input. FaceOFFx removes
+any chip padding, rescales those points into chip space, and then maps them back into original
+image coordinates.
 
 **Precision**: The PFLD model achieves sub-pixel accuracy for facial feature localization, essential for precise PIV alignment and ROI calculation.
 
@@ -536,7 +538,7 @@ The PFLD model extracts precise 68-point facial landmarks using the standard iBU
 
 ## Image Processing Pipeline
 
-FaceOFFx follows a carefully orchestrated pipeline to transform input images into PIV-compatible JPEG 2000 files:
+FaceOFFx follows a single profile-encoding pipeline to transform input images into profile-compliant JPEG 2000 files:
 
 ### 1. Image Loading and Validation
 
@@ -548,57 +550,59 @@ Input Image (any format) → ImageSharp Image<Rgba32>
 - Converts to consistent RGBA32 format for processing
 - Validates image dimensions and format compatibility
 
-### 2. Face Detection Phase
+### 2. Coarse Detection Phase
 
 ```
 Image<Rgba32> → RetinaFace Model → DetectedFace[]
 ```
 
-- Resize image to 640×640 with letterboxing
-- Normalize pixel values to [0,1] range
+- Resize image to 640×640 with aspect-preserving padding
+- Convert the padded image into the detector tensor format
 - Run ONNX inference to detect faces
-- Filter for frontal faces with confidence >0.8
-- Select single best face for PIV processing
+- Decode bounding boxes, confidence, and 5-point landmarks
+- Filter overlapping detections with non-maximum suppression
+- Select the single best face for downstream processing
 
-### 3. Face Crop Extraction
-
-```
-DetectedFace → Face Region Crop (Variable Size)
-```
-
-- Extract face region with padding based on detection box
-- Maintain original image resolution for landmark precision
-- Preserve aspect ratio of detected face region
-
-### 4. Landmark Detection Phase
+### 3. Canonical Chip Construction
 
 ```
-Face Crop → Resize to 112×112 → PFLD Model → 68 Landmarks
+DetectedFace + 5-point landmarks → Canonical chip transform → 112×112 chip
 ```
 
-- Resize face crop to exactly 112×112 pixels
+- Build a stable chip transform from the coarse face solve
+- Extract a normalized 112×112 chip from the original image
+- Preserve the forward and inverse transform so chip-space points can be mapped back to source
+  space exactly
+
+### 4. Fine Landmark Detection Phase
+
+```
+112×112 chip → PFLD Model → 68 chip-space landmarks
+```
+
 - Normalize to [0,1] for ONNX inference
 - Extract 68-point facial landmarks
-- Transform coordinates back to full image space
+- Project the fine landmarks back into full image coordinates
 
-### 5. PIV Transformation Calculation
-
-```
-68 Landmarks → Geometric Analysis → PivTransform
-```
-
-- **Eye angle calculation**: Compute rotation needed to level eyes horizontally
-- **Face centering**: Calculate optimal crop region for PIV compatibility
-- **Scale factor**: Determine resize ratio for 420×560 output
-- **Validation**: Ensure rotation is within ±5° PIV limits
-
-### 6. Image Transformation Sequence
+### 5. Canonical Geometry Resolution
 
 ```
-Original Image → Rotate → Crop → Resize → PIV Image (420×560)
+Coarse detection + chip transform + fine landmarks → CanonicalFaceGeometry
 ```
 
-**Critical Order**: Rotation is applied to the full original image first to avoid black borders, then cropping and resizing follow.
+- Combine the original-space fine landmarks with the chip transform
+- Preserve the exact relationship between source image, chip, and later portrait outputs
+- Use this canonical geometry as the single source of truth for later render and validation steps
+
+### 6. Portrait Transformation Sequence
+
+```
+CanonicalFaceGeometry + profile spec → PortraitPlanSolver → Rotate → Crop → Resize → output portrait
+```
+
+**Critical Order**: Rotation is applied to the full original image first to avoid black borders.
+Cropping and resizing follow after the eye line and face placement are solved from the canonical
+geometry.
 
 #### Rotation Phase
 
@@ -608,9 +612,9 @@ Original Image → Rotate → Crop → Resize → PIV Image (420×560)
 
 #### Cropping Phase
 
-- Calculate face position in rotated image
-- Apply PIV-compatible crop with proper margins
-- Ensure face occupies 57% of final image width
+- Calculate face position from the canonical original-space landmarks
+- Apply the profile-specific crop candidate selected by `PortraitPlanSolver`
+- Preserve the exact transform map from source coordinates to output coordinates
 
 #### Resizing Phase
 
@@ -626,7 +630,7 @@ Original Landmarks → Transform Matrix → PIV Space Landmarks
 
 - Apply same rotation, crop, and scale transforms to landmarks
 - Ensure landmarks align with transformed face position
-- Validate eye positions are within PIV compatibility zones
+- Validate eye positions and head placement against the requested standard
 
 ### 8. ROI Region Calculation
 
@@ -642,26 +646,28 @@ PIV Landmarks → Facial Region Analysis → ROI Bounds
 ### 9. JPEG 2000 Encoding with ROI
 
 ```
-PIV Image + ROI → CoreJ2K → PIV-Compatible JP2 File
+Rendered profile portrait + ROI → EncodingPlanSolver → CoreJ2K → JP2 File
 ```
 
 - **Single tile encoding**: Use one 420×560 tile for optimal compression
 - **ROI priority**: Encode facial region at higher quality (levels 0-3)
 - **Background compression**: Apply base compression rate to non-ROI areas
-- **Target file size**: Precise file size control using TargetSize strategy
+- **PIV encoding goal**: Hard-cap solving for the card facial image
 
 ### Processing Flow Diagram
 
 ```
 Input Image
     ↓
-Face Detection (RetinaFace 640×640)
+Coarse Detection (RetinaFace 640×640)
     ↓
-Face Crop Extraction
+Canonical Chip Construction (112×112)
     ↓
-Landmark Detection (PFLD 112×112)
+Fine Landmark Detection (PFLD on chip)
     ↓
-Geometric Analysis (Eye angle, face bounds)
+Back-Projection To Source Coordinates
+    ↓
+Canonical Face Geometry
     ↓
 Image Transformation (Rotate → Crop → Resize)
     ↓
@@ -669,22 +675,25 @@ Landmark Transformation (Match image transforms)
     ↓
 ROI Calculation (Facial region bounds)
     ↓
-JPEG 2000 Encoding (Single tile + ROI)
+Profile Encoding Solver (Single tile + ROI)
     ↓
-PIV-Compatible JP2 Output (420×560, exact target size)
+Profile-Compatible JP2 Output
 ```
 
 ### Coordinate System Transformations
 
-The pipeline involves multiple coordinate space transformations:
+The pipeline involves multiple coordinate spaces:
 
 1. **Original Image Space**: Source image dimensions (e.g., 1920×1080)
-2. **Detection Space**: 640×640 normalized coordinates
-3. **Landmark Space**: 112×112 normalized coordinates [0,1]
-4. **Rotated Image Space**: Original dimensions after rotation
-5. **PIV Space**: Final 420×560 dimensions
+2. **Detection Tensor Space**: 640×640 detector input
+3. **Chip Space**: Canonical 112×112 chip coordinates
+4. **Fine Landmark Space**: Normalized landmark coordinates relative to the chip
+5. **Rotated Image Space**: Original dimensions after rotation
+6. **Output Portrait Space**: Final rendered dimensions such as 420×560
 
-Each transformation maintains mathematical precision to ensure accurate facial feature alignment throughout the process.
+Each transform is preserved explicitly so facial features can be mapped forward and backward without
+re-solving detection or landmarks. The diagnostics command exists to make those stage boundaries
+visible on real inputs.
 
 ## Requirements
 
