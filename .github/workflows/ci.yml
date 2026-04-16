@@ -85,4 +85,6 @@ jobs:
       - name: Install and smoke test tool
         run: |
           dotnet tool install --global --add-source ./src/FaceOFFx.Cli/nupkg FaceOFFx.Cli
-          ~/.dotnet/tools/faceoffx quality --input tests/sample_images/generic_guy.png --format json || test $? -eq 1
+          mkdir -p "$RUNNER_TEMP/faceoffx-smoke"
+          ~/.dotnet/tools/faceoffx piv tests/test-images/people/generic-guy/source.png --variant digital --output-dir "$RUNNER_TEMP/faceoffx-smoke" --json > "$RUNNER_TEMP/faceoffx-smoke/result.json"
+          python -m json.tool "$RUNNER_TEMP/faceoffx-smoke/result.json" > /dev/null

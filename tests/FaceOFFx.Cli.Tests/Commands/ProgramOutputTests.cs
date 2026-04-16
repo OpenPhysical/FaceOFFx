@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using AwesomeAssertions;
 using FaceOFFx.Tests.Common;
@@ -67,6 +68,41 @@ public class ProgramOutputTests : IntegrationTestBase
 
         stdout.Should().NotContain("PIV · ICAO · TWIC Biometrics");
         using var json = JsonDocument.Parse(stdout);
+        json.RootElement.GetProperty("Document").GetString().Should().Be("piv");
+    }
+
+    [Test]
+    public async Task PivCommand_WithJsonFormat_WritesUtf8JsonWithoutBom()
+    {
+        var outputDir = Path.Combine(TempDirectory, "piv-program-output-bytes");
+        Directory.CreateDirectory(outputDir);
+
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = $"\"{_cliAssemblyPath}\" piv \"{_testImagePath}\" --variant digital --output-dir \"{outputDir}\" --json",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(processInfo)
+            ?? throw new InvalidOperationException("Failed to start process");
+
+        await using var stdout = new MemoryStream();
+        await process.StandardOutput.BaseStream.CopyToAsync(stdout);
+        await process.WaitForExitAsync();
+
+        process.ExitCode.Should().Be(0);
+        var bytes = stdout.ToArray();
+        bytes.Should().NotBeEmpty();
+        bytes[0].Should().Be((byte)'{');
+        bytes.Take(3).Should().NotEqual(new byte[] { 0xEF, 0xBB, 0xBF });
+
+        var text = Encoding.UTF8.GetString(bytes);
+        text.Should().NotContain("PIV · ICAO · TWIC Biometrics");
+        using var json = JsonDocument.Parse(bytes);
         json.RootElement.GetProperty("Document").GetString().Should().Be("piv");
     }
 

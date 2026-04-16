@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
+using FaceOFFx.Core.Domain.Common;
 using FaceOFFx.Core.Domain.Documents;
 using FaceOFFx.Infrastructure.Services;
 using Spectre.Console;
@@ -41,121 +43,109 @@ internal abstract class DocumentIssuanceCommandBase<TSettings>(
     {
         var request = CreateRequest(settings);
 
-        StringWriter? swallowedStdout = null;
-        TextWriter? originalStdout = null;
+        if (settings.Json)
+        {
+            System.Console.SetOut(TextWriter.Null);
+        }
 
-        try
+        using var stdoutRedirect = settings.Json ? StandardOutputRedirect.ToNull() : null;
+        var result = await JobRunner.RunAsync(request, cancellationToken).ConfigureAwait(false);
+        stdoutRedirect?.Dispose();
+
+        if (result.IsFailure)
         {
             if (settings.Json)
             {
-                originalStdout = System.Console.Out;
-                swallowedStdout = new StringWriter();
-                System.Console.SetOut(swallowedStdout);
+                WriteJson(new { Error = result.Error.Message });
             }
-
-            var result = await JobRunner.RunAsync(request, cancellationToken).ConfigureAwait(false);
-            if (result.IsFailure)
+            else
             {
-                if (settings.Json)
-                {
-                    WriteJson(originalStdout, new { Error = result.Error.Message });
-                }
-                else
-                {
-                    Console.MarkupLine($"[red]Error:[/] {result.Error.Message}");
-                }
-
-                return 1;
+                Console.MarkupLine($"[red]Error:[/] {result.Error.Message}");
             }
 
-            if (settings.Json)
+            return 1;
+        }
+
+        if (settings.Json)
+        {
+            WriteJson(new
             {
-                WriteJson(originalStdout, new
+                Document = result.Value.Document.Id,
+                Variant = result.Value.Variant.Id,
+                result.Value.InputPath,
+                result.Value.InputPassed,
+                result.Value.InputSummary,
+                result.Value.ProvenancePath,
+                Deliverables = result.Value.Deliverables.Select(deliverable => new
                 {
-                    Document = result.Value.Document.Id,
-                    Variant = result.Value.Variant.Id,
-                    result.Value.InputPath,
-                    result.Value.InputPassed,
-                    result.Value.InputSummary,
-                    result.Value.ProvenancePath,
-                    Deliverables = result.Value.Deliverables.Select(deliverable => new
-                    {
-                        deliverable.Id,
-                        deliverable.OutputPath,
-                        deliverable.Passed,
-                        deliverable.Summary,
-                        deliverable.FileSizeBytes,
-                        deliverable.SupportingInfoPath,
-                        deliverable.OriginalFileRequirementSatisfied,
-                        deliverable.ProductionDefaults
-                    }),
-                    ManualChecklist = result.Value.ManualChecklist
-                });
-                return result.Value.InputPassed && result.Value.Deliverables.All(d => d.Passed) ? 0 : 1;
-            }
-
-            Console.MarkupLine($"[green]Document:[/] {DocumentDisplayName}");
-            Console.MarkupLine($"[green]Input:[/] {result.Value.InputPath}");
-            Console.MarkupLine($"[green]Input analysis:[/] {result.Value.InputSummary}");
-
-            foreach (var deliverable in result.Value.Deliverables)
-            {
-                var status = deliverable.Passed ? "[green]PASS[/]" : "[red]FAIL[/]";
-                Console.MarkupLine($"{status} {deliverable.DisplayName}: {deliverable.OutputPath}");
-                Console.MarkupLine($"[grey]{deliverable.Summary}[/]");
-
-                foreach (var check in deliverable.Checks.Where(check => check.Disposition == DocumentCheckDisposition.Advisory && !check.Passed))
-                {
-                    Console.MarkupLine($"[yellow]ADVISORY[/] {check.Name}: {check.Summary}");
-                }
-
-                if (!string.IsNullOrWhiteSpace(deliverable.SupportingInfoPath))
-                {
-                    Console.MarkupLine($"[blue]Supporting Info:[/] {deliverable.SupportingInfoPath}");
-                }
-            }
-
-            if (result.Value.ManualChecklist.Count > 0)
-            {
-                Console.WriteLine();
-                Console.MarkupLine("[bold]Manual Checklist[/]");
-                foreach (var item in result.Value.ManualChecklist)
-                {
-                    Console.MarkupLine($"- [yellow]{item.Name}:[/] {item.Summary}");
-                }
-            }
-
-            Console.MarkupLine($"[blue]Provenance:[/] {result.Value.ProvenancePath}");
-
-            if (settings.Explain)
-            {
-                Console.WriteLine();
-                Console.MarkupLine("[bold]Cited Clauses[/]");
-                foreach (var citation in result.Value.Document.Citations)
-                {
-                    Console.MarkupLine($"- [yellow]{citation.DocumentTitle}[/], {citation.Clause}");
-                    Console.MarkupLine($"  {citation.Summary}");
-                }
-            }
-
+                    deliverable.Id,
+                    deliverable.OutputPath,
+                    deliverable.Passed,
+                    deliverable.Summary,
+                    deliverable.FileSizeBytes,
+                    deliverable.SupportingInfoPath,
+                    deliverable.OriginalFileRequirementSatisfied,
+                    deliverable.ProductionDefaults
+                }),
+                ManualChecklist = result.Value.ManualChecklist
+            });
             return result.Value.InputPassed && result.Value.Deliverables.All(d => d.Passed) ? 0 : 1;
         }
-        finally
+
+        Console.MarkupLine($"[green]Document:[/] {DocumentDisplayName}");
+        Console.MarkupLine($"[green]Input:[/] {result.Value.InputPath}");
+        Console.MarkupLine($"[green]Input analysis:[/] {result.Value.InputSummary}");
+
+        foreach (var deliverable in result.Value.Deliverables)
         {
-            if (originalStdout != null)
+            var status = deliverable.Passed ? "[green]PASS[/]" : "[red]FAIL[/]";
+            Console.MarkupLine($"{status} {deliverable.DisplayName}: {deliverable.OutputPath}");
+            Console.MarkupLine($"[grey]{deliverable.Summary}[/]");
+
+            foreach (var check in deliverable.Checks.Where(check => check.Disposition == DocumentCheckDisposition.Advisory && !check.Passed))
             {
-                System.Console.SetOut(originalStdout);
+                Console.MarkupLine($"[yellow]ADVISORY[/] {check.Name}: {check.Summary}");
             }
 
-            swallowedStdout?.Dispose();
+            if (!string.IsNullOrWhiteSpace(deliverable.SupportingInfoPath))
+            {
+                Console.MarkupLine($"[blue]Supporting Info:[/] {deliverable.SupportingInfoPath}");
+            }
         }
+
+        if (result.Value.ManualChecklist.Count > 0)
+        {
+            Console.WriteLine();
+            Console.MarkupLine("[bold]Manual Checklist[/]");
+            foreach (var item in result.Value.ManualChecklist)
+            {
+                Console.MarkupLine($"- [yellow]{item.Name}:[/] {item.Summary}");
+            }
+        }
+
+        Console.MarkupLine($"[blue]Provenance:[/] {result.Value.ProvenancePath}");
+
+        if (settings.Explain)
+        {
+            Console.WriteLine();
+            Console.MarkupLine("[bold]Cited Clauses[/]");
+            foreach (var citation in result.Value.Document.Citations)
+            {
+                Console.MarkupLine($"- [yellow]{citation.DocumentTitle}[/], {citation.Clause}");
+                Console.MarkupLine($"  {citation.Summary}");
+            }
+        }
+
+        return result.Value.InputPassed && result.Value.Deliverables.All(d => d.Passed) ? 0 : 1;
     }
 
-    private static void WriteJson(TextWriter? writer, object payload)
+    private static void WriteJson(object payload)
     {
-        var target = writer ?? System.Console.Out;
-        target.WriteLine(JsonSerializer.Serialize(payload));
-        target.Flush();
+        var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(payload);
+        using var stdout = System.Console.OpenStandardOutput();
+        stdout.Write(jsonBytes);
+        stdout.WriteByte((byte)'\n');
+        stdout.Flush();
     }
 
     protected virtual DocumentJobRequest CreateRequest(TSettings settings) =>
@@ -167,6 +157,80 @@ internal abstract class DocumentIssuanceCommandBase<TSettings>(
             Json: settings.Json,
             Explain: settings.Explain,
             FileSizeTargetId: Maybe<string>.None);
+}
+
+internal sealed class StandardOutputRedirect : IDisposable
+{
+    private const int StdoutFileDescriptor = 1;
+    private const int WriteOnly = 0x0001;
+
+    private readonly int _savedStdout;
+    private bool _disposed;
+
+    private StandardOutputRedirect(int savedStdout)
+    {
+        _savedStdout = savedStdout;
+    }
+
+    public static StandardOutputRedirect? ToNull()
+    {
+        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsLinux())
+        {
+            return null;
+        }
+
+        var savedStdout = Dup(StdoutFileDescriptor);
+        if (savedStdout == -1)
+        {
+            throw CreateRedirectError("duplicate stdout");
+        }
+
+        var nullDevice = Open("/dev/null", WriteOnly);
+        if (nullDevice == -1)
+        {
+            var error = CreateRedirectError("open /dev/null");
+            Close(savedStdout);
+            throw error;
+        }
+
+        if (Dup2(nullDevice, StdoutFileDescriptor) == -1)
+        {
+            var error = CreateRedirectError("redirect stdout");
+            Close(nullDevice);
+            Close(savedStdout);
+            throw error;
+        }
+
+        Close(nullDevice);
+        return new StandardOutputRedirect(savedStdout);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Dup2(_savedStdout, StdoutFileDescriptor);
+        Close(_savedStdout);
+        _disposed = true;
+    }
+
+    private static InvalidOperationException CreateRedirectError(string operation) =>
+        new($"Unable to {operation} for clean JSON output: errno {Marshal.GetLastPInvokeError()}.");
+
+    [DllImport("libc", EntryPoint = "dup", SetLastError = true)]
+    private static extern int Dup(int oldfd);
+
+    [DllImport("libc", EntryPoint = "dup2", SetLastError = true)]
+    private static extern int Dup2(int oldfd, int newfd);
+
+    [DllImport("libc", EntryPoint = "open", SetLastError = true)]
+    private static extern int Open(string pathname, int flags);
+
+    [DllImport("libc", EntryPoint = "close", SetLastError = true)]
+    private static extern int Close(int fd);
 }
 
 internal class DocumentIssuanceCommandSettings : CommandSettings

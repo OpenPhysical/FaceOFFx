@@ -6,10 +6,17 @@ using Spectre.Console;
 using Spectre.Console.Cli;
 using Spectre.Console.Cli.Extensions.DependencyInjection;
 
+var requiresCleanStdout = StructuredOutputDetector.RequiresCleanStdout(args);
+
 // Configure services
 var services = new ServiceCollection();
-var console = AnsiConsole.Console;
-var requiresCleanStdout = StructuredOutputDetector.RequiresCleanStdout(args);
+var console = requiresCleanStdout
+    ? AnsiConsole.Create(new AnsiConsoleSettings
+    {
+        Out = new AnsiConsoleOutput(TextWriter.Null),
+        Interactive = InteractionSupport.No
+    })
+    : AnsiConsole.Console;
 
 // Configure logging - check for --debug flag in args
 var hasDebugFlag = args.Contains("--debug");
