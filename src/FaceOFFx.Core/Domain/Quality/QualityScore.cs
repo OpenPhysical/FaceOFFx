@@ -73,7 +73,7 @@ public record QualityScore
     /// <summary>
     /// Returns the quality score formatted as a percentage
     /// </summary>
-    public override string ToString() => $"{Value:P1}";
+    public override string ToString() => FormattableString.Invariant($"{Value * 100f:F1}%");
 }
 
 /// <summary>
