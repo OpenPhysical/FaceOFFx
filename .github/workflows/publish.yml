@@ -1,10 +1,13 @@
 name: Publish NuGet Package
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Approve publication of the validated FaceOFFx package"
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -16,6 +19,10 @@ env:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    environment: nuget-production
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -26,7 +33,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
           global-json-file: global.json
 
       - name: Restore dependencies
@@ -37,32 +47,51 @@ jobs:
 
       - name: Test
         run: |
-          dotnet test tests/FaceOFFx.Core.Tests/FaceOFFx.Core.Tests.csproj --configuration Release --no-build -f net10.0 --settings tests/FaceOFFx.Core.Tests.runsettings
-          dotnet test tests/FaceOFFx.Infrastructure.Tests/FaceOFFx.Infrastructure.Tests.csproj --configuration Release --no-build -f net10.0 --settings tests/FaceOFFx.Infrastructure.Tests.runsettings
-          dotnet test tests/FaceOFFx.Cli.Tests/FaceOFFx.Cli.Tests.csproj --configuration Release --no-build -f net10.0 --settings tests/FaceOFFx.Cli.Tests.runsettings
-
-      - name: Pack CLI tool
-        run: dotnet pack src/FaceOFFx.Cli/FaceOFFx.Cli.csproj --configuration Release --no-build
+          for tfm in net8.0 net9.0 net10.0; do
+            for project in Core Infrastructure Cli Diagnostics.Cli; do
+              dotnet test "tests/FaceOFFx.$project.Tests/FaceOFFx.$project.Tests.csproj" --configuration Release --no-build -f "$tfm"
+            done
+            dotnet test tests/CoreJ2K.FaceOFFx.Tests/CoreJ2K.FaceOFFx.Tests.csproj --configuration Release --no-build -f "$tfm"
+          done
 
       - name: Pack library
-        run: dotnet pack src/FaceOFFx/FaceOFFx.csproj --configuration Release --no-restore
+        run: |
+          dotnet pack src/FaceOFFx/FaceOFFx.csproj --configuration Release --no-build --output artifacts/release-packages
+          python scripts/verify_package.py artifacts/release-packages --version "$(dotnet msbuild src/FaceOFFx/FaceOFFx.csproj -getProperty:Version)"
+
+      - name: Verify package consumers
+        run: |
+          for tfm in net8.0 net9.0 net10.0; do
+            dotnet run --project scripts/PackageSmoke --configuration Release --framework "$tfm" -p:FaceOffxPackageSource="$GITHUB_WORKSPACE/artifacts/release-packages" -p:RestorePackagesPath="$RUNNER_TEMP/faceoffx-consumer-packages" -- tests/test-images/people/johnson/source.jpg
+          done
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nuget-packages
-          path: |
-            ./artifacts/packages/*.nupkg
-            ./src/FaceOFFx.Cli/nupkg/*.nupkg
+          path: ./artifacts/release-packages/FaceOFFx.*.nupkg
+
+      - name: Validate release tag
+        if: inputs.publish
+        run: |
+          version="$(dotnet msbuild src/FaceOFFx/FaceOFFx.csproj -getProperty:Version)"
+          test "$GITHUB_REF" = "refs/tags/v$version"
+
+      - name: NuGet login
+        if: inputs.publish && startsWith(github.ref, 'refs/tags/v')
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        id: login
+        with:
+          user: mistial-dev
 
       - name: Publish to NuGet
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: inputs.publish && startsWith(github.ref, 'refs/tags/v')
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
-          dotnet nuget push ./artifacts/packages/*.nupkg \
+          version="$(dotnet msbuild src/FaceOFFx/FaceOFFx.csproj -getProperty:Version)"
+          test "$GITHUB_REF_NAME" = "v$version"
+          dotnet nuget push "./artifacts/release-packages/FaceOFFx.$version.nupkg" \
             --source https://api.nuget.org/v3/index.json \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
-            --skip-duplicate
-          dotnet nuget push ./src/FaceOFFx.Cli/nupkg/*.nupkg \
-            --source https://api.nuget.org/v3/index.json \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --api-key "$NUGET_API_KEY" \
             --skip-duplicate

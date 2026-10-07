@@ -34,88 +34,49 @@ jobs:
       - name: Build
         run: dotnet build FaceOFFx.sln --configuration Release --no-restore -warnaserror
 
-      - name: Pack all projects
+      - name: Pack the FaceOFFx library
         run: |
-          dotnet pack src/FaceOFFx.Cli/FaceOFFx.Cli.csproj --configuration Release --no-build
-          dotnet pack src/FaceOFFx/FaceOFFx.csproj --configuration Release --no-restore
+          version="$(dotnet msbuild src/FaceOFFx/FaceOFFx.csproj -getProperty:Version)"
+          test "$GITHUB_REF_NAME" = "v$version"
+          dotnet pack src/FaceOFFx/FaceOFFx.csproj --configuration Release --no-build --output artifacts/release-packages
+          python scripts/verify_package.py artifacts/release-packages --version "$version"
 
-      - name: Generate and attach SBOM with ML components
+      - name: Verify release tests
         run: |
-          # Install required tools
-          dotnet tool install --global CycloneDX
-          sudo apt-get update && sudo apt-get install -y jq
+          for project in Core Infrastructure Cli Diagnostics.Cli; do
+            dotnet test "tests/FaceOFFx.$project.Tests/FaceOFFx.$project.Tests.csproj" --configuration Release --no-build -f net10.0
+          done
+          dotnet test tests/CoreJ2K.FaceOFFx.Tests/CoreJ2K.FaceOFFx.Tests.csproj --configuration Release --no-build -f net10.0
 
-          # Generate base SBOM from solution file to include all dependencies
-          ~/.dotnet/tools/dotnet-CycloneDX FaceOFFx.sln -o ./artifacts -j --filename sbom
+      - name: Generate library SBOM with vendored codec and models
+        run: |
+          dotnet tool install --global CycloneDX --version 5.4.0
+          version="$(dotnet msbuild src/FaceOFFx/FaceOFFx.csproj -getProperty:Version)"
+          dotnet CycloneDX src/FaceOFFx/FaceOFFx.csproj \
+            --framework net8.0 \
+            --recursive \
+            --include-project-references \
+            --disable-package-restore \
+            --base-intermediate-output-path artifacts/obj \
+            --disable-github-licenses \
+            --set-name FaceOFFx \
+            --set-version "$version" \
+            --set-type Library \
+            --output artifacts \
+            --filename sbom-raw.json \
+            --output-format Json
+          python3 scripts/merge_release_sbom.py artifacts/sbom-raw.json artifacts/sbom.json
 
-          # The tool creates 'sbom' file (without extension) in the artifacts directory
-          # This file contains all NuGet dependencies. Now add ONNX models as ML components using jq
-          jq '.components += [
-            {
-              "type": "machine-learning-model",
-              "bom-ref": "onnx-model/FaceDetector.onnx",
-              "name": "RetinaFace Face Detection Model",
-              "version": "1.0.0",
-              "description": "RetinaFace face detection model for identifying faces in images",
-              "publisher": "FaceOFFx Project",
-              "hashes": [{
-                "alg": "SHA-256",
-                "content": "'"$(sha256sum src/FaceOFFx.Models/Resources/FaceDetector.onnx | cut -d' ' -f1)"'"
-              }],
-              "properties": [
-                {"name": "model:framework", "value": "ONNX"},
-                {"name": "model:architecture", "value": "RetinaFace"},
-                {"name": "model:task", "value": "face-detection"},
-                {"name": "model:input_shape", "value": "[1, 3, 640, 640]"},
-                {"name": "model:input_type", "value": "image"},
-                {"name": "model:output_type", "value": "object_detection"},
-                {"name": "model:file_size_bytes", "value": "109458296"},
-                {"name": "model:file_path", "value": "src/FaceOFFx.Models/Resources/FaceDetector.onnx"}
-              ],
-              "externalReferences": [{
-                "type": "distribution",
-                "url": "https://github.com/discipleofhamilton/RetinaFace"
-              }]
-            },
-            {
-              "type": "machine-learning-model",
-              "bom-ref": "onnx-model/landmarks_68_pfld.onnx",
-              "name": "PFLD 68-Point Facial Landmark Detection Model",
-              "version": "1.0.0",
-              "description": "68-point facial landmark detection using PFLD (Practical Facial Landmark Detector)",
-              "publisher": "FaceOFFx Project",
-              "hashes": [{
-                "alg": "SHA-256",
-                "content": "'"$(sha256sum src/FaceOFFx.Models/Resources/landmarks_68_pfld.onnx | cut -d' ' -f1)"'"
-              }],
-              "properties": [
-                {"name": "model:framework", "value": "ONNX"},
-                {"name": "model:architecture", "value": "PFLD"},
-                {"name": "model:task", "value": "facial-landmark-detection"},
-                {"name": "model:input_shape", "value": "[1, 3, 112, 112]"},
-                {"name": "model:input_type", "value": "image"},
-                {"name": "model:output_type", "value": "landmarks"},
-                {"name": "model:output_shape", "value": "[1, 136]"},
-                {"name": "model:landmarks_count", "value": "68"},
-                {"name": "model:file_size_bytes", "value": "2987921"},
-                {"name": "model:file_path", "value": "src/FaceOFFx.Models/Resources/landmarks_68_pfld.onnx"}
-              ]
-            }
-          ]' ./artifacts/sbom > ./artifacts/sbom-with-ml.json
-
-          # Move the updated SBOM back
-          mv ./artifacts/sbom-with-ml.json ./artifacts/sbom.json
-
-          # Also generate Microsoft SBOM for compatibility
+          # Preserve the SPDX compatibility artifact.
           dotnet tool install --global Microsoft.Sbom.DotNetTool
-          ~/.dotnet/tools/sbom-tool generate -b ./artifacts -bc . -pn FaceOFFx -pv "${GITHUB_REF#refs/tags/v}" -ps mistial-dev -nsb https://github.com/mistial-dev/FaceOFFx
+          ~/.dotnet/tools/sbom-tool generate -b ./artifacts -bc . -pn FaceOFFx -pv "$version" -ps mistial-dev -nsb https://github.com/mistial-dev/FaceOFFx
 
       - name: Create Release
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8
         with:
           files: |
-            ./artifacts/packages/*.nupkg
-            ./src/FaceOFFx.Cli/nupkg/*.nupkg
+            ./artifacts/release-packages/FaceOFFx.*.nupkg
+            ./artifacts/sbom.json
             ./artifacts/_manifest/spdx_2.2/*.json
           generate_release_notes: true
           draft: false

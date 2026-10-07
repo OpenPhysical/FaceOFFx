@@ -1,53 +1,40 @@
-# GitHub Actions Workflows
+# GitHub Actions workflows
 
-This directory contains the CI/CD workflows for FaceOFFx.
+## CI (`ci.yml`)
 
-## Workflows
+Pushes to master/develop and pull requests to master build and test on Ubuntu,
+Windows and macOS across .NET 8, 9 and 10. A separate job verifies the bundled
+NuGet package, package consumers and CLI JSON output.
 
-### CI Build (`ci.yml`)
+## Trusted publishing (`publish.yml`)
 
-- **Triggers**: Push to main/develop branches, PRs to main
-- **Purpose**: Build and test on multiple platforms (Ubuntu, Windows, macOS)
-- **Actions**:
-  - Build solution in Release mode
-  - Run all tests
-  - Pack NuGet packages (Ubuntu only)
-  - Test tool installation (Ubuntu only)
+Manual dispatch builds, tests, packs and smoke-tests one FaceOFFx package.
+Publication requires `publish=true` and an exact `v<Version>` tag.
+NuGet/login exchanges GitHub OIDC for a short-lived key immediately before push.
+No long-lived NuGet API key is used.
 
-### Publish NuGet (`publish.yml`)
+NuGet policy settings:
 
-- **Triggers**: Push of version tags (v*), manual dispatch
-- **Purpose**: Publish packages to NuGet.org
-- **Actions**:
-  - Build and test
-  - Pack all projects
-  - Upload artifacts
-  - Publish to NuGet.org (requires NUGET_API_KEY secret)
+- Package owner and login user: `mistial-dev`
+- Repository owner: `mistial-dev`
+- Repository: `FaceOFFx`
+- Workflow: `publish.yml`
+- Environment: `nuget-production`
+- Scope: push only new package versions
+- Package pattern: `FaceOFFx` (no wildcard)
 
-### Create Release (`release.yml`)
+Configure the GitHub `nuget-production` environment to allow version tags only.
+Create and push a signed version tag, then dispatch:
 
-- **Triggers**: Push of version tags (v*)
-- **Purpose**: Create GitHub releases with packages
-- **Actions**:
-  - Build and pack all projects
-  - Generate SBOM (Software Bill of Materials)
-  - Create GitHub release with artifacts
-
-## Required Secrets
-
-- `NUGET_API_KEY`: API key for publishing to NuGet.org
-  - Get from: <https://www.nuget.org/account/apikeys>
-  - Set in: Settings → Secrets and variables → Actions
-
-## Versioning
-
-Tag format: `v1.0.0`
-
-To create a new release:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
+```sh
+gh workflow run publish.yml --ref v4.0.0 -f publish=true
 ```
 
-This will trigger both the publish and release workflows.
+A dispatch without publication validates artifacts without logging into NuGet.
+
+## GitHub release (`release.yml`)
+
+Version-tag pushes create a release with the verified library package and merged
+CycloneDX/SPDX inventories. NuGet publication is dispatched separately after
+release validation. Older NuGet versions can be unlisted through Manage Packages;
+unlisting preserves existing consumers that request an exact version.

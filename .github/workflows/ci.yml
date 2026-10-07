@@ -2,9 +2,9 @@ name: CI Build
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, develop]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: read
@@ -41,13 +41,15 @@ jobs:
         run: dotnet restore FaceOFFx.sln
 
       - name: Build
-        run: dotnet build FaceOFFx.sln --configuration Release --no-restore -f ${{ matrix.tfm }} -warnaserror
+        run: dotnet build FaceOFFx.sln --configuration Release --no-restore -warnaserror
 
       - name: Test
         run: |
           dotnet test tests/FaceOFFx.Core.Tests/FaceOFFx.Core.Tests.csproj --configuration Release --no-build -f ${{ matrix.tfm }} --settings tests/FaceOFFx.Core.Tests.runsettings --logger "trx;LogFileName=core-${{ matrix.tfm }}.trx"
           dotnet test tests/FaceOFFx.Infrastructure.Tests/FaceOFFx.Infrastructure.Tests.csproj --configuration Release --no-build -f ${{ matrix.tfm }} --settings tests/FaceOFFx.Infrastructure.Tests.runsettings --logger "trx;LogFileName=infra-${{ matrix.tfm }}.trx"
           dotnet test tests/FaceOFFx.Cli.Tests/FaceOFFx.Cli.Tests.csproj --configuration Release --no-build -f ${{ matrix.tfm }} --settings tests/FaceOFFx.Cli.Tests.runsettings --logger "trx;LogFileName=cli-${{ matrix.tfm }}.trx"
+          dotnet test tests/FaceOFFx.Diagnostics.Cli.Tests/FaceOFFx.Diagnostics.Cli.Tests.csproj --configuration Release --no-build -f ${{ matrix.tfm }} --logger "trx;LogFileName=diagnostics-${{ matrix.tfm }}.trx"
+          dotnet test tests/CoreJ2K.FaceOFFx.Tests/CoreJ2K.FaceOFFx.Tests.csproj --configuration Release --no-build -f ${{ matrix.tfm }} --logger "trx;LogFileName=codec-${{ matrix.tfm }}.trx"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -68,7 +70,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
           global-json-file: global.json
 
       - name: Restore dependencies
@@ -77,14 +82,20 @@ jobs:
       - name: Build
         run: dotnet build FaceOFFx.sln --configuration Release --no-restore -warnaserror
 
-      - name: Pack packages
+      - name: Pack the library
         run: |
-          dotnet pack src/FaceOFFx/FaceOFFx.csproj --configuration Release --no-restore
-          dotnet pack src/FaceOFFx.Cli/FaceOFFx.Cli.csproj --configuration Release --no-build
+          dotnet pack src/FaceOFFx/FaceOFFx.csproj --configuration Release --no-build --output artifacts/release-packages
+          python scripts/verify_package.py artifacts/release-packages --version "$(dotnet msbuild src/FaceOFFx/FaceOFFx.csproj -getProperty:Version)"
+          python -m unittest discover -s scripts -p test_verify_package.py
 
-      - name: Install and smoke test tool
+      - name: Smoke test package consumers
         run: |
-          dotnet tool install --global --add-source ./src/FaceOFFx.Cli/nupkg FaceOFFx.Cli
+          for tfm in net8.0 net9.0 net10.0; do
+            dotnet run --project scripts/PackageSmoke --configuration Release --framework "$tfm" -p:FaceOffxPackageSource="$GITHUB_WORKSPACE/artifacts/release-packages" -p:RestorePackagesPath="$RUNNER_TEMP/faceoffx-consumer-packages" -- tests/test-images/people/johnson/source.jpg
+          done
+
+      - name: Smoke test the CLI shim
+        run: |
           mkdir -p "$RUNNER_TEMP/faceoffx-smoke"
-          ~/.dotnet/tools/faceoffx piv tests/test-images/people/generic-guy/source.png --variant digital --output-dir "$RUNNER_TEMP/faceoffx-smoke" --json > "$RUNNER_TEMP/faceoffx-smoke/result.json"
+          dotnet run --project src/FaceOFFx.Cli --configuration Release --no-build -f net10.0 -- tests/test-images/people/johnson/source.jpg -o "$RUNNER_TEMP/faceoffx-smoke/portrait.jp2" --json > "$RUNNER_TEMP/faceoffx-smoke/result.json"
           python -m json.tool "$RUNNER_TEMP/faceoffx-smoke/result.json" > /dev/null
