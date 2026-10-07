@@ -19,7 +19,7 @@ env:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    environment: nuget-production
+    environment: production
     permissions:
       contents: read
       id-token: write

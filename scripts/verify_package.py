@@ -46,7 +46,7 @@ def verify(path, version):
         readme = archive.read("README.md").decode("utf-8")
         if re.search(r'''(?:src|href)=["']docs/samples/|\]\(docs/samples/''', readme):
             raise ValueError("NuGet gallery links require absolute release URLs.")
-        if "raw.githubusercontent.com/mistial-dev/FaceOFFx/" in readme and f"/v{version}/docs/samples/" not in readme:
+        if "raw.githubusercontent.com/OpenPhysical/FaceOFFx/" in readme and f"/v{version}/docs/samples/" not in readme:
             raise ValueError("NuGet gallery version differs from the package.")
         for notice in ("LICENSE", "COPYRIGHT-JJ2000-5.1", "provenance.json"):
             expected = "licenses/CoreJ2K.FaceOFFx/"+notice

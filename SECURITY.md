@@ -107,7 +107,7 @@ FaceOFFx includes several security features:
 
 For any security-related questions that don't require immediate attention, you can also:
 
-- Open a [GitHub Discussion](https://github.com/mistial-dev/FaceOFFx/discussions) with the "security" tag
+- Open a [GitHub Discussion](https://github.com/OpenPhysical/FaceOFFx/discussions) with the "security" tag
 - Check our [Contributing Guidelines](docs/CONTRIBUTING.md) for general questions
 
 Thank you for helping keep FaceOFFx and its users safe!

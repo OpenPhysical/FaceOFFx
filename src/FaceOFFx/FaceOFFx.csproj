@@ -81,7 +81,7 @@
       <_PackageReadmePath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'package-readme/README.md'))</_PackageReadmePath>
     </PropertyGroup>
     <CreateTaggedPackageReadme RepositoryReadme="$(_RepositoryReadmePath)" PackageReadmePath="$(_PackageReadmePath)"
-                              GalleryBaseUrl="https://raw.githubusercontent.com/mistial-dev/FaceOFFx/v$(Version)/docs/samples/" />
+                              GalleryBaseUrl="https://raw.githubusercontent.com/OpenPhysical/FaceOFFx/v$(Version)/docs/samples/" />
     <ItemGroup>
       <None Remove="$(_RepositoryReadmePath)" />
       <None Include="$(_PackageReadmePath)" Pack="true" PackagePath="README.md" />

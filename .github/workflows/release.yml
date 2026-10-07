@@ -69,7 +69,7 @@ jobs:
 
           # Preserve the SPDX compatibility artifact.
           dotnet tool install --global Microsoft.Sbom.DotNetTool
-          ~/.dotnet/tools/sbom-tool generate -b ./artifacts -bc . -pn FaceOFFx -pv "$version" -ps mistial-dev -nsb https://github.com/mistial-dev/FaceOFFx
+          ~/.dotnet/tools/sbom-tool generate -b ./artifacts -bc . -pn FaceOFFx -pv "$version" -ps OpenPhysical -nsb https://github.com/OpenPhysical/FaceOFFx
 
       - name: Create Release
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8

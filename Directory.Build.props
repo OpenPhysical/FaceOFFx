@@ -20,8 +20,8 @@
     <Product>FaceOFFx</Product>
     <Copyright>Copyright © 2025 FaceOFFx Contributors</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/mistial-dev/FaceOFFx</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/mistial-dev/FaceOFFx</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/OpenPhysical/FaceOFFx</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/OpenPhysical/FaceOFFx</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>piv;face-recognition;face-detection;facial-landmarks;jpeg2000;fips201;onnx;computer-vision</PackageTags>
     <PackageIcon>icon.png</PackageIcon>

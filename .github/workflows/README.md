@@ -15,15 +15,18 @@ No long-lived NuGet API key is used.
 
 NuGet policy settings:
 
-- Package owner and login user: `mistial-dev`
-- Repository owner: `mistial-dev`
+- Package owner: `OpenPhysical`; login user: `mistial-dev`
+- Repository owner: `OpenPhysical`
 - Repository: `FaceOFFx`
 - Workflow: `publish.yml`
-- Environment: `nuget-production`
-- Scope: push only new package versions
-- Package pattern: `FaceOFFx` (no wildcard)
+- Environment: `production`
+- Scopes: push new packages/versions and unlist/relist versions
+- Package patterns: `FaceOFFx` and `FaceOFFx.Cli` (no wildcard)
 
-Configure the GitHub `nuget-production` environment to allow version tags only.
+The v4 workflow publishes only the bundled `FaceOFFx` library; `FaceOFFx.Cli`
+is retained in the policy for managing historical tool versions.
+
+Configure the GitHub `production` environment to allow version tags only.
 Create and push a signed version tag, then dispatch:
 
 ```sh

@@ -323,8 +323,8 @@ This project is derived from the excellent FaceONNX library and incorporates:
 
 ### Support
 
-- GitHub Issues: <https://github.com/mistial-dev/FaceOFFx/issues>
-- Documentation: <https://github.com/mistial-dev/FaceOFFx/wiki>
+- GitHub Issues: <https://github.com/OpenPhysical/FaceOFFx/issues>
+- Documentation: <https://github.com/OpenPhysical/FaceOFFx/wiki>
 - Samples: See docs/samples/ directory
 
 ### License

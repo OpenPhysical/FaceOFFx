@@ -6,7 +6,7 @@ contributing to the project.
 ## Getting Started
 
 1. Fork the repository on GitHub
-2. Clone your fork locally: `git clone https://github.com/mistial-dev/FaceOFFx.git`
+2. Clone your fork locally: `git clone https://github.com/OpenPhysical/FaceOFFx.git`
 3. Create a new branch for your feature: `git checkout -b feature/your-feature-name`
 4. Make your changes following the guidelines below
 5. Submit a pull request
@@ -23,7 +23,7 @@ contributing to the project.
 
 ```bash
 # Clone the repository
-git clone https://github.com/mistial-dev/FaceOFFx.git
+git clone https://github.com/OpenPhysical/FaceOFFx.git
 cd FaceOFFx
 
 # Build the solution

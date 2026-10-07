@@ -106,5 +106,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JPEG 2000 with Region of Interest encoding
 - 68-point facial landmark standard
 
-[2.1.0]: https://github.com/mistial-dev/FaceOFFx/compare/v2.0.0...v2.1.0
-[2.0.0]: https://github.com/mistial-dev/FaceOFFx/releases/tag/v2.0.0
+[2.1.0]: https://github.com/OpenPhysical/FaceOFFx/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/OpenPhysical/FaceOFFx/releases/tag/v2.0.0
