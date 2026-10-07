@@ -29,7 +29,13 @@ public sealed record PortraitSpecification(
     float MaximumRotationDegrees,
     int MinimumInterPupillaryDistance,
     int MinimumTopMargin,
-    int MinimumSideMargin);
+    int MinimumSideMargin)
+{
+    /// <summary>Apply PIV native-resolution, full-head geometry, and source-support checks.</summary>
+    public bool EnforcePivGeometry { get; init; }
+    /// <summary>Defines the face-centered protected region before encoding or byte measurement.</summary>
+    public PivFaceRegion FaceRegion { get; init; } = PivFaceRegion.LandmarkFace;
+}
 
 /// <summary>
 /// Base type for profile encoding goals.
@@ -46,7 +52,11 @@ public sealed record ProfileFileSizeTarget(
     string Id,
     string DisplayName,
     int MaxBytes,
-    string Description);
+    string Description)
+{
+    /// <summary>Issuer and container reservations used to derive this JP2 allowance.</summary>
+    public PivCardImageBudget? CardBudget { get; init; }
+}
 
 /// <summary>
 /// Hard-cap encoding goal.
@@ -60,21 +70,10 @@ public sealed record MaxFileSizeGoal(int MaxBytes) : EncodingGoal;
 [PublicAPI]
 public sealed record NamedFileSizeGoal(ProfileFileSizeTarget Target) : EncodingGoal;
 
-/// <summary>
-/// Single-rate encoding goal.
-/// </summary>
-[PublicAPI]
-public sealed record ExplicitRateGoal(float BitsPerPixel) : EncodingGoal;
-
-/// <summary>
-/// Immutable encoding requirements for a profile.
-/// </summary>
+/// <summary>Fixed balanced JP2 media type and complete-image byte target.</summary>
 [PublicAPI]
 public sealed record EncodingSpecification(
     string MimeType,
-    bool EnableRoi,
-    int RoiStartLevel,
-    bool RoiAlign,
     EncodingGoal Goal);
 
 /// <summary>
@@ -88,6 +87,16 @@ public sealed record ProfileSpecification(
     PortraitSpecification Portrait,
     EncodingSpecification Encoding)
 {
+    /// <summary>Derives a PIV image allowance from the configured card and issuer reservations.</summary>
+    public Result<ProfileSpecification, PipelineError> WithCardImageBudget(PivCardImageBudget budget)
+    {
+        ArgumentNullException.ThrowIfNull(budget);
+        return string.Equals(Id, "piv", StringComparison.OrdinalIgnoreCase)
+            ? WithFileSizeTarget(new ProfileFileSizeTarget("piv", "issuer-budget", "Issuer Card Image Budget",
+                budget.MaximumJpeg2000Bytes, "Card capacity and issuer signature reservation.") { CardBudget = budget })
+            : Result.Failure<ProfileSpecification, PipelineError>(new ConfigurationError("An issuer card-image budget requires the PIV profile.", Id));
+    }
+
     /// <summary>
     /// Returns this profile with the supplied named file-size target applied.
     /// </summary>
@@ -113,15 +122,21 @@ public static class ProfileFileSizeTargets
         "preferred",
         "Preferred PIV Card Image",
         22_000,
-        "Higher-quality PIV card image target for systems with larger facial-image containers.");
+        "Higher-quality PIV card image target for systems with larger facial-image containers.")
+    {
+        CardBudget = new PivCardImageBudget(maximumBiometricValueBytes: 22_884, maximumObjectBytes: 22_890)
+    };
 
     /// <summary>Minimum-capacity PIV card image target with room for wrapping overhead.</summary>
     public static ProfileFileSizeTarget PivMinimum { get; } = new(
         "piv",
         "minimum",
         "Minimum PIV Card Image",
-        12_000,
-        "Minimum-capacity PIV card image target that leaves room below the guaranteed container size for CBEFF, signing, and wrapping overhead.");
+        new PivCardImageBudget().MaximumJpeg2000Bytes,
+        "Minimum-capacity target reserving FAC, CBEFF and 750 issuer-signature bytes within the 12,704-byte biometric value and 12,710-byte object.")
+    {
+        CardBudget = new PivCardImageBudget()
+    };
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, ProfileFileSizeTarget>> Targets =
         new Dictionary<string, IReadOnlyDictionary<string, ProfileFileSizeTarget>>(StringComparer.OrdinalIgnoreCase)
@@ -171,69 +186,24 @@ public static class ProfileSpecifications
         MinimumFaceSizePixels: 50);
 
     private static readonly PortraitSpecification CardPortrait = new(
-        new ImageDimensions(420, 560),
-        new[] { 235f / 420f, 225f / 420f, 215f / 420f, 210f / 420f },
+        new ImageDimensions(480, 640),
+        new[] { 225f / 420f, 215f / 420f, 235f / 420f, 210f / 420f },
         MinimumHeadWidthRatio: 210f / 420f,
         MaximumHeadWidthRatio: 240f / 420f,
         TargetEyeLineFromTopRatio: 0.40f,
-        MaximumRotationDegrees: 15f,
+        MaximumRotationDegrees: 5f,
         MinimumInterPupillaryDistance: 90,
-        MinimumTopMargin: 20,
-        MinimumSideMargin: 10);
+        MinimumTopMargin: 24,
+        MinimumSideMargin: 12)
+    { EnforcePivGeometry = true, FaceRegion = PivFaceRegion.LandmarkFace };
 
-    private static readonly PortraitSpecification StandardPortrait420x560 = new(
-        new ImageDimensions(420, 560),
-        new[] { 0.70f },
-        MinimumHeadWidthRatio: 0.50f,
-        MaximumHeadWidthRatio: 0.75f,
-        TargetEyeLineFromTopRatio: 0.45f,
-        MaximumRotationDegrees: 15f,
-        MinimumInterPupillaryDistance: 90,
-        MinimumTopMargin: 0,
-        MinimumSideMargin: 0);
-
-    private static readonly PortraitSpecification StandardPortrait413x531 = new(
-        new ImageDimensions(413, 531),
-        new[] { 0.70f },
-        MinimumHeadWidthRatio: 0.50f,
-        MaximumHeadWidthRatio: 0.75f,
-        TargetEyeLineFromTopRatio: 0.45f,
-        MaximumRotationDegrees: 15f,
-        MinimumInterPupillaryDistance: 90,
-        MinimumTopMargin: 0,
-        MinimumSideMargin: 0);
-
-    /// <summary>Federal PIV card profile.</summary>
+    /// <summary>Federal PIV card candidate using balanced ROI allocation and explicit regional verification.</summary>
     public static ProfileSpecification Piv { get; } = new(
         "piv",
         "PIV",
         DefaultSingleFaceSelection,
         CardPortrait,
-        new EncodingSpecification("image/jp2", true, 3, false, new NamedFileSizeGoal(ProfileFileSizeTargets.PivPreferred)));
-
-    /// <summary>TWIC card profile.</summary>
-    public static ProfileSpecification Twic { get; } = new(
-        "twic",
-        "TWIC",
-        DefaultSingleFaceSelection,
-        CardPortrait,
-        new EncodingSpecification("image/jp2", true, 3, false, new MaxFileSizeGoal(14000)));
-
-    /// <summary>Common Access Card profile.</summary>
-    public static ProfileSpecification Cac { get; } = new(
-        "cac",
-        "CAC",
-        DefaultSingleFaceSelection,
-        StandardPortrait420x560,
-        new EncodingSpecification("image/jp2", true, 3, false, new ExplicitRateGoal(0.7f)));
-
-    /// <summary>ICAO portrait profile.</summary>
-    public static ProfileSpecification Icao { get; } = new(
-        "icao",
-        "ICAO",
-        DefaultSingleFaceSelection with { RequireSingleFace = false },
-        StandardPortrait413x531,
-        new EncodingSpecification("image/jp2", false, 2, false, new ExplicitRateGoal(2.0f)));
+        new EncodingSpecification("image/jp2", new NamedFileSizeGoal(ProfileFileSizeTargets.PivMinimum)));
 }
 
 /// <summary>
@@ -257,7 +227,13 @@ public sealed record PortraitPlan(
     float AcceptedHeadWidthRatio,
     float AcceptedEyeLineFromTopRatio,
     RenderTransformMap TransformMap,
-    IReadOnlyList<CandidateTrace> CandidateTraces);
+    IReadOnlyList<CandidateTrace> CandidateTraces)
+{
+    /// <summary>Source/output PIV candidate measurements and remaining verification requirements.</summary>
+    public PivGeometryEvidence? GeometryEvidence { get; init; }
+    /// <summary>Fixed face-region definition selected for this source-supported crop.</summary>
+    public PivFaceRegion FaceRegion { get; init; } = PivFaceRegion.LandmarkFace;
+}
 
 /// <summary>
 /// Rendered portrait plus transformed landmarks and ROI.
@@ -278,7 +254,15 @@ public sealed record EncodingDecision(
     int FileSize,
     Maybe<int> TargetFileSize,
     IReadOnlyList<float> AttemptedRates,
-    Maybe<string> TargetFileSizeId = default);
+    Maybe<string> TargetFileSizeId = default)
+{
+    /// <summary>Measured allocation and protected-payload counters.</summary>
+    public Jpeg2000EncodingResult? CodecEvidence { get; init; }
+    /// <summary>Configured issuer and container reservations.</summary>
+    public PivCardImageBudget? CardBudget { get; init; }
+    /// <summary>Regional compression arithmetic and its external attribution requirement for a PIV card candidate.</summary>
+    public RegionalCompressionVerification? RegionalCompressionVerification { get; init; }
+}
 
 /// <summary>
 /// Final encoded profile artifact.
@@ -293,4 +277,12 @@ public sealed record ProfileEncodingResult(
     float RotationDegrees,
     float FaceConfidence,
     EncodingDecision Encoding,
-    IReadOnlyList<CandidateTrace> CandidateTraces);
+    IReadOnlyList<CandidateTrace> CandidateTraces)
+{
+    /// <summary>Recorded source color interpretation or profile conversion to sRGB.</summary>
+    public PivSourceColorEvidence? SourceColorEvidence { get; init; }
+    /// <summary>Recorded PIV candidate geometry and remaining verification requirements.</summary>
+    public PivGeometryEvidence? GeometryEvidence { get; init; }
+    /// <summary>Defined facial-mask construction and remaining anatomical coverage review.</summary>
+    public FacialRoiCoverage? RoiCoverage { get; init; }
+}

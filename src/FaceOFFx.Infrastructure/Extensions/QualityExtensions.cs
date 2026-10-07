@@ -195,6 +195,9 @@ public static class QualityExtensions
         AssessmentMode mode = AssessmentMode.InputValidation)
     {
         logger ??= NullLogger.Instance;
+        if (!string.Equals(standardName, "PIV", StringComparison.OrdinalIgnoreCase))
+            return Result.Failure<ComplianceAssessment, PipelineError>(
+                new ConfigurationError("PIV is the supported quality assessment profile.", nameof(standardName)));
         
         try
         {
@@ -243,13 +246,7 @@ public static class QualityExtensions
 
                 if (mode == AssessmentMode.OutputValidation)
                 {
-                    var profile = standardName.ToUpperInvariant() switch
-                    {
-                        "TWIC" => ProfileSpecifications.Twic,
-                        "ICAO" => ProfileSpecifications.Icao,
-                        "CAC" => ProfileSpecifications.Cac,
-                        _ => ProfileSpecifications.Piv,
-                    };
+                    var profile = ProfileSpecifications.Piv;
                     var profileEncoder = new ProfileEncoder(
                         new FaceGeometryPipeline(
                             new SharedFacialProcessingServiceFactory(services),

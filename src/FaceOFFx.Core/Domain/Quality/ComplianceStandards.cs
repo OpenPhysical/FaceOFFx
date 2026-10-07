@@ -66,7 +66,7 @@ public record DualComplianceRules(
 }
 
 /// <summary>
-/// Registry of compliance standards with specific thresholds
+/// PIV landmark-quality scoring thresholds. Anatomical and acquisition verification use separate evidence.
 /// </summary>
 [PublicAPI]
 public static class ComplianceStandards
@@ -86,43 +86,19 @@ public static class ComplianceStandards
                 MaxHeadSizePercent: 85f,
                 MinIpdPixels: 60f,           // Wider range for varied input scales
                 MaxIpdPixels: 200f,
-                ExpectedDimensions: new ImageDimensions(420, 560)
+                ExpectedDimensions: new ImageDimensions(480, 640)
             ),
             OutputValidation: new ComplianceRules(
                 Name: "PIV-Output",
-                MinSymmetryPercent: 60f,     // Strict PIV requirements
-                MinSharpnessPercent: 25f,    // Strict PIV requirements
-                MinHeadSizePercent: 35f,     // Official PIV range
+                MinSymmetryPercent: 60f,     // Engineering quality thresholds
+                MinSharpnessPercent: 25f,
+                MinHeadSizePercent: 35f,
                 MaxHeadSizePercent: 80f,
-                MinIpdPixels: 90f,           // Official PIV range
-                MaxIpdPixels: 120f,
-                ExpectedDimensions: new ImageDimensions(420, 560)
-            ),
-            ExpectedDimensions: new ImageDimensions(420, 560)
-        ),
-        ["TWIC"] = new DualComplianceRules(
-            Name: "TWIC",
-            InputValidation: new ComplianceRules(
-                Name: "TWIC-Input",
-                MinSymmetryPercent: 45f,
-                MinSharpnessPercent: 20f,
-                MinHeadSizePercent: 30f,
-                MaxHeadSizePercent: 85f,
-                MinIpdPixels: 60f,
-                MaxIpdPixels: 200f,
-                ExpectedDimensions: new ImageDimensions(420, 560)
-            ),
-            OutputValidation: new ComplianceRules(
-                Name: "TWIC-Output",
-                MinSymmetryPercent: 65f,     // Stricter than PIV
-                MinSharpnessPercent: 55f,    // Stricter than PIV
-                MinHeadSizePercent: 50f,
-                MaxHeadSizePercent: 75f,
                 MinIpdPixels: 90f,
                 MaxIpdPixels: 120f,
-                ExpectedDimensions: new ImageDimensions(420, 560)
+                ExpectedDimensions: new ImageDimensions(480, 640)
             ),
-            ExpectedDimensions: new ImageDimensions(420, 560)
+            ExpectedDimensions: new ImageDimensions(480, 640)
         )
     };
 
@@ -139,37 +115,7 @@ public static class ComplianceStandards
             MaxHeadSizePercent: 80f,
             MinIpdPixels: 90f,
             MaxIpdPixels: 120f,
-            ExpectedDimensions: new ImageDimensions(420, 560)
-        ),
-        ["TWIC"] = new ComplianceRules(
-            Name: "TWIC",
-            MinSymmetryPercent: 65f,    // Stricter than PIV
-            MinSharpnessPercent: 55f,   // Stricter than PIV
-            MinHeadSizePercent: 50f,
-            MaxHeadSizePercent: 75f,
-            MinIpdPixels: 90f,
-            MaxIpdPixels: 120f,
-            ExpectedDimensions: new ImageDimensions(420, 560)
-        ),
-        ["ICAO"] = new ComplianceRules(
-            Name: "ICAO",
-            MinSymmetryPercent: 70f,    // Strictest for passports
-            MinSharpnessPercent: 60f,   // Strictest for passports
-            MinHeadSizePercent: 50f,
-            MaxHeadSizePercent: 75f,
-            MinIpdPixels: 90f,
-            MaxIpdPixels: 120f,
-            ExpectedDimensions: new ImageDimensions(413, 531)  // Different size for passports
-        ),
-        ["CAC"] = new ComplianceRules(
-            Name: "CAC",
-            MinSymmetryPercent: 60f,    // Same as PIV for military cards
-            MinSharpnessPercent: 50f,
-            MinHeadSizePercent: 50f,
-            MaxHeadSizePercent: 75f,
-            MinIpdPixels: 90f,
-            MaxIpdPixels: 120f,
-            ExpectedDimensions: new ImageDimensions(420, 560)
+            ExpectedDimensions: new ImageDimensions(480, 640)
         )
     };
 

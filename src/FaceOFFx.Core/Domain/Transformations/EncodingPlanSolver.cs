@@ -8,116 +8,80 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace FaceOFFx.Core.Domain.Transformations;
 
-/// <summary>
-/// Solves profile encoding decisions against explicit profile goals.
-/// </summary>
+/// <summary>Encodes a fixed PIV face region using balanced allocation and a complete-JP2 ceiling.</summary>
 [PublicAPI]
 public static class EncodingPlanSolver
 {
-    /// <summary>
-    /// Encodes a rendered portrait according to the supplied profile encoding specification.
-    /// </summary>
+    /// <summary>Preserves hard-cap and payload reconciliation checks while recording regional measurements for review.</summary>
     public static Result<(byte[] ImageData, EncodingDecision Decision), PipelineError> Encode(
-        Image<Rgba32> image,
-        FacialRoiSet roiSet,
-        IJpeg2000Encoder encoder,
-        EncodingSpecification specification)
+        Image<Rgba32> image, FacialRoiSet roiSet, IJpeg2000Encoder encoder, EncodingSpecification specification)
     {
-        return specification.Goal switch
+        ArgumentNullException.ThrowIfNull(image);
+        ArgumentNullException.ThrowIfNull(roiSet);
+        ArgumentNullException.ThrowIfNull(encoder);
+        ArgumentNullException.ThrowIfNull(specification);
+        if (!string.Equals(specification.MimeType, "image/jp2", StringComparison.Ordinal))
+            return Failure("The fixed PIV encoder emits the image/jp2 media type.");
+
+        int maxBytes;
+        var targetId = Maybe<string>.None;
+        PivCardImageBudget? cardBudget = null;
+        switch (specification.Goal)
         {
-            MaxFileSizeGoal maxFileSizeGoal => EncodeForMaxFileSize(image, roiSet, encoder, specification, maxFileSizeGoal.MaxBytes, Maybe<string>.None),
-            NamedFileSizeGoal namedFileSizeGoal => EncodeForMaxFileSize(
-                image,
-                roiSet,
-                encoder,
-                specification,
-                namedFileSizeGoal.Target.MaxBytes,
-                Maybe<string>.From(namedFileSizeGoal.Target.Id)),
-            ExplicitRateGoal explicitRateGoal => EncodeForRate(image, roiSet, encoder, specification, explicitRateGoal),
-            _ => Result.Failure<(byte[] ImageData, EncodingDecision Decision), PipelineError>(
-                new ConfigurationError($"Unsupported encoding goal '{specification.Goal.GetType().Name}'."))
+            case MaxFileSizeGoal maximum:
+                maxBytes = maximum.MaxBytes;
+                break;
+            case NamedFileSizeGoal named when named.Target is not null:
+                cardBudget = named.Target.CardBudget;
+                maxBytes = cardBudget is null ? named.Target.MaxBytes :
+                    Math.Min(named.Target.MaxBytes, cardBudget.MaximumJpeg2000Bytes);
+                targetId = Maybe<string>.From(named.Target.Id);
+                break;
+            default:
+                return Failure("Supply a complete-JP2 byte target.");
+        }
+        if (maxBytes <= 0) return Failure("Supply a positive complete-JP2 byte target.");
+        if (roiSet.Mask is null || roiSet.PixelCount <= 0)
+            return Failure("The PIV candidate requires an anatomy-derived face mask.");
+
+        var encoded = encoder.Encode(image, roiSet, new Jpeg2000EncodingOptions { MaximumOutputBytes = maxBytes });
+        if (encoded.IsFailure)
+            return Result.Failure<(byte[] ImageData, EncodingDecision Decision), PipelineError>(encoded.Error);
+        var evidence = encoded.Value;
+        if (evidence.Data.Length > maxBytes)
+            return Failure($"Encoder output {evidence.Data.Length} exceeds the {maxBytes}-byte allowance.");
+        if (evidence.RoiPixelCount != roiSet.PixelCount)
+            return Failure("Encoder evidence must cover the complete PIV face mask.");
+        if (evidence.SharedPayloadAttribution is null || evidence.PayloadTelemetry is null)
+            return Failure("PIV encoding requires committed shared-payload attribution and complete-output telemetry.");
+        if (evidence.PayloadTelemetry.TotalOutputBytes != evidence.Data.Length ||
+            evidence.PayloadTelemetry.CodestreamBytes != evidence.CodestreamBytes ||
+            evidence.PayloadTelemetry.ContainerBytes != evidence.ContainerBytes)
+            return Failure("PIV payload evidence must reconcile with the actual complete JP2 output.");
+
+        RegionalCompressionVerification regional;
+        try
+        {
+            regional = RegionalCompressionVerification.MeasuredPiv(
+                roiSet.PixelCount, evidence.SharedPayloadAttribution, evidence.PayloadTelemetry);
+        }
+        catch (ArgumentException ex)
+        {
+            return Failure($"PIV regional evidence must match the complete face mask and committed payload. {ex.Message}");
+        }
+        // The ledger is an operational measurement convention. Its ratio is an issuer review input;
+        // allocation follows the fixed balanced recipe without a regional byte quota.
+        var effectiveRate = (float)(evidence.Data.Length * 8.0 / ((long)image.Width * image.Height));
+        var decision = new EncodingDecision(effectiveRate, evidence.Data.Length, Maybe<int>.From(maxBytes),
+            Array.Empty<float>(), targetId)
+        {
+            CodecEvidence = evidence,
+            CardBudget = cardBudget,
+            RegionalCompressionVerification = regional
         };
+        return Result.Success<(byte[] ImageData, EncodingDecision Decision), PipelineError>((evidence.Data, decision));
     }
 
-    private static Result<(byte[] ImageData, EncodingDecision Decision), PipelineError> EncodeForRate(
-        Image<Rgba32> image,
-        FacialRoiSet roiSet,
-        IJpeg2000Encoder encoder,
-        EncodingSpecification specification,
-        ExplicitRateGoal goal)
-    {
-        using var imageForEncoding = image.Clone();
-        return encoder.EncodeWithRoi(
-                imageForEncoding,
-                roiSet,
-                goal.BitsPerPixel,
-                specification.RoiStartLevel,
-                specification.EnableRoi,
-                specification.RoiAlign)
-            .Map(data => (
-                data,
-                new EncodingDecision(
-                    goal.BitsPerPixel,
-                    data.Length,
-                    Maybe<int>.None,
-                    new[] { goal.BitsPerPixel } as IReadOnlyList<float>)));
-    }
-
-    private static Result<(byte[] ImageData, EncodingDecision Decision), PipelineError> EncodeForMaxFileSize(
-        Image<Rgba32> image,
-        FacialRoiSet roiSet,
-        IJpeg2000Encoder encoder,
-        EncodingSpecification specification,
-        int maxBytes,
-        Maybe<string> targetId)
-    {
-        var targetWithMargin = (int)(maxBytes * 0.95f);
-        var expectedRate = CompressionMapping.GetRateForTargetSize(targetWithMargin);
-        var expectedIndex = CompressionMapping.GetIndexForRate(expectedRate);
-        var allRates = CompressionMapping.GetAllRates();
-        var attemptedRates = new List<float>();
-        var maxAttempts = Math.Max(1, 3);
-        var upperAttempts = (int)Math.Floor(maxAttempts / 2.0);
-        var lowerAttempts = (int)Math.Ceiling(maxAttempts / 2.0);
-        var candidateRates = new List<float>();
-
-        for (var i = 1; i <= upperAttempts; i++)
-        {
-            candidateRates.Add(allRates[Math.Min(expectedIndex + i, allRates.Length - 1)]);
-        }
-
-        for (var i = 0; i < lowerAttempts; i++)
-        {
-            candidateRates.Add(allRates[Math.Max(expectedIndex - i, 0)]);
-        }
-
-        foreach (var rate in candidateRates.Distinct())
-        {
-            attemptedRates.Add(rate);
-            using var imageForEncoding = image.Clone();
-            var result = encoder.EncodeWithRoi(
-                imageForEncoding,
-                roiSet,
-                rate,
-                specification.RoiStartLevel,
-                specification.EnableRoi,
-                specification.RoiAlign);
-            if (result.IsFailure)
-            {
-                continue;
-            }
-
-            if (result.Value.Length <= maxBytes)
-            {
-                return Result.Success<(byte[] ImageData, EncodingDecision Decision), PipelineError>((
-                    result.Value,
-                    new EncodingDecision(rate, result.Value.Length, Maybe<int>.From(maxBytes), attemptedRates, targetId)));
-            }
-        }
-
-        return Result.Failure<(byte[] ImageData, EncodingDecision Decision), PipelineError>(
-            new ValidationError(
-                $"Cannot encode the portrait within {maxBytes} bytes using the available compression ladder.",
-                "profile-encoding"));
-    }
+    private static Result<(byte[] ImageData, EncodingDecision Decision), PipelineError> Failure(string message) =>
+        Result.Failure<(byte[] ImageData, EncodingDecision Decision), PipelineError>(new ValidationError(message, "profile-encoding"));
 }

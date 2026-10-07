@@ -2,6 +2,7 @@ using FaceOFFx.Cli;
 using FaceOFFx.Cli.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using Spectre.Console.Cli.Extensions.DependencyInjection;
@@ -26,6 +27,9 @@ services.AddLogging(builder =>
 {
     // Clear existing providers first
     builder.ClearProviders();
+    // Diagnostics share stderr so stdout remains usable for JSON and encoded files.
+    builder.Services.Configure<ConsoleLoggerOptions>(options =>
+        options.LogToStandardErrorThreshold = LogLevel.Trace);
 
     // Set minimum level based on debug flag
     if (hasDebugFlag)
@@ -54,16 +58,27 @@ if (!requiresCleanStdout)
 {
     console.MarkupLine(" [grey]╭───╮[/]   [bold blue]Face[/][bold]OFF[/][bold yellow]x[/]");
     console.MarkupLine(" [grey]│[/][bold cyan]◉ ◉[/][grey]│[/]   [grey]──────────────────────────[/]");
-    console.MarkupLine(" [grey]│[/][white]╰─╯[/][grey]│[/]   [grey]PIV · Passport · PR Photos[/]");
+    console.MarkupLine(" [grey]│[/][white]╰─╯[/][grey]│[/]   [grey]PIV JPEG 2000 preparation[/]");
     console.MarkupLine(" [grey]╰───╯[/]   [dim]\"I want to take his face... off.\"[/]");
     console.WriteLine();
 }
 
 // Create the CLI app with dependency injection
 using var registrar = new DependencyInjectionRegistrar(services);
-var app = new CommandApp(registrar);
+var app = new CommandApp<PivCommand>(registrar);
 
-app.Configure(CliAppConfiguration.Configure);
+app.Configure(configuration =>
+{
+    CliAppConfiguration.Configure(configuration);
+    if (requiresCleanStdout)
+        configuration.SetExceptionHandler((exception, _) =>
+        {
+            using var stdout = System.Console.OpenStandardOutput();
+            stdout.Write(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { Error = exception.Message }));
+            stdout.WriteByte((byte)'\n');
+            return 1;
+        });
+});
 
 // Run the CLI app
 try
@@ -72,6 +87,12 @@ try
 }
 catch (Exception ex)
 {
-    console.WriteException(ex);
+    if (requiresCleanStdout)
+    {
+        using var stdout = System.Console.OpenStandardOutput();
+        stdout.Write(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { Error = ex.Message }));
+        stdout.WriteByte((byte)'\n');
+    }
+    else console.WriteException(ex);
     return 1;
 }

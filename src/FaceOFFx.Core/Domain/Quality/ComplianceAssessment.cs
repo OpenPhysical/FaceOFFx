@@ -38,18 +38,6 @@ public record Standard(string Name, string DisplayName, string Description)
     /// Personal Identity Verification standard
     /// </summary>
     public static readonly Standard Piv = new("PIV", "PIV", "Personal Identity Verification cards");
-    /// <summary>
-    /// Transportation Worker Identification Credential standard
-    /// </summary>
-    public static readonly Standard Twic = new("TWIC", "TWIC", "Transportation Worker Identification Credential");
-    /// <summary>
-    /// International Civil Aviation Organization standard
-    /// </summary>
-    public static readonly Standard Icao = new("ICAO", "ICAO", "International Civil Aviation Organization passport standards");
-    /// <summary>
-    /// Common Access Card standard
-    /// </summary>
-    public static readonly Standard Cac = new("CAC", "CAC", "Common Access Card for military personnel");
     
     /// <summary>
     /// Get a standard by name (case insensitive)
@@ -59,9 +47,6 @@ public record Standard(string Name, string DisplayName, string Description)
     public static Standard? FromName(string name) => name.ToUpperInvariant() switch
     {
         "PIV" => Piv,
-        "TWIC" => Twic,
-        "ICAO" => Icao,
-        "CAC" => Cac,
         _ => null
     };
 }

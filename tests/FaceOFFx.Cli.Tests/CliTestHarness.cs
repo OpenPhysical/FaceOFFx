@@ -1,4 +1,5 @@
 using FaceOFFx.Cli;
+using FaceOFFx.Cli.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
@@ -21,6 +22,7 @@ internal static class CliTestHarness
         var registrar = new DependencyInjectionRegistrar(services);
         var settings = new CommandAppTesterSettings { TrimConsoleOutput = false };
         var tester = new CommandAppTester(registrar, settings, console);
+        tester.SetDefaultCommand<PivCommand>();
         tester.Configure(CliAppConfiguration.Configure);
         return tester;
     }

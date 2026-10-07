@@ -26,8 +26,6 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<FaceGeometryPipeline>();
         services.AddScoped<ProfileEncoder>();
-        services.AddScoped<PassportPhotoRenderService>();
-        services.AddScoped<DocumentRenderService>();
         services.AddScoped<DiagnosticsCorpusService>();
         services.AddScoped<DiagnosticsBatchService>();
 

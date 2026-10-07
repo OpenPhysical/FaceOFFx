@@ -16,6 +16,7 @@
     <PackageReference Include="AwesomeAssertions" Version="9.1.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\FaceOFFx\FaceOFFx.csproj" />
     <ProjectReference Include="..\..\src\FaceOFFx.Cli\FaceOFFx.Cli.csproj" />
     <ProjectReference Include="..\..\src\FaceOFFx.Core\FaceOFFx.Core.csproj" />
     <ProjectReference Include="..\FaceOFFx.Tests.Common\FaceOFFx.Tests.Common.csproj" />

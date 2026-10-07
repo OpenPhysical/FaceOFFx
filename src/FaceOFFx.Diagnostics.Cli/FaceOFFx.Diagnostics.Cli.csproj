@@ -3,9 +3,7 @@
     <OutputType>Exe</OutputType>
     <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
     <AssemblyName>faceoffx-diagnostics</AssemblyName>
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>faceoffx-diagnostics</ToolCommandName>
-    <PackageId>FaceOFFx.Diagnostics.Cli</PackageId>
+    <IsPackable>false</IsPackable>
     <Product>FaceOFFx Diagnostics CLI</Product>
     <Description>Engineering and diagnostics CLI for FaceOFFx staged human-detection visualization and corpus verification.</Description>
     <PackageTags>face-detection;diagnostics;biometrics;onnx;cli;dotnet-tool</PackageTags>

@@ -398,6 +398,14 @@ demo/
 /tests/test-results/
 /tests/batch-test-results/
 /tests/test-images/
+!/tests/test-images/
+/tests/test-images/*
+!/tests/test-images/people/
+/tests/test-images/people/*
+!/tests/test-images/people/glenn/
+/tests/test-images/people/glenn/*
+!/tests/test-images/people/glenn/source.jpg
+!/tests/test-images/people/glenn/source.json
 /tests/test-output/
 /tests/temp_outputs/
 /tests/blur_progression/

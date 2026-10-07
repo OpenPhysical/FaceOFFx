@@ -14,6 +14,8 @@ namespace FaceOFFx.Core.Domain.Transformations;
 /// </summary>
 public sealed record CanonicalFaceGeometry
 {
+    /// <summary>Optional caller-measured ear attachments and crown in original-image coordinates.</summary>
+    public AnatomicalGeometry? SourceAnatomy { get; init; }
     /// <summary>
     /// Initializes a new canonical face geometry instance.
     /// </summary>

@@ -6,6 +6,7 @@
     { "id": "johnson", "source": "johnson/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
     { "id": "starmer", "source": "starmer/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
     { "id": "carter", "source": "carter/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
+    { "id": "glenn", "source": "glenn/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
     { "id": "person-01", "source": "person-01/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
     { "id": "person-02", "source": "person-02/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },
     { "id": "person-03", "source": "person-03/source.jpg", "expectedFaceCount": 1, "expectLandmarks": true },

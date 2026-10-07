@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
+    <TargetFramework>$(FaceOffxLibraryTargetFramework)</TargetFramework>
     <Description>Infrastructure implementation for FaceOFFx facial recognition library</Description>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IsPackable>false</IsPackable>
@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FaceOFFx.Core\FaceOFFx.Core.csproj" />
     <ProjectReference Include="..\FaceOFFx.Models\FaceOFFx.Models.csproj" />
+    <ProjectReference Include="..\CoreJ2K.FaceOFFx\CoreJ2K.FaceOFFx.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
@@ -15,7 +16,5 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.7" />
     <PackageReference Include="MetadataExtractor" Version="2.8.1" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
-    <PackageReference Include="CoreJ2K" Version="1.1.2.50" />
-    <PackageReference Include="CoreJ2K.ImageSharp" Version="1.0.1" />
   </ItemGroup>
 </Project>

@@ -110,18 +110,18 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
     public bool IsValid => Points.Count == 68;
 
     /// <summary>
-    /// Creates an Appendix C.6 compliant ROI set for PIV images.
+    /// Creates one face-centered mask estimate from the detected landmarks.
     /// </summary>
-    /// <param name="imageWidth">The width of the PIV image (should be 420 for standard PIV).</param>
-    /// <param name="imageHeight">The height of the PIV image (should be 560 for standard PIV).</param>
-    /// <returns>A Result containing the FacialRoiSet with Appendix C.6 Inner Region or an error message.</returns>
+    /// <param name="imageWidth">The width of the portrait canvas.</param>
+    /// <param name="imageHeight">The height of the portrait canvas.</param>
+    /// <returns>The facial-region estimate and recorded coverage requirements, or a geometry error.</returns>
     /// <remarks>
-    /// Creates the Inner Region as specified in INCITS 385-2004 Appendix C.6.
-    /// This method is for PIV-compatible images only and uses the standard rectangular region approach.
+    /// The region includes the jaw, all detected facial features, and an estimated forehead boundary.
+    /// Fixed anatomical construction parameters are independent of the encoding budget.
     /// </remarks>
     /// <example>
     /// <code>
-    /// var roiResult = landmarks.CalculateRoiSet(420, 560); // Standard PIV dimensions
+    /// var roiResult = landmarks.CalculateRoiSet(480, 640);
     /// if (roiResult.IsSuccess)
     /// {
     ///     var rois = roiResult.Value;
@@ -131,7 +131,7 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
     /// </example>
     public Result<FacialRoiSet> CalculateRoiSet(int imageWidth, int imageHeight)
     {
-        return FacialRoiSet.CreateAppendixC6(imageWidth, imageHeight);
+        return AnatomicalFaceRoi.Create(this, imageWidth, imageHeight);
     }
 
     /// <summary>
@@ -257,13 +257,13 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
     }
     
     /// <summary>
-    /// Calculates the PIV compliance lines (AA, BB, CC) from the 68-point landmarks.
+    /// Calculates centerline and eye-line geometry plus an estimated head-width proxy from the landmarks.
     /// </summary>
     /// <returns>PIV compliance lines for face positioning validation</returns>
     /// <remarks>
     /// Line AA (Vertical Center): Passes through nose bridge and mouth center
     /// Line BB (Horizontal Eye): Passes through both eye centers
-    /// Line CC (Head Width): Level line between the widest face contour points
+    /// Line CC (Estimated Head Width): Jaw contour width, with ear-to-head attachment measurement as a verification requirement
     /// </remarks>
     public Result<PivComplianceLines, PipelineError> CalculatePivLines()
     {
@@ -288,7 +288,7 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
         var leftEyeCenter = LeftEyeCenter;
         var rightEyeCenter = RightEyeCenter;
 
-        // Find the actual widest points from the face contour (points 0-16)
+        // Jaw contour points supply an estimated width until reviewed ear-attachment measurements are available.
         var faceContourPoints = Points.Take(17).ToList(); // Points 0-16: jaw/face contour
 
         // Find leftmost and rightmost points
@@ -298,7 +298,7 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
         // Calculate the Y-position as the average of the widest points
         var levelY = (leftmostPoint.Y + rightmostPoint.Y) / 2.0f;
 
-        // Create level ear points for aesthetic head width line
+        // Project the jaw endpoints onto a level diagnostic line.
         var leftEarPoint = new Point2D(leftmostPoint.X, levelY);
         var rightEarPoint = new Point2D(rightmostPoint.X, levelY);
 
@@ -308,7 +308,7 @@ public record FaceLandmarks68(IReadOnlyList<Point2D> Points)
         // Calculate Line BB (Horizontal Eye Line) - average of eye Y coordinates
         var lineBB_Y = (leftEyeCenter.Y + rightEyeCenter.Y) / 2.0f;
 
-        // Calculate Line CC (Head Width) - now using actual widest points
+        // Retain the jaw-width proxy with Estimated measurement status.
         var lineCC_Width = rightmostPoint.X - leftmostPoint.X;
 
         return Result.Success<PivComplianceLines, PipelineError>(new PivComplianceLines(

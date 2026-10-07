@@ -1,0 +1,10 @@
+[
+  { "id": "bush", "label": "George W. Bush", "path": "tests/test-images/people/bush/source.jpg", "sourceKind": "Existing photographic test fixture", "expectedSha256": "d935c932c2989f1d0d23ab02b401a5905ebea9c9a6beefb5cf6d150b031cbb37" },
+  { "id": "carter", "label": "Jimmy Carter", "path": "tests/test-images/people/carter/source.jpg", "sourceKind": "Existing photographic test fixture", "expectedSha256": "6ca266c9e465cea3b25fb43924edce1805c42bf8f6c049112395e4b9940a5a1e" },
+  { "id": "johnson", "label": "Boris Johnson", "path": "tests/test-images/people/johnson/source.jpg", "sourceKind": "Existing photographic test fixture", "expectedSha256": "a41c342be0419f62c3e563530e47308ec5a2e4adf62d048326a8b2db13c3f13f" },
+  { "id": "starmer", "label": "Keir Starmer", "path": "tests/test-images/people/starmer/source.jpg", "sourceKind": "Existing photographic test fixture", "expectedSha256": "7e0c7f41ea43e8c515defff735130eefe3c105d91771d061f2fac4bafd914fd2" },
+  { "id": "glenn", "label": "John H. Glenn Jr.", "path": "tests/test-images/people/glenn/source.jpg", "sourceKind": "NASA historical portrait", "expectedSha256": "09d1af00da493b69681e4678a7448c665516ebe90c930dfd93bd7db333f17942" },
+  { "id": "construction", "label": "Watermarked construction sample", "path": "datasets/samples/cardholders/source_watermarked/construction/german-male.png", "sourceKind": "Supplied watermarked fixture; untagged samples assumed sRGB; provenance review required", "expectedSha256": "5d84f535f99cd2b41803517280fd2167f28bf83caea43964a258a66d841275ee" },
+  { "id": "medical", "label": "Watermarked medical sample", "path": "datasets/samples/cardholders/source_watermarked/medical/german-nurse-male.png", "sourceKind": "Supplied watermarked fixture; untagged samples assumed sRGB; provenance review required", "expectedSha256": "edba3ecc892409e1586da6987240372b37e281b93b91dfded7766522e01eb041" },
+  { "id": "generic_guy", "label": "Generic Guy illustration control", "path": "tests/test-images/people/generic-guy/source.png", "sourceKind": "Illustrated detector regression fixture", "expectedSha256": "0e5adcaf2aef1a1fbb2882734f4383043a0e3acfc1e86a3d3bb848e7cad468f3" }
+]

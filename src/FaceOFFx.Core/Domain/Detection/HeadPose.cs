@@ -75,7 +75,7 @@ public sealed record HeadPose(float Yaw, float Pitch, float Roll)
     /// <remarks>
     /// <para>
     /// This method is useful for filtering faces for applications that require frontal views,
-    /// such as face recognition, PIV image capture, or passport photo validation.
+    /// such as face recognition and PIV image capture review. Supply angles from a validated estimator.
     /// </para>
     /// <para>
     /// Common threshold values:

@@ -117,20 +117,25 @@ public record RoiBoundingBox(int X, int Y, int Width, int Height)
 }
 
 /// <summary>
-/// Represents facial ROI for JPEG 2000 encoding following INCITS 385-2004 Appendix C.6.
+/// Represents one protected facial region for JPEG 2000 encoding.
 /// </summary>
-/// <param name="InnerRegion">The Inner Region as defined by Appendix C.6 - rectangular area for high-quality encoding.</param>
+/// <param name="InnerRegion">The facial region bounds and landmark coverage for review.</param>
 /// <remarks>
-/// Implements the Appendix C.6 specification for PIV-compatible facial image compression:
-/// - Inner Region: Rectangular area at (0.1×W-1, 0.1×W-1) to (0.9×W-1, 1.1×W-1)
-/// - Outer Region: Everything outside Inner Region gets lower quality (handled by encoder)
-/// This approach provides consistent, standards-compliant ROI behavior.
+/// Fixed policies preserve every detected facial feature and jaw point with a localization margin.
+/// The optional extended policy also includes estimated forehead and ear envelopes.
+/// PIV Full Frontal geometry, source acquisition, and region coverage have separate verification evidence.
 /// </remarks>
 [PublicAPI]
 public record FacialRoiSet(RoiRegion InnerRegion)
 {
+    /// <summary>One immutable face-centered mask, with anatomical coverage recorded separately.</summary>
+    public FacialRoiMask? Mask { get; init; }
+    /// <summary>Recorded construction method and visual verification requirements.</summary>
+    public FacialRoiCoverage? Coverage { get; init; }
+    /// <summary>Actual protected mask pixels, or the area of an explicitly rectangular ROI.</summary>
+    public long PixelCount => Mask?.PixelCount ?? (long)InnerRegion.BoundingBox.Width * InnerRegion.BoundingBox.Height;
     /// <summary>
-    /// Gets the ROI Inner Region (single region for Appendix C.6).
+    /// Gets the single protected facial region.
     /// </summary>
     public IReadOnlyList<RoiRegion> AllRegions => [InnerRegion];
 
@@ -145,99 +150,4 @@ public record FacialRoiSet(RoiRegion InnerRegion)
             : Result.Success();
     }
 
-    /// <summary>
-    /// Creates an Appendix C.6 compliant facial ROI set for PIV images.
-    /// </summary>
-    /// <param name="imageWidth">The width of the PIV image (should be 420 for standard PIV).</param>
-    /// <param name="imageHeight">The height of the PIV image (should be 560 for standard PIV).</param>
-    /// <returns>A Result containing the FacialRoiSet with Appendix C.6 Inner Region or an error.</returns>
-    /// <remarks>
-    /// Creates the Inner Region as specified in INCITS 385-2004 Appendix C.6:
-    /// Formula: (0.1×W-1, 0.1×W-1) to (0.9×W-1, 1.1×W-1)
-    /// For standard PIV (420×560): Inner Region at (41, 41) to (377, 461)
-    /// The Outer Region (everything else) gets lower quality automatically by the encoder.
-    /// </remarks>
-    public static Result<FacialRoiSet> CreateAppendixC6(int imageWidth, int imageHeight)
-    {
-        try
-        {
-            // Appendix C.6: Inner Region formula
-            // (0.1×W-1, 0.1×W-1) to (0.9×W-1, 1.1×W-1)
-            var innerRegionX = (int)(0.1f * imageWidth - 1);
-            var innerRegionY = (int)(0.1f * imageWidth - 1); // Use width for both dimensions as per spec
-            var innerRegionMaxX = (int)(0.9f * imageWidth - 1);
-            var innerRegionMaxY = (int)(1.1f * imageWidth - 1);
-            var innerRegionWidth = innerRegionMaxX - innerRegionX + 1;
-            var innerRegionHeight = Math.Min(
-                innerRegionMaxY - innerRegionY + 1,
-                imageHeight - innerRegionY
-            );
-
-            // Ensure Inner Region stays within image bounds
-            innerRegionHeight = Math.Min(innerRegionHeight, imageHeight - innerRegionY);
-
-            var innerRegionBox = new RoiBoundingBox(
-                innerRegionX,
-                innerRegionY,
-                innerRegionWidth,
-                innerRegionHeight
-            );
-
-            // All 68 landmark indices are included in the Inner Region for visualization
-            var allLandmarkIndices = Enumerable.Range(0, 68).ToList();
-
-            var innerRegion = new RoiRegion("Inner", 3, innerRegionBox, allLandmarkIndices);
-            var roiSet = new FacialRoiSet(innerRegion);
-
-            return roiSet.Validate().Map(() => roiSet);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<FacialRoiSet>(
-                $"Failed to create Appendix C.6 ROI set: {ex.Message}"
-            );
-        }
-    }
-
-    /// <summary>
-    /// Creates an Appendix C.6 compliant facial ROI set for any image dimensions.
-    /// This is a pure function that calculates ROI based on the formula regardless of image size.
-    /// </summary>
-    /// <param name="imageWidth">The width of the image in pixels.</param>
-    /// <param name="imageHeight">The height of the image in pixels.</param>
-    /// <returns>A FacialRoiSet with dynamically calculated Inner Region based on image dimensions.</returns>
-    /// <remarks>
-    /// This pure function applies the INCITS 385-2004 Appendix C.6 formula to any image size:
-    /// Formula: (0.1×W-1, 0.1×W-1) to (0.9×W-1, 1.1×W-1)
-    /// The formula uses the image width (W) for both X and Y calculations as per the standard.
-    /// This allows ROI to be calculated for non-standard image sizes when using --no-resize.
-    /// </remarks>
-    [PublicAPI]
-    public static FacialRoiSet CalculateRoiForDimensions(int imageWidth, int imageHeight)
-    {
-        // Apply Appendix C.6 formula using width for both dimensions as per spec
-        var innerRegionX = Math.Max(0, (int)(0.1f * imageWidth - 1));
-        var innerRegionY = Math.Max(0, (int)(0.1f * imageWidth - 1));
-        var innerRegionMaxX = Math.Min(imageWidth - 1, (int)(0.9f * imageWidth - 1));
-        var innerRegionMaxY = Math.Min(imageHeight - 1, (int)(1.1f * imageWidth - 1));
-
-        // Calculate dimensions ensuring they stay within bounds
-        var innerRegionWidth = innerRegionMaxX - innerRegionX + 1;
-        var innerRegionHeight = innerRegionMaxY - innerRegionY + 1;
-
-        // Create bounding box
-        var innerRegionBox = new RoiBoundingBox(
-            innerRegionX,
-            innerRegionY,
-            innerRegionWidth,
-            innerRegionHeight
-        );
-
-        // All 68 landmark indices for consistency (even though no face detection is performed)
-        var allLandmarkIndices = Enumerable.Range(0, 68).ToList();
-
-        // Create and return the ROI set
-        var innerRegion = new RoiRegion("Inner", 3, innerRegionBox, allLandmarkIndices);
-        return new FacialRoiSet(innerRegion);
-    }
 }

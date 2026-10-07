@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
+    <TargetFramework>$(FaceOffxLibraryTargetFramework)</TargetFramework>
     <Description>ONNX models for FaceOFFx facial recognition library</Description>
     <IsPackable>false</IsPackable>
   </PropertyGroup>

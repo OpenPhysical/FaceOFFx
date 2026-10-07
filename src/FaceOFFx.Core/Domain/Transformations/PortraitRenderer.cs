@@ -22,29 +22,18 @@ public static class PortraitRenderer
         CanonicalFaceGeometry geometry,
         PortraitPlan plan)
     {
-        using var rotatedImage = Math.Abs(plan.RotationDegrees) > 0.1f
-            ? sourceImage.Clone(ctx => ctx.Rotate(plan.RotationDegrees))
-            : sourceImage.Clone();
+        // One resampling pass preserves detail and uses the same coordinates as source-support verification.
+        var renderedImage = sourceImage.Clone(ctx => ctx.Transform(
+            sourceImage.Bounds,
+            plan.TransformMap.SourceToOutput.ToMatrix(),
+            new Size(plan.OutputDimensions.Width, plan.OutputDimensions.Height),
+            KnownResamplers.Lanczos3));
 
-        var rotatedLandmarks = PortraitPlanSolver.RotateLandmarks(
-            geometry.SourceLandmarks,
-            plan.RotationDegrees,
-            new ImageDimensions(sourceImage.Width, sourceImage.Height),
-            plan.RotatedSourceDimensions);
+        var outputLandmarks = new FaceLandmarks68(geometry.SourceLandmarks.Points
+            .Select(plan.TransformMap.MapSourceToOutput).ToArray());
 
-        var renderedImage = rotatedImage.Clone(ctx =>
-        {
-            ctx.Crop(plan.CropRectangle);
-            ctx.Resize(plan.OutputDimensions.Width, plan.OutputDimensions.Height);
-        });
-
-        var outputLandmarks = PortraitPlanSolver.TransformLandmarks(
-            rotatedLandmarks,
-            plan.CropRectangle,
-            plan.OutputDimensions);
-
-        var roiResult = outputLandmarks
-            .CalculateRoiSet(plan.OutputDimensions.Width, plan.OutputDimensions.Height)
+        var roiResult = AnatomicalFaceRoi
+            .Create(outputLandmarks, plan.OutputDimensions.Width, plan.OutputDimensions.Height, plan.FaceRegion)
             .ToPipelineResult(error => new GeometryError(error, "profile-roi"));
         if (roiResult.IsFailure)
         {

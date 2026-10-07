@@ -1,0 +1,15 @@
+{
+  "subject": "John H. Glenn Jr.",
+  "credit": "NASA",
+  "description": "Official astronaut portrait, December 1962. Educational encoding test image.",
+  "article": "https://www.nasa.gov/image-article/portrait-of-astronaut-john-h-glenn-jr-2/",
+  "asset": "https://www.nasa.gov/wp-content/uploads/2023/03/s62-05540.jpg",
+  "usageGuidelines": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+  "usageScope": "Factual, informational software-test example with NASA source credit. Commercial promotional reuse requires review of NASA's identifiable-person and media guidelines.",
+  "width": 1041,
+  "height": 1324,
+  "bytes": 173964,
+  "sha256": "09d1af00da493b69681e4678a7448c665516ebe90c930dfd93bd7db333f17942",
+  "iccProfile": "sRGB IEC61966-2.1, 3144 bytes",
+  "captureVerification": "Historical source; current PIV enrollment acquisition requirements require separate evidence."
+}

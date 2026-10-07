@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "scope": "Supplemental source-component and license inventory for the FaceOFFx 4.0.0 package",
+  "name": "CoreJ2K.FaceOFFx",
+  "distribution": "Encoder-only assembly bundled in the FaceOFFx library package",
+  "sourceDirectory": "src/CoreJ2K.FaceOFFx",
+  "upstreamRepository": "https://github.com/mistial-dev/corej2k.imagesharp",
+  "upstreamHead": "78ede8845e77e33e83d66c9c4c64667da3a3e143",
+  "sourceBasis": "Tested working-tree snapshot with local typed encoder, telemetry and V3 attribution changes",
+  "sourceProvenance": "src/CoreJ2K.FaceOFFx/provenance.json",
+  "sourceProvenanceSha256": "7343b392b0b633f8f55274b2dbefadc92c6346aca49a9d724e946c2bc780d670",
+  "licenses": [
+    {
+      "id": "BSD-3-Clause",
+      "path": "src/CoreJ2K.FaceOFFx/LICENSE",
+      "sha256": "492816a21e8e47818f0033d652ce0ef5ce6c20d3b6a737be9011061c0c491d94",
+      "copyright": "2007-2016 CSJ2K contributors; 2024-2025 Sjofn LLC"
+    },
+    {
+      "id": "LicenseRef-JJ2000",
+      "path": "src/CoreJ2K.FaceOFFx/COPYRIGHT-JJ2000-5.1",
+      "sha256": "10c284b2af1ea5fe8516b5510a7b05a9def383e232a5e1b871be8098f75b9588",
+      "copyright": "1999/2000 JJ2000 Partners",
+      "reviewRequirement": "Retain the complete notice and review its JPEG 2000 conformity and patent conditions."
+    }
+  ],
+  "packageDependencies": [
+    { "name": "SixLabors.ImageSharp", "version": "3.1.11" },
+    { "name": "Microsoft.Extensions.Logging.Abstractions", "version": "9.0.7" }
+  ],
+  "verificationRequirement": "Regenerate the complete dependency graph from the final restored package before release."
+}

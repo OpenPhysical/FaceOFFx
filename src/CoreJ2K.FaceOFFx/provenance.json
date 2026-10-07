@@ -1,0 +1,914 @@
+{
+  "schemaVersion": 2,
+  "upstreamRepository": "https://github.com/mistial-dev/corej2k.imagesharp",
+  "upstreamHead": "78ede8845e77e33e83d66c9c4c64667da3a3e143",
+  "sourceKind": "Tested dirty working-tree snapshot including typed encoder, telemetry and V3 attribution changes",
+  "validatedCoreAssemblySha256": "266dd9b1ab8ce2a51485b961412e94c3f315451170c992704237d81d70e9d2ec",
+  "namespace": "CoreJ2K.FaceOFFx",
+  "sourceFiles": {
+    "CoreJ2K/J2kSetup.cs": "bcd554aeabede2ce9c0dafc3aefed63348430dc21a062b58baab728ba16b2a81",
+    "CoreJ2K/Util/CoreJ2KLog.cs": "684b228adf3987eb24838ff5c13e7d76d0e745bcbc0d92502f19cdcc27d5862b",
+    "CoreJ2K/Util/DotnetFileInfo.cs": "7037161bf01b20165200ddcca140e1163eefe5f4d520e05cfd08c7410ab0bcb7",
+    "CoreJ2K/Util/DotnetFileInfoCreator.cs": "b04b819d8792e97f3a01894daa231202212b80a16278027454b6fa8eebb99fdd",
+    "CoreJ2K/Util/DotnetFileStreamCreator.cs": "32f82f13e4290f7fe961c19d8641cc1c5a0fd2425a0cdbfde5c228e259793506",
+    "CoreJ2K/Util/DotnetMsgLogger.cs": "0f8ce4000ad8813c89ea9655f759ee36655d3f0b43441b9fac3ced2fc02fda33",
+    "CoreJ2K/Util/EndianBinaryReader.cs": "616ec5f5a12d9c61aaa833c5f2398b016c7b840c5b3b7e3f046aba4a9b75d65c",
+    "CoreJ2K/Util/EndianBinaryWriter.cs": "2615ca720daf8563c486cd55fb765aed6ae0a608a9faf35f274570c6b1f96b48",
+    "CoreJ2K/Util/FileInfoFactory.cs": "e2d641ec23daae191f7983d01ca8cc0f587b5a912c008f523bd4362c0f55b2f2",
+    "CoreJ2K/Util/FileStreamFactory.cs": "ab75bac2263848bee6bb84d5b3f1af7a62f759c4921978baf5f01db845abcbaa",
+    "CoreJ2K/Util/IDefaultable.cs": "5370f0145009a4815973f6a36415b3e1e9e72497077a9c121aafc7e197d3ec2b",
+    "CoreJ2K/Util/IFileInfo.cs": "9c9f11e04afc3c03631e043c9844a9b31cfa6edfb672f8dbbea4aafbf8f021d0",
+    "CoreJ2K/Util/IFileInfoCreator.cs": "9a2e33fe63cd9e898b25ba88949d27103a4709aff99f4d328b2bfe7d704ee2c1",
+    "CoreJ2K/Util/IFileStreamCreator.cs": "cb26b8d61c75f2490edd786498bba32f43e0031d39eb78cbc0d8de9d7d3d5216",
+    "CoreJ2K/Util/SupportClass.cs": "91e17b6a9dad22ac62dfaac4e3c32ccbe5af0decf261e30d1614e113a5bc5f0f",
+    "CoreJ2K/j2k/IntegerSpec.cs": "239ab9a3e13a6ad7ec53bf3c32c449ea09f7531db3a6123275e60488267975e9",
+    "CoreJ2K/j2k/JJ2KExceptionHandler.cs": "314b083009805595357f759aec94b94870d3cb61d057cf9fa05aa9c6a4c48359",
+    "CoreJ2K/j2k/JJ2KInfo.cs": "f25b7510bcfb90189a5ef096e6ee6af633f92b4f6f613d712f4b83ee36ba6812",
+    "CoreJ2K/j2k/ModuleSpec.cs": "e25ca1dcb7f9dab6eea39f6ddbcfe894b23e412cafcaafe96d88031620c27155",
+    "CoreJ2K/j2k/NoNextElementException.cs": "314788e5e769627ad7609cfe6c1361dd9cea3c854027f0d5b5a74cb7d4d65e2d",
+    "CoreJ2K/j2k/StringSpec.cs": "f2a6d0d31e42aa141bfaf2a783e44d3efc1a87c96371cd34f3f8182480f92b25",
+    "CoreJ2K/j2k/codestream/CBlkCoordInfo.cs": "e1cc3ae04d2f9afa5b3b692667ebab681a9864e57e350498ba7778f494e8cc90",
+    "CoreJ2K/j2k/codestream/CoordInfo.cs": "59d53e1d7bafa2bd9687bc0320ece2431257bff601d571d9a77288972889674a",
+    "CoreJ2K/j2k/codestream/CorruptedCodestreamException.cs": "921379aa575c14fdd753d15498c10f88815aa0008f6f3b25c2373cde03728155",
+    "CoreJ2K/j2k/codestream/Markers.cs": "541e08ee3df39abeb38ca9520926b4fbff7ad022af324cbb4d285284938bc992",
+    "CoreJ2K/j2k/codestream/PltMarker.cs": "f49d51bd21c0b6bc2194eba7b96d6bb1fb1e5c875bacae74d9489532542fd55b",
+    "CoreJ2K/j2k/codestream/PltMarkerCollection.cs": "694612e900b5f9147e4aa1b1db1982103971e471ea977138f98550667c7e1fa5",
+    "CoreJ2K/j2k/codestream/PrecCoordInfo.cs": "dcb585048f36f1d37fcce7b81da246298a1db6f7fcb6ea687fac6111e3648cc9",
+    "CoreJ2K/j2k/codestream/PrecInfo.cs": "7832f90ba4ec254bfd8c80882f02f4ada191f39ce875f5df82aa0929ff32128a",
+    "CoreJ2K/j2k/codestream/ProgressionType.cs": "d598e548877056da81841e6399cb8d833bde31e0f4c22c8545e5ea6ade07f0a7",
+    "CoreJ2K/j2k/codestream/writer/BitOutputBuffer.cs": "7915f4ac1e05471e2d956bb11a307d93905edcc61798f9e3467d29bc564eed87",
+    "CoreJ2K/j2k/codestream/writer/CodestreamWriter.cs": "c52eb7f2bddc15924fe9826b618c5c08692905d5780934bdf5290abab0dee222",
+    "CoreJ2K/j2k/codestream/writer/FileCodestreamWriter.cs": "86ced2b44a66d41e5d1805ca4a4ea25c270b02984bc8bcecaf8a9456913fcbfb",
+    "CoreJ2K/j2k/codestream/writer/HeaderEncoder.cs": "f26a4c03c4f2c35adb599251ef43bc7e1bca9b94df4a3c70053a9772d941eea1",
+    "CoreJ2K/j2k/codestream/writer/PktEncoder.cs": "d5f06dcf6572febd58b6c04f3cdb7ab49cf2ea57470818e7721357fdb0f52b30",
+    "CoreJ2K/j2k/codestream/writer/TagTreeEncoder.cs": "7b1b2e90aa0f6dfb5022eca7e6ca0d7408b1db47db4b89f64ce5e4a0ef43e53e",
+    "CoreJ2K/j2k/encoder/EncoderOptions.cs": "7bea05467b98825549652a485bf21d8789346f31d38c91063e9c6293da3722d9",
+    "CoreJ2K/j2k/encoder/EncoderOutputFormat.cs": "5211e14767f368a7d016ced7430bf71f75e6bf54c471609e9d41e109a34b0c19",
+    "CoreJ2K/j2k/encoder/EncoderResult.cs": "d4e2c485a0cb46ff59b704e94f0b124e1f2cc2072c0728a88081ed50f11fe497",
+    "CoreJ2K/j2k/encoder/EncoderSpecs.cs": "749447556d12ba6e4c70fcdbc3e747e139479e687bb570478582b638772902ac",
+    "CoreJ2K/j2k/encoder/PayloadTelemetry.cs": "d04d8dc36704029faf3dee6d8f412758225841df83b85bc874d76eda18d982af",
+    "CoreJ2K/j2k/encoder/RoiMask.cs": "c03523a60934f0014e54453f94bf2aaa70e65e4ece4feb6e3126122a12a92f4f",
+    "CoreJ2K/j2k/encoder/RoiOptions.cs": "4811f59a929d8cdb9526e8d158060aa9d97c6b7a020b57a3789f42e775694ca2",
+    "CoreJ2K/j2k/encoder/RoiRegion.cs": "425c2ded095f1eabb416edb728cef68c5cee8bd7e732bd8c27d560df7917cee9",
+    "CoreJ2K/j2k/encoder/SharedPayloadAttribution.cs": "7cce8f748bee91f66e92aa0bcffe77a60a159700527853ccafe7949f9b26ebc3",
+    "CoreJ2K/j2k/encoder/SubbandPayloadAttribution.cs": "724c051f3738a556a8d7eddcfde2ff1601804fefcc018e2dc67b717718330a0f",
+    "CoreJ2K/j2k/encoder/SubbandPayloadTelemetry.cs": "d6c392bd127ffb646a03089e8ff8b580462c5b4e4a7cd209e160ad360bfbf972",
+    "CoreJ2K/j2k/encoder/SubbandWeights.cs": "fcabc244ca4d8c3690b7ee004467bd14f978206eb61444ac951b46773e5aac37",
+    "CoreJ2K/j2k/entropy/CBlkSizeSpec.cs": "fd2cff3d93762d2c18817085aa94ee8203b398b0f9165e52ef856e2a00a0e6a4",
+    "CoreJ2K/j2k/entropy/CodedCBlk.cs": "684590786c9b05af15e861ec082a598a61f4dc972462ae3a21d0b26d34451454",
+    "CoreJ2K/j2k/entropy/PrecinctSizeSpec.cs": "1cf683b9d65f6cc29e18e74d5b3643c6823ec66998a7f50eff987cb7475a8fa3",
+    "CoreJ2K/j2k/entropy/Progression.cs": "8c491dab247a7925e0b3c8940b38846509709f1c0a7d8575b5d7f0e4a47423f5",
+    "CoreJ2K/j2k/entropy/ProgressionSpec.cs": "f0bb26cc8e3650ad06a5edaec9b69861a69fc2960549fa4fef36d429447e334c",
+    "CoreJ2K/j2k/entropy/StdEntropyCoderOptions.cs": "5fd44c3e611003adf32a95f1fbd1689a7d149f99d95f86c90f679dc370db806c",
+    "CoreJ2K/j2k/entropy/encoder/BitToByteOutput.cs": "51c65df8502b536c3a983c97d0b8b25b47994fc8484f3edcc33fd9fa5c33a39c",
+    "CoreJ2K/j2k/entropy/encoder/BudgetAllocationDiagnostics.cs": "c97b993f15cd033e23010b64340208f0d451ad8097c56b4378777ac9d96ac5eb",
+    "CoreJ2K/j2k/entropy/encoder/ByteOutputBuffer.cs": "abf7ad079a74de471e752324ef02c1c8ea0dfe4a86b54b94a1e1a1bfd6ddfee1",
+    "CoreJ2K/j2k/entropy/encoder/CBlkRateDistStats.cs": "dff518982f02cca9f488cad5b599df14e490c3025627bbf6c38c769dc13ceede",
+    "CoreJ2K/j2k/entropy/encoder/CodedCBlkDataSrcEnc.cs": "7de7c1c2f0e77f83ee5c19304d19e9494a226413bfcfe200051921e4bdd2ca6c",
+    "CoreJ2K/j2k/entropy/encoder/EBCOTBudgetAllocation.cs": "4603023d5e3f7d40d6a91f625e69c73cee0d50352d07f041b315512ff6080f40",
+    "CoreJ2K/j2k/entropy/encoder/EBCOTLayer.cs": "78e893e53d2f1f3ec6e5a83bc1c8b66aaca359e138b0a71117dfd883e918431d",
+    "CoreJ2K/j2k/entropy/encoder/EBCOTPayloadTelemetry.cs": "db15cac9bb558e752d91818aad5cc4a96a712208168c42f4c7e50846a2a51844",
+    "CoreJ2K/j2k/entropy/encoder/EBCOTRateAllocator.cs": "9972712c5b5d0be6eed1acabc47767eb560e51805b79cca6662f64c328d6db35",
+    "CoreJ2K/j2k/entropy/encoder/EBCOTSharedPayloadAttribution.cs": "34fa9d5c53e6d32370057193d86683774924c4af1725db85561df532f29d459f",
+    "CoreJ2K/j2k/entropy/encoder/EntropyCoder.cs": "f84cf78334007bb148b6481b7c4275b9590e650595b05cb47524eeea251f6536",
+    "CoreJ2K/j2k/entropy/encoder/LayersInfo.cs": "0abdabfdb559dfd5a38bbcaaae9258b2413c15419d715d5914d2e661451030af",
+    "CoreJ2K/j2k/entropy/encoder/MQCoder.cs": "13053b165e02a1659435309186e1fb6f71f7d3f3f6e049ce6b1f53313a391518",
+    "CoreJ2K/j2k/entropy/encoder/PostCompRateAllocator.cs": "6967ea2a9c3f5333a1013fe51ed8e3c07936dc0bf886ca23465c0a0dd8c7669f",
+    "CoreJ2K/j2k/entropy/encoder/StdEntropyCoder.cs": "40382590c9bf5e717201954e6d768c82733cae6fbb9e978156ccab7c0e8cb290",
+    "CoreJ2K/j2k/entropy/encoder/SynthesisEnergyInfluence.cs": "9d5dfd63d6765e6d3016e03cbd9bdda774dfed2d539734d1803323cffc0536cf",
+    "CoreJ2K/j2k/entropy/encoder/SynthesisPassGainAccumulator.cs": "02202ce4fc034d12652e21f8935fc4faa4218d84547984f03b58b697e0b2cfdb",
+    "CoreJ2K/j2k/fileformat/FileFormatBoxes.cs": "a6b71f81ddaf6e867a6bee18b96d81ffcb653495d1a8bf00c834421f0d55732a",
+    "CoreJ2K/j2k/fileformat/writer/FileFormatWriter.cs": "071e79a781734937ade59fad2a3227073e605792d4bd8e235cf58ba9c08215a1",
+    "CoreJ2K/j2k/image/BlkImgDataSrc.cs": "2113aec4ffae26d5da8c919298b28d276e521f10d33ff3d5e6c2d43ad13d4e81",
+    "CoreJ2K/j2k/image/CompTransfSpec.cs": "2a0c579bfd24cff3df5e146319821858a08842b98fd8350b1807de5f360f0049",
+    "CoreJ2K/j2k/image/Coord.cs": "b34ca4f09ade921ed9e005014dc224dc7b7fcba005a21017a2a350c92cca507a",
+    "CoreJ2K/j2k/image/DataBlk.cs": "3fcb391777792c1950b1b65a5b5a48c0891eb860604ff7f0fe865dbe4a5224ba",
+    "CoreJ2K/j2k/image/DataBlkFloat.cs": "3ce14e49ef6608cc892ddc4f9a080390c9f3e789071575a6850f1acbda096f07",
+    "CoreJ2K/j2k/image/DataBlkInt.cs": "6e21deaf604dc95058c890871a7682bfa4bfe040a4747e4b1aed89b86ed965e6",
+    "CoreJ2K/j2k/image/ImgData.cs": "2af0668cd19a235530ed186890c6dd90e960fa9bbd9ed3e992de23200494686b",
+    "CoreJ2K/j2k/image/ImgDataAdapter.cs": "1fc89e7ebc724f28139949e8bdbeda39f06103f02848e3b9563d2a11aeecdbf6",
+    "CoreJ2K/j2k/image/ImgDataConverter.cs": "5a79c7d4aeffbddf4a525482d1e2c36cbd95c0ced2d45e0c07778a54dc7c27ba",
+    "CoreJ2K/j2k/image/Tiler.cs": "f3ab03ee7f66321d423531f383b9e55f3449fdbce78f640ed2121376a8f27f3c",
+    "CoreJ2K/j2k/image/forwcomptransf/ForwCompTransf.cs": "d3400abae246aa92e98a6720e9cd16c065d619e61d2d37a06b7c7a20abd2387e",
+    "CoreJ2K/j2k/image/forwcomptransf/ForwCompTransfSpec.cs": "2988ddca1c219015b5140a65555c83bf49d75f9ae25e83715bcd4b34492b5c9c",
+    "CoreJ2K/j2k/image/input/ImgReader.cs": "d65ad42e7a901c7b2c5fdfdf015bd6bf7edd459e58af957c346a4c606f5bca0f",
+    "CoreJ2K/j2k/io/BEBufferedRandomAccessFile.cs": "5206ced737b7713a70506aa8f557c4aff272e840361583633e9f8df42abf0f71",
+    "CoreJ2K/j2k/io/BinaryDataInput.cs": "e784b441fbd5f25c3c37c2609bef51522c24dcd1305ab5e6e65b19756239062a",
+    "CoreJ2K/j2k/io/BinaryDataOutput.cs": "3d740a974b2c3eb7c15de2f3f77be54d00d40ae3d00e505714118021f2aba7b3",
+    "CoreJ2K/j2k/io/BufferedRandomAccessFile.cs": "60b2e8bcf7139709a8428f72cb29fb7973a8177515b7b063d9ea375cb333c1c3",
+    "CoreJ2K/j2k/io/EndianType.cs": "bf183d7f9251f272c957f64fae400617e798ebb03ca870b51e8040e55de3ca21",
+    "CoreJ2K/j2k/io/RandomAccessIO.cs": "6a6aeea59fb9094fc9d22cb7624eb579722901bb7ed101634bf049bc5aa7ccfe",
+    "CoreJ2K/j2k/quantization/GuardBitsSpec.cs": "26133847351eb415739355e70c7326a1a4c1a081ace048867d74d24a6cee3096",
+    "CoreJ2K/j2k/quantization/QuantStepSizeSpec.cs": "9989832a19fae0a3939c67567ba5a30d181378a1c5cea1300c0dc647dfa2c74b",
+    "CoreJ2K/j2k/quantization/QuantTypeSpec.cs": "5aadad37f5fa0fa21b5194a7b1b461e874736adde7c08f9dce484c6e585247a2",
+    "CoreJ2K/j2k/quantization/QuantizationType.cs": "0d66007832f76edba8dbf688642046f75e4d3177603fd98109f35b132b318c34",
+    "CoreJ2K/j2k/quantization/quantizer/CBlkQuantDataSrcEnc.cs": "70161022938557a29402e50a2e638e9fd02070e6e6a215b0f01758c9da160a57",
+    "CoreJ2K/j2k/quantization/quantizer/Quantizer.cs": "e5373348df90d70b33f13c652f4e1299bb692dbc59edf33e0a151ff15012747f",
+    "CoreJ2K/j2k/quantization/quantizer/StdQuantizer.cs": "d4512aec5bc8faf1ec34aa93956d4ac588d31aa1021eaa20c17e892be5f71fba",
+    "CoreJ2K/j2k/roi/MaxShiftSpec.cs": "1fd9c67cd803c7dd0865d372e9399ca4d05f4f02910f65b814117d0ce83eee1e",
+    "CoreJ2K/j2k/roi/encoder/ArbROIMaskGenerator.cs": "9a801f5de225850df73da59704aa853fce0ccf93555693c3e54e9f08d070c21f",
+    "CoreJ2K/j2k/roi/encoder/ROI.cs": "17ccbb5362eb3b469a3493d3eee27a4dc9aca03c3efec02c453006a980b6097b",
+    "CoreJ2K/j2k/roi/encoder/ROIMaskGenerator.cs": "6ad53c300d3b95749b66a035de2daea029d4636862d4ba48853c6c3809a170c5",
+    "CoreJ2K/j2k/roi/encoder/ROIScaler.cs": "8d1f8c7119ae727ae3596ff832ef9bf23f145a5e1d9f4a7a1caeb5872afaff55",
+    "CoreJ2K/j2k/roi/encoder/RectROIMaskGenerator.cs": "794789c0adffb6de378d42205174dc3def1c8e536a4e618bda7053482d147cd6",
+    "CoreJ2K/j2k/roi/encoder/SubbandROIMask.cs": "d298133bf16f9cdb36b7a81a2a0876703c7c9b72bad8fc3bb3ff75e240e577c0",
+    "CoreJ2K/j2k/roi/encoder/SubbandRectROIMask.cs": "e73536b5554833c0635fe8df86efa952066bb759b40f2eabca6357f0f4249364",
+    "CoreJ2K/j2k/util/ArrayUtil.cs": "0c9a1f2161b4d9ea0b1c24a2dba6cabff6d4803743453d6ec561d16d9a4e5cd8",
+    "CoreJ2K/j2k/util/FacilityManager.cs": "5069b735ad13a4064f03389f21552bbda2329edc0b1b0282e84469031128ee4c",
+    "CoreJ2K/j2k/util/IMsgLogger.cs": "3eff19fd296923dc65d3267c7e2f70036aba438eed9b1713243393268f6dce57",
+    "CoreJ2K/j2k/util/MathUtil.cs": "337b9c6024291dc138123863525a6a8d53592c9446a40047cf8ccbd0d3f61e98",
+    "CoreJ2K/j2k/util/MsgPrinter.cs": "b36e0b97932968d85dc3a9363aa0ab60e577019321c00bb1c701d2fc8ff0bd38",
+    "CoreJ2K/j2k/util/ParameterList.cs": "337c2df639d8683ce9afc68d13c22a93ecf75a10c843fab73ca76dfad92948a8",
+    "CoreJ2K/j2k/util/ProgressWatch.cs": "e9ace138a9e7a41f942a760e44e94e3e1e622a334bc4152a9d7eb45864dad093",
+    "CoreJ2K/j2k/util/StreamMsgLogger.cs": "c4818ed898697c51251b0a0fd4b60d6d47cd1d573b73ce89385c26f45f8e5d8c",
+    "CoreJ2K/j2k/util/StringFormatException.cs": "ea74c76502986b0104ecc6c8c123751228b9b4d657042c4dc710a6bbd7842fea",
+    "CoreJ2K/j2k/wavelet/FilterTypes.cs": "9b0da535ff9149160a92c2f32bdfceaa3dfce63a82139958d4df8d20386a1d28",
+    "CoreJ2K/j2k/wavelet/Subband.cs": "e41be3a1c6538f32db49525a13814f71d426d2ec6b584e2fce9425a37f1e15ce",
+    "CoreJ2K/j2k/wavelet/WTDecompSpec.cs": "236ef918ebe3b3d8e26213cde9059e16e207170617ceb7286a0ee8fea7ccebc8",
+    "CoreJ2K/j2k/wavelet/WTFilterSpec.cs": "53e4cf5068fc24bced1ddf64a17bffeea73bc4813972981fe40665ccd94d0181",
+    "CoreJ2K/j2k/wavelet/WaveletFilter.cs": "bef2a29c01018d6552e1391159e254038e04a612363a06028cb554084f9f4cb7",
+    "CoreJ2K/j2k/wavelet/WaveletTransform.cs": "816b4755045ccddda80640d689a0878bcd692f28006bc276ad3df3926125e86a",
+    "CoreJ2K/j2k/wavelet/analysis/AnWTFilter.cs": "562358c6aa3a85d931cf5a2471b7efbc37adecfa3a6785492325a13e77d34fc6",
+    "CoreJ2K/j2k/wavelet/analysis/AnWTFilterFloat.cs": "4e2c127fa3b1c3c3c23df39847bfaa23dd2192a9d318ec2215f2cc14dfa0b87d",
+    "CoreJ2K/j2k/wavelet/analysis/AnWTFilterFloatLift9x7.cs": "68e8bf2d004ee19d12979ddeb8992f246ae01ac98387a37a029adaa4aa508ab6",
+    "CoreJ2K/j2k/wavelet/analysis/AnWTFilterInt.cs": "dbcbe83586513bac19c0b11283d3bbc4974877ed4721b9d8fd9c148cd3d39e1e",
+    "CoreJ2K/j2k/wavelet/analysis/AnWTFilterIntLift5x3.cs": "b48304eabbbbd21bbd559933d9ae2b845a3eff5572721d9e095fd6e7f92c164b",
+    "CoreJ2K/j2k/wavelet/analysis/AnWTFilterSpec.cs": "43b23ef03b6fe96fab37f2a1dd05735aa5c181b4519cad932368ab722363c452",
+    "CoreJ2K/j2k/wavelet/analysis/CBlkWTData.cs": "5471b60a004576f8bfabe3d88ded86ec601ce942e82448d2372629a11404ffa8",
+    "CoreJ2K/j2k/wavelet/analysis/CBlkWTDataFloat.cs": "41024fbda2f966296e46cd9933cc55dd05c9db65f59b005e97f8111fd2751626",
+    "CoreJ2K/j2k/wavelet/analysis/CBlkWTDataInt.cs": "5534d4fce76368ba1dee8308b21739e52f81a2bb347a00888ea78cc8dafd367f",
+    "CoreJ2K/j2k/wavelet/analysis/CBlkWTDataSrc.cs": "8b36bd240c31f5b15cb422d4b7e2b6d6dabc5df454428265aba1cb110fece541",
+    "CoreJ2K/j2k/wavelet/analysis/ForwWT.cs": "bd432d2e07a24c27bf318ebf040597eabc4630b77ebba931c10e7508e9f3300b",
+    "CoreJ2K/j2k/wavelet/analysis/ForwWTDataProps.cs": "7d0f778746993db2e56d5970c49dcfdec6533960575e82a597c7b7f5f26cb9d3",
+    "CoreJ2K/j2k/wavelet/analysis/ForwWTFull.cs": "99d567dceef3bf4acf57e0e8774f63978a487d68f90ca326090b82b331225b24",
+    "CoreJ2K/j2k/wavelet/analysis/ForwardWT.cs": "dfe622d28667cf8ba72603c43ef15497e8b4206d124000cca78f65741fddfe70",
+    "CoreJ2K/j2k/wavelet/analysis/SubbandAn.cs": "d9151e43b52176b66eff1ec509767d3010adc92ada7ee0f9f8ff4a6b1c4ae5c4",
+    "CoreJ2K/j2k/wavelet/synthesis/SynWTFilter.cs": "168c8312d95bf3bf0bbd2bbf95a848603353cac28731c32d88dfc0cd0f320719",
+    "CoreJ2K/j2k/wavelet/synthesis/SynWTFilterFloat.cs": "4f8b82bb89cbc70add9fab0712c43e8be107c876d861e59130969c1917e8141b",
+    "CoreJ2K/j2k/wavelet/synthesis/SynWTFilterFloatLift9x7.cs": "9b6aca7a836babb276acfbdc7c4ab5c80ed130c3e3f062dfcd52d3ee5814190a",
+    "CoreJ2K/J2kImage.cs": "bac17539847d3120a26334e2c25e36779e82eb5690f1dac497eca66892f0d8f8",
+    "CoreJ2K.ImageSharp/ImgReaderImageSharp.cs": "ff6e687e38262015e5058bab118a01fd392966289b5b3d962bb41ceb9fa90643"
+  },
+  "initialVendoredFiles": [
+    {
+      "path": "J2kSetup.cs",
+      "vendoredInitialSha256": "3d5999f70c0ea14978f757679692de1181d916de2df6ef22cb6d75735b1b1ff1"
+    },
+    {
+      "path": "Util/CoreJ2KLog.cs",
+      "vendoredInitialSha256": "879c1fafe99a8a6185d06372dad0eeb8257e6b60bca222697dfd0e04c9c3cebb"
+    },
+    {
+      "path": "Util/DotnetFileInfo.cs",
+      "vendoredInitialSha256": "9b648958964001f79a857edae9d9067cba766bb6bd4abec0aff17fe48ee1b283"
+    },
+    {
+      "path": "Util/DotnetFileInfoCreator.cs",
+      "vendoredInitialSha256": "92224f80f4caf7d166ad383582245655923818381d64db2c4f59e2bb1e85d890"
+    },
+    {
+      "path": "Util/DotnetFileStreamCreator.cs",
+      "vendoredInitialSha256": "bff5078954daa5cf8c986b35c812d5687828a52a9602c3a694adc48c9953eea4"
+    },
+    {
+      "path": "Util/DotnetMsgLogger.cs",
+      "vendoredInitialSha256": "38c53fe07b688cfde4fb950decf3e45433361e164b10f8607e923e90ad1691f1"
+    },
+    {
+      "path": "Util/EndianBinaryReader.cs",
+      "vendoredInitialSha256": "f0241916da5aeeb92e4acd808ef217f28dba28dc3361988b9822723b3fd9e929"
+    },
+    {
+      "path": "Util/EndianBinaryWriter.cs",
+      "vendoredInitialSha256": "5892219fddf3b5d4308d70154aa8db78429a3beb3e51e0f55726b091747901eb"
+    },
+    {
+      "path": "Util/FileInfoFactory.cs",
+      "vendoredInitialSha256": "b165c12019f9487914e31ea8ae03eb89eddc120399bdc8b540d762518e446695"
+    },
+    {
+      "path": "Util/FileStreamFactory.cs",
+      "vendoredInitialSha256": "b2ded729c1817a70a368114010800a110d53158419721556e1f54c470873736d"
+    },
+    {
+      "path": "Util/IDefaultable.cs",
+      "vendoredInitialSha256": "9a7dcbdb85f23f9b52bd987925075f76928f894876a56cab3abae643dd6e5051"
+    },
+    {
+      "path": "Util/IFileInfo.cs",
+      "vendoredInitialSha256": "8499881b096ab8b6d34065c271e1398ed997c1daf2ef0c5f3a1ea7f3df79cd1c"
+    },
+    {
+      "path": "Util/IFileInfoCreator.cs",
+      "vendoredInitialSha256": "aaddbb4c9b20a767818a02b6e200b5deb8745ab98749f7f7a01fd81005559eca"
+    },
+    {
+      "path": "Util/IFileStreamCreator.cs",
+      "vendoredInitialSha256": "0fc68d7058d9784d840e9ab755ed9d176a016f49d04e717c61c7eb7f9f5ab198"
+    },
+    {
+      "path": "Util/SupportClass.cs",
+      "vendoredInitialSha256": "1e43e864d749eabdd1acdc93c16cd0734454f34fb69a04ce75ef89ba04c0c7a8"
+    },
+    {
+      "path": "j2k/IntegerSpec.cs",
+      "vendoredInitialSha256": "85a514987c317e67675a280f6eb85b15193c8a0656e36ee12d27714f453731d4"
+    },
+    {
+      "path": "j2k/JJ2KExceptionHandler.cs",
+      "vendoredInitialSha256": "2fd30d8c3fa822c9fefa49f0052ccb8a45d31caf818207d1f212f34f9c0c0611"
+    },
+    {
+      "path": "j2k/JJ2KInfo.cs",
+      "vendoredInitialSha256": "86e9fedfc16b166ed3430e6d83898ec797bd8567eba9968734982683ec75ca23"
+    },
+    {
+      "path": "j2k/ModuleSpec.cs",
+      "vendoredInitialSha256": "ef5f9bed4af49e20aed772a454699e8749ea1012953fafa4f976ac13d85058c7"
+    },
+    {
+      "path": "j2k/NoNextElementException.cs",
+      "vendoredInitialSha256": "8409a6c0a4fa30e208ff579d6836c07dbcb6e9d1621d7ba383beb7b0c773aaec"
+    },
+    {
+      "path": "j2k/StringSpec.cs",
+      "vendoredInitialSha256": "1f5dbd4c11c392c94bcbdfec98d6466dbe45f46a926da60732296c8003b9928e"
+    },
+    {
+      "path": "j2k/codestream/CBlkCoordInfo.cs",
+      "vendoredInitialSha256": "62c09cb36c981eba96f71cfa363b7c696a45466f9d00ff7d82921a0ab78997ab"
+    },
+    {
+      "path": "j2k/codestream/CoordInfo.cs",
+      "vendoredInitialSha256": "a16bebeff33d883592a6fdff6805bd198317f679515cffcc3fa10198efac5770"
+    },
+    {
+      "path": "j2k/codestream/CorruptedCodestreamException.cs",
+      "vendoredInitialSha256": "869e5d0fa6e29f197b88aa0a80491f3597e3effecdadf6ad102a7665c5f7f75c"
+    },
+    {
+      "path": "j2k/codestream/Markers.cs",
+      "vendoredInitialSha256": "06c14b59d7d081c966f14ab5f821613bd915347301f1c1daf29b3e6277d08551"
+    },
+    {
+      "path": "j2k/codestream/PltMarker.cs",
+      "vendoredInitialSha256": "9dc1dc50712bbe35eb5d7256109085f2fa93ca5ccdb89abf962b8bb19694899b"
+    },
+    {
+      "path": "j2k/codestream/PltMarkerCollection.cs",
+      "vendoredInitialSha256": "a51a90f2293ecfdf186c5d6a3dcef010add132312d4e41e11ee46d9a38fff8d0"
+    },
+    {
+      "path": "j2k/codestream/PrecCoordInfo.cs",
+      "vendoredInitialSha256": "98858320e7d3285c61766d9677550fe47146fc106646581fbc320c0bddbe1655"
+    },
+    {
+      "path": "j2k/codestream/PrecInfo.cs",
+      "vendoredInitialSha256": "dd241284ba1feaadef077bab50a9fc9368baaf65a3776fa130048edf07e3575c"
+    },
+    {
+      "path": "j2k/codestream/ProgressionType.cs",
+      "vendoredInitialSha256": "bc84e3092b09ca2aec6203a50deacb90500f9518b3677c3e00eb27e72c314774"
+    },
+    {
+      "path": "j2k/codestream/writer/BitOutputBuffer.cs",
+      "vendoredInitialSha256": "34cec6d495118cab43b549dffa04bd6d835c26804a1b549a2f50a99e5267fb20"
+    },
+    {
+      "path": "j2k/codestream/writer/CodestreamWriter.cs",
+      "vendoredInitialSha256": "e532ba33d39206afafb70c8fa58a1f9f87a1237e75828739e51e16e815d160a9"
+    },
+    {
+      "path": "j2k/codestream/writer/FileCodestreamWriter.cs",
+      "vendoredInitialSha256": "86d028b72a5276afc7ca07d718f773e19c9d9fd50a7c2cb9c911cfce07b5e1af"
+    },
+    {
+      "path": "j2k/codestream/writer/HeaderEncoder.cs",
+      "vendoredInitialSha256": "f3588a31664cde0931921cf2a1e089c3d7afe11dd1f18bedef8a464b424aeff7"
+    },
+    {
+      "path": "j2k/codestream/writer/PktEncoder.cs",
+      "vendoredInitialSha256": "2aaf5a50b4d432c1e1cb2dd5252e0810bf9f7d0f4aab2e58a7b36b6fabcf5177"
+    },
+    {
+      "path": "j2k/codestream/writer/TagTreeEncoder.cs",
+      "vendoredInitialSha256": "85c12029534aaa23ac4fd943c1d91d86565e45cfa07d3d2de42d07a41b608754"
+    },
+    {
+      "path": "j2k/encoder/EncoderOptions.cs",
+      "vendoredInitialSha256": "0412452fa106dafedfc1d37fcbde67dab9040b376e0907eb51e380e3fb2567de"
+    },
+    {
+      "path": "j2k/encoder/EncoderOutputFormat.cs",
+      "vendoredInitialSha256": "b6c7cb1e3526fd3823e9a940951b394e9dbcad3db953581a257a76be60af4f78"
+    },
+    {
+      "path": "j2k/encoder/EncoderResult.cs",
+      "vendoredInitialSha256": "9cc30a2051bace4bcae1b2f1880972a448ea1b3dc0f3928a8b5d83d2525cb3cf"
+    },
+    {
+      "path": "j2k/encoder/EncoderSpecs.cs",
+      "vendoredInitialSha256": "7be110d96a04b45e89384a08b9118d133b59577ef16d30a5d74d3f4680f2f752"
+    },
+    {
+      "path": "j2k/encoder/PayloadTelemetry.cs",
+      "vendoredInitialSha256": "2f73123a5d4ffda8eacb16f3eb3d29541c231c034a0fb371d3f3b70deaf33637"
+    },
+    {
+      "path": "j2k/encoder/RoiMask.cs",
+      "vendoredInitialSha256": "f1a0efd46a58b6c7d34c36d0e9e2d776c4a0a0d0fb23a4adea8e2b21bb744b70"
+    },
+    {
+      "path": "j2k/encoder/RoiOptions.cs",
+      "vendoredInitialSha256": "e2471c599ec7694f1302587a70f326b3a835718ec8c28736d939168f80ec6266"
+    },
+    {
+      "path": "j2k/encoder/RoiRegion.cs",
+      "vendoredInitialSha256": "4996ebc75e60c74586e17cfcde713eb54bd429bdde6d1bf6fac5d5fdf4b9eaf6"
+    },
+    {
+      "path": "j2k/encoder/SharedPayloadAttribution.cs",
+      "vendoredInitialSha256": "27f684a2bd3f2f2bb9e1983afe6af028b0d4d42583dfe6b1eb75749cbacc9122"
+    },
+    {
+      "path": "j2k/encoder/SubbandPayloadAttribution.cs",
+      "vendoredInitialSha256": "5cc84fa9d3fca1b819fa325fd7c052b2666d07b9d8b91109f9f1faf979e32ddd"
+    },
+    {
+      "path": "j2k/encoder/SubbandPayloadTelemetry.cs",
+      "vendoredInitialSha256": "21299aaedc5d8c8a83b31832c83a0d85410816dbcaca7ac78b1c4904ba5e070a"
+    },
+    {
+      "path": "j2k/encoder/SubbandWeights.cs",
+      "vendoredInitialSha256": "9ae148b35c5a0ded1de07506dc8857232b86100a6ca9a281d0e79d8d336fa393"
+    },
+    {
+      "path": "j2k/entropy/CBlkSizeSpec.cs",
+      "vendoredInitialSha256": "0c122a1c4fe46f07f57d2102850374eb41ae8a906431cf89b48a707d2266dfbe"
+    },
+    {
+      "path": "j2k/entropy/CodedCBlk.cs",
+      "vendoredInitialSha256": "5f1d953f3dc07a41890a8f24a3107b7cc7969f842345405aa53e3ef538d48ab4"
+    },
+    {
+      "path": "j2k/entropy/PrecinctSizeSpec.cs",
+      "vendoredInitialSha256": "b085b2cc6d7949f1063b349e249b2f4f8eb697b2671ca1ed267367287edcc163"
+    },
+    {
+      "path": "j2k/entropy/Progression.cs",
+      "vendoredInitialSha256": "b8a3e7e026d908a3a2e4eb2b044641bfe8d632608a34fdbd20c5cb61919a3e56"
+    },
+    {
+      "path": "j2k/entropy/ProgressionSpec.cs",
+      "vendoredInitialSha256": "697d49f13eb0605ff6ae5debcb9b9774168a0ba1ef715f32117d480bab06ba5b"
+    },
+    {
+      "path": "j2k/entropy/StdEntropyCoderOptions.cs",
+      "vendoredInitialSha256": "60b796abc1f46377ad67046308da6116d697144df827543e5ccfcfd1ac1a334f"
+    },
+    {
+      "path": "j2k/entropy/encoder/BitToByteOutput.cs",
+      "vendoredInitialSha256": "03786f11f6647c4e7ae7139a198c512f0b7a33e52a499387e0c9604c446e02b7"
+    },
+    {
+      "path": "j2k/entropy/encoder/BudgetAllocationDiagnostics.cs",
+      "vendoredInitialSha256": "f4c567de4cb14a494307fb1c2d65b785acca9e328cf69e35ace61e042f3eb22e"
+    },
+    {
+      "path": "j2k/entropy/encoder/ByteOutputBuffer.cs",
+      "vendoredInitialSha256": "c00f99e566b3e0d437b6de8c3d1eb719c83d2b15f66a3d7dca7ba113e7436131"
+    },
+    {
+      "path": "j2k/entropy/encoder/CBlkRateDistStats.cs",
+      "vendoredInitialSha256": "a02bb0a2a63dc679a015e8d32ab81823bff4c39400b31665f8c0bd2e6c91c3f5"
+    },
+    {
+      "path": "j2k/entropy/encoder/CodedCBlkDataSrcEnc.cs",
+      "vendoredInitialSha256": "0d48cf27affe1d91d2b55e7c6991865296f8acf5b1f39c3366f47c73edfb22b0"
+    },
+    {
+      "path": "j2k/entropy/encoder/EBCOTBudgetAllocation.cs",
+      "vendoredInitialSha256": "1899f61e89d3d5ddec2caa277f39f26bce902c2a388d7d26d76e2b8134b6cb24"
+    },
+    {
+      "path": "j2k/entropy/encoder/EBCOTLayer.cs",
+      "vendoredInitialSha256": "7071ade927e95f1758a6515ccc9b184901da8745b28eef21629eb8afc06e06f3"
+    },
+    {
+      "path": "j2k/entropy/encoder/EBCOTPayloadTelemetry.cs",
+      "vendoredInitialSha256": "351e9de3631a9a4228c38779d6e0d39752cf36c32e3cec417237ddf5932f9ecf"
+    },
+    {
+      "path": "j2k/entropy/encoder/EBCOTRateAllocator.cs",
+      "vendoredInitialSha256": "f9fd83a2a1ad3b23700ebcd6f67cc1edf51e38245a8e965414da67f71ccc34a2"
+    },
+    {
+      "path": "j2k/entropy/encoder/EBCOTSharedPayloadAttribution.cs",
+      "vendoredInitialSha256": "29360807e70b571af6d7802c74c5aff9c672e13ff93f2c863edd51007cb91221"
+    },
+    {
+      "path": "j2k/entropy/encoder/EntropyCoder.cs",
+      "vendoredInitialSha256": "054c4c729823c1a93c14afc7976ddd3df00f7f633ff3595ad720da2da0f22056"
+    },
+    {
+      "path": "j2k/entropy/encoder/LayersInfo.cs",
+      "vendoredInitialSha256": "7a494f0d6b193fc0cd7f5a001dc110d0ae92c446b86153e56e219836456efcb3"
+    },
+    {
+      "path": "j2k/entropy/encoder/MQCoder.cs",
+      "vendoredInitialSha256": "5c1c5867bbe8c463b08d7b3e879779a8cae52495885e376b14b78ffbd59d7cfa"
+    },
+    {
+      "path": "j2k/entropy/encoder/PostCompRateAllocator.cs",
+      "vendoredInitialSha256": "75052b86746b1b81d11bb032d751a4e6de49feda115608544d7c737d7a3a144f"
+    },
+    {
+      "path": "j2k/entropy/encoder/StdEntropyCoder.cs",
+      "vendoredInitialSha256": "b176afd084742c1a1e6484ae7366d55ad7fe4e526ceece85099e7d1542dc4395"
+    },
+    {
+      "path": "j2k/entropy/encoder/SynthesisEnergyInfluence.cs",
+      "vendoredInitialSha256": "69282e566edcf3f4d7ec0e2136ec5fd46265c84f59a7da2f0abded0e996a977d"
+    },
+    {
+      "path": "j2k/entropy/encoder/SynthesisPassGainAccumulator.cs",
+      "vendoredInitialSha256": "8b969e667539ed9dbda996f00152f302c4960a58a9c55e6afd3aa8f25397d03a"
+    },
+    {
+      "path": "j2k/fileformat/FileFormatBoxes.cs",
+      "vendoredInitialSha256": "1128cc698a31aaa37497decaf40b8c20c3aeaba833df36ff14324523561cd088"
+    },
+    {
+      "path": "j2k/fileformat/writer/FileFormatWriter.cs",
+      "vendoredInitialSha256": "14453cce5f6ea35a106857e63807d61fc15929fde7d2eafc0a59d3b0c2e43168"
+    },
+    {
+      "path": "j2k/image/BlkImgDataSrc.cs",
+      "vendoredInitialSha256": "cc9acd5765fd341e7c00de988898fc876b4b2f8b4871d6a910806af11236eca0"
+    },
+    {
+      "path": "j2k/image/CompTransfSpec.cs",
+      "vendoredInitialSha256": "9cb49904bc3389557568b547afeba65ef0f52e0361823287b0bd87fa08a04a54"
+    },
+    {
+      "path": "j2k/image/Coord.cs",
+      "vendoredInitialSha256": "7f7505fcfaeb79e69521c29e90e342b90d74998f8b7408a0c5292972d9715c69"
+    },
+    {
+      "path": "j2k/image/DataBlk.cs",
+      "vendoredInitialSha256": "4466941c35f2ed467a23cedbfd31c9d247d0081b95247d4cb1158cbc173bd8f3"
+    },
+    {
+      "path": "j2k/image/DataBlkFloat.cs",
+      "vendoredInitialSha256": "2c9659667e3fccbb6157d688f905e0a07712109f732077892e20fa860af50a14"
+    },
+    {
+      "path": "j2k/image/DataBlkInt.cs",
+      "vendoredInitialSha256": "c4622301f776993e03474b5d98c882bbe0f6a76d22ee63264adff113b3d78cc5"
+    },
+    {
+      "path": "j2k/image/ImgData.cs",
+      "vendoredInitialSha256": "18703a67db99de6b775d6753e03be4f20e9d756f694f6184c448e4eedfa9b591"
+    },
+    {
+      "path": "j2k/image/ImgDataAdapter.cs",
+      "vendoredInitialSha256": "14e45c1232b9b2c57aaf44d3ae96ad738b98831baad2147f06f8f6bdc8fcb878"
+    },
+    {
+      "path": "j2k/image/ImgDataConverter.cs",
+      "vendoredInitialSha256": "aca5b077964db7054e7273a8656f0f1b98825aa3be4fd9f6db1cca6ce61f2cec"
+    },
+    {
+      "path": "j2k/image/Tiler.cs",
+      "vendoredInitialSha256": "539328ad31a1b03724cf10ec724f03057d24cfae7a10baf879f746cdcc6b3b0e"
+    },
+    {
+      "path": "j2k/image/forwcomptransf/ForwCompTransf.cs",
+      "vendoredInitialSha256": "cc7d4c183d3a583a542ac08d2026c58f4a7069cba371b8c3bcb90bdfb65f601a"
+    },
+    {
+      "path": "j2k/image/forwcomptransf/ForwCompTransfSpec.cs",
+      "vendoredInitialSha256": "9c9cad2a9192f29ec96bfb9cf283870efca2df2e3d74825e12068d4f996d0375"
+    },
+    {
+      "path": "j2k/image/input/ImgReader.cs",
+      "vendoredInitialSha256": "d3f4b5ec673d9d0756de4c43015887481ebdfda05ee2c86d161213676f60baba"
+    },
+    {
+      "path": "j2k/io/BEBufferedRandomAccessFile.cs",
+      "vendoredInitialSha256": "c49bc58c9878c9bf7758a71e6c90fd065a35d93bd925f36efbafb0d64f66e172"
+    },
+    {
+      "path": "j2k/io/BinaryDataInput.cs",
+      "vendoredInitialSha256": "1cf2e7604a85fbfec3a887ee7082a5adff7a0381604069b9e37c7527aeecd77f"
+    },
+    {
+      "path": "j2k/io/BinaryDataOutput.cs",
+      "vendoredInitialSha256": "2099bd1d96f9df76052a5e8fbe8963bb79d8d81da73009525c14a9aa558b3af7"
+    },
+    {
+      "path": "j2k/io/BufferedRandomAccessFile.cs",
+      "vendoredInitialSha256": "65b2d374421a4c516a2f25fd2053d1c43f712c97771664fb94423cf680f91167"
+    },
+    {
+      "path": "j2k/io/EndianType.cs",
+      "vendoredInitialSha256": "3c2efc6d14863683cbe949be7eb279be068a2a24dae1c7cfb4c145bc48405da5"
+    },
+    {
+      "path": "j2k/io/RandomAccessIO.cs",
+      "vendoredInitialSha256": "39015bf574f1f29be6249b9048a07c2f18601a212290ce35f6a9aeeff739aaa9"
+    },
+    {
+      "path": "j2k/quantization/GuardBitsSpec.cs",
+      "vendoredInitialSha256": "5ede0ed8656e727ddbbb573443ef7c6f9c814d086aeabe9ddaa825f390ea4048"
+    },
+    {
+      "path": "j2k/quantization/QuantStepSizeSpec.cs",
+      "vendoredInitialSha256": "fb7ed2f7bc1df1dbbcc5e8b3454c069332e877f3f5edfe8710cd1c0fae86a49e"
+    },
+    {
+      "path": "j2k/quantization/QuantTypeSpec.cs",
+      "vendoredInitialSha256": "ddf82523bad3828fccb6c549e49b1e5a6153ee573f85740fca2501215b0886f0"
+    },
+    {
+      "path": "j2k/quantization/QuantizationType.cs",
+      "vendoredInitialSha256": "69e5b746671958f9192d888c0b2fe678dcac51ce77624421c0c66b06498f11ec"
+    },
+    {
+      "path": "j2k/quantization/quantizer/CBlkQuantDataSrcEnc.cs",
+      "vendoredInitialSha256": "8cd73a62f3faff14a6444ed01110cc354d4f5ed53e85e127884ae89d143b3196"
+    },
+    {
+      "path": "j2k/quantization/quantizer/Quantizer.cs",
+      "vendoredInitialSha256": "26f9735c07e419726164f107f64b175824ff87ee75c1a7790cd059eef238e7c2"
+    },
+    {
+      "path": "j2k/quantization/quantizer/StdQuantizer.cs",
+      "vendoredInitialSha256": "2832e20e0b969c7d6fbe2b62d9b8bbe19f2bdfa4f23b1766a3943ef916e10052"
+    },
+    {
+      "path": "j2k/roi/MaxShiftSpec.cs",
+      "vendoredInitialSha256": "7d9c72322164b41f53f9d2ea7bf85a88028ae542e0a1b2cea4c1104053e7811a"
+    },
+    {
+      "path": "j2k/roi/encoder/ArbROIMaskGenerator.cs",
+      "vendoredInitialSha256": "b1e227a1a0869407c1e3386c0f05c3f4cf9e0b0c931fe67a794c606cb6a5e3f3"
+    },
+    {
+      "path": "j2k/roi/encoder/ROI.cs",
+      "vendoredInitialSha256": "d8c45d1b99b6667d376d7ba259f793f6a267a7556f7755df11b334f2b8827378"
+    },
+    {
+      "path": "j2k/roi/encoder/ROIMaskGenerator.cs",
+      "vendoredInitialSha256": "9fe517003fc05c5a0c429020feb4c221496e31dd3ccbfbba5ad59af52d491eca"
+    },
+    {
+      "path": "j2k/roi/encoder/ROIScaler.cs",
+      "vendoredInitialSha256": "ff184d03fe0abb1061dcc550afb17e8b83509059634d51c0bdc372945b223763"
+    },
+    {
+      "path": "j2k/roi/encoder/RectROIMaskGenerator.cs",
+      "vendoredInitialSha256": "764e5501f2d79e03552e736dc24fbd0749ead974234879b87c1aaf7685d5241b"
+    },
+    {
+      "path": "j2k/roi/encoder/SubbandROIMask.cs",
+      "vendoredInitialSha256": "c8f6afb2657a8401c2055b8ad12ab9e063cb04f1bf4368542c62670f5fc1c7c6"
+    },
+    {
+      "path": "j2k/roi/encoder/SubbandRectROIMask.cs",
+      "vendoredInitialSha256": "968e9a340fd81f14d6c423c8c95316eaf130b054dd75ff59c5bf83de0679f961"
+    },
+    {
+      "path": "j2k/util/ArrayUtil.cs",
+      "vendoredInitialSha256": "a575fece145227849b77ae3cb1ecb542d243a02c7cad0b2f0f6459021d97d732"
+    },
+    {
+      "path": "j2k/util/FacilityManager.cs",
+      "vendoredInitialSha256": "e4502721abfabf875bedc93da2536de88f9f7a55665f4cf1b61738aaa21b76a9"
+    },
+    {
+      "path": "j2k/util/IMsgLogger.cs",
+      "vendoredInitialSha256": "cf4df2dd46df21e6837fe2c715529468c9f88f324f3990b7deb8076a6554ebe4"
+    },
+    {
+      "path": "j2k/util/MathUtil.cs",
+      "vendoredInitialSha256": "ced27e8529b4a572f97302cf4d582e98d7cdc5c9e4a2677247c1ca32550973b8"
+    },
+    {
+      "path": "j2k/util/MsgPrinter.cs",
+      "vendoredInitialSha256": "5ea618e2f2cface29dd513cfea1ee8402719d70be70a5b1bd38a5967645cef29"
+    },
+    {
+      "path": "j2k/util/ParameterList.cs",
+      "vendoredInitialSha256": "975af88b0d688dfc81d49a7b5464d3312c0175c99bbd6df9b13b15baf7c36c6e"
+    },
+    {
+      "path": "j2k/util/ProgressWatch.cs",
+      "vendoredInitialSha256": "e6c12390e8e31aa2b38063023b8e780ba828db7c88194699f812bcb2ce2125b3"
+    },
+    {
+      "path": "j2k/util/StreamMsgLogger.cs",
+      "vendoredInitialSha256": "9dd1e1dda68cce5de850e3e5d79c7f5fefcc6e34b78f01f460a86f54d549d1c5"
+    },
+    {
+      "path": "j2k/util/StringFormatException.cs",
+      "vendoredInitialSha256": "0e801a8005236979388825562f6559b12620b59de6217decb6ff17e7e0d14d2d"
+    },
+    {
+      "path": "j2k/wavelet/FilterTypes.cs",
+      "vendoredInitialSha256": "7cb7e50084c87154dd8d9997cdb85c0733689bd4a5dfc469375cd81d77b8f2a0"
+    },
+    {
+      "path": "j2k/wavelet/Subband.cs",
+      "vendoredInitialSha256": "59c01b34ea92d3d3cf2312aa8cea476bc2b92143245622f21231723d69aa8c0d"
+    },
+    {
+      "path": "j2k/wavelet/WTDecompSpec.cs",
+      "vendoredInitialSha256": "75760b6f8e868782fd8f64cabebd5de24721bf8874a1aaf1d28e31a56c4b5ec9"
+    },
+    {
+      "path": "j2k/wavelet/WTFilterSpec.cs",
+      "vendoredInitialSha256": "f4493f76e98da02553dac8a6cdee9d94bbe3520fa5b54f9a331b38303f3200ec"
+    },
+    {
+      "path": "j2k/wavelet/WaveletFilter.cs",
+      "vendoredInitialSha256": "78a957a42f3f2718bf68b1d38a3ffd50f0cfd1203c5ea976a2c8c2e389ddebbd"
+    },
+    {
+      "path": "j2k/wavelet/WaveletTransform.cs",
+      "vendoredInitialSha256": "cc90d1a73bc28fb734e7de68efcd72a9505f6f0298362fffc333eaed4c20fd48"
+    },
+    {
+      "path": "j2k/wavelet/analysis/AnWTFilter.cs",
+      "vendoredInitialSha256": "7981351a7cf5cae2d9c97cb20e79cb1dddbce766213d16fb689b8cd6388a3e44"
+    },
+    {
+      "path": "j2k/wavelet/analysis/AnWTFilterFloat.cs",
+      "vendoredInitialSha256": "dbbaca6f9179494bc2c997a63a898533c2662a83f0a8a9117a77016a060633ca"
+    },
+    {
+      "path": "j2k/wavelet/analysis/AnWTFilterFloatLift9x7.cs",
+      "vendoredInitialSha256": "37738cda46e4f3c1dd57f19095c59ad380adf76b637edfd833ff0ef81334cad7"
+    },
+    {
+      "path": "j2k/wavelet/analysis/AnWTFilterInt.cs",
+      "vendoredInitialSha256": "d6186f2f097d7438ee69467db5bcfbb412a511f4c5dd6d136b2aae1cc4c99ea4"
+    },
+    {
+      "path": "j2k/wavelet/analysis/AnWTFilterIntLift5x3.cs",
+      "vendoredInitialSha256": "cdfe79de5b3b4012dd959d68ed06d8f24f7992bdfd99ab3aacafd6c804b4627f"
+    },
+    {
+      "path": "j2k/wavelet/analysis/AnWTFilterSpec.cs",
+      "vendoredInitialSha256": "5b2017f6358b299f54255c019db610e02036e4c7e2f2722b73043a54dfb2aa90"
+    },
+    {
+      "path": "j2k/wavelet/analysis/CBlkWTData.cs",
+      "vendoredInitialSha256": "639548b2d6ec183f1cfaf8c3a98b7b0914af22669418f2f2ed3a8c2a6474f440"
+    },
+    {
+      "path": "j2k/wavelet/analysis/CBlkWTDataFloat.cs",
+      "vendoredInitialSha256": "83ddcb5589d6b68b019cebb91f0fda43b2f3011b3d8a84f6d6797156de6265c3"
+    },
+    {
+      "path": "j2k/wavelet/analysis/CBlkWTDataInt.cs",
+      "vendoredInitialSha256": "e44bc680561f855c4f57750343a2d23f351897f8bd7b16055428971580fbd745"
+    },
+    {
+      "path": "j2k/wavelet/analysis/CBlkWTDataSrc.cs",
+      "vendoredInitialSha256": "207c78bdb8cab5e00608c1fd8aacec3611a7cfd0a543f1e4394b7508bdf831b9"
+    },
+    {
+      "path": "j2k/wavelet/analysis/ForwWT.cs",
+      "vendoredInitialSha256": "e7163574d8f48f2bdfe5a14bc8569a00d0d17d034f6cfd3c83992a88857b8187"
+    },
+    {
+      "path": "j2k/wavelet/analysis/ForwWTDataProps.cs",
+      "vendoredInitialSha256": "bbe27e1622c654063b107f4f7eafffc4fb2b88cb9835d9beda9ec23c10f14fb0"
+    },
+    {
+      "path": "j2k/wavelet/analysis/ForwWTFull.cs",
+      "vendoredInitialSha256": "e4e392a3b55017bc6191850bd69606ba002fd395f5784a023c65d48970710afc"
+    },
+    {
+      "path": "j2k/wavelet/analysis/ForwardWT.cs",
+      "vendoredInitialSha256": "4128bf165b567316c9ebd749fc3e7aacf9833de265d9eec150d9e6b5de955fd7"
+    },
+    {
+      "path": "j2k/wavelet/analysis/SubbandAn.cs",
+      "vendoredInitialSha256": "57d35cd173eb90bf991a1aca2aa025ecba99b4bb986fb162a7beb7d75c5bc0a7"
+    },
+    {
+      "path": "j2k/wavelet/synthesis/SynWTFilter.cs",
+      "vendoredInitialSha256": "9b157d2221c3de69af561e3dd5e0e97aeea6a0dc0419f2f3ca8b01fd70413685"
+    },
+    {
+      "path": "j2k/wavelet/synthesis/SynWTFilterFloat.cs",
+      "vendoredInitialSha256": "6a5665d027232f74965c7befad94b54e602f629d0947e2a15a2c8496b606e16f"
+    },
+    {
+      "path": "j2k/wavelet/synthesis/SynWTFilterFloatLift9x7.cs",
+      "vendoredInitialSha256": "9ce20b821b9d305007823226a50e8e80a06897c08fba6dff76f5ba8de8db366a"
+    },
+    {
+      "path": "EncodingPipeline.cs",
+      "vendoredInitialSha256": "3b3aa63c7a275d8cebe719f713e9b8cbcaf161369f34d8b87b46e9ca8bc84c6b"
+    },
+    {
+      "path": "Rgb24ImageSource.cs",
+      "vendoredInitialSha256": "6369568dd3bad774c60be54d6b703312ba5ee808f2f44c0cb7f4a699df960a04"
+    }
+  ],
+  "changes": [
+    "Namespace and type visibility isolation",
+    "Encoder-only facade extraction",
+    "Memory-only ROI masks",
+    "Raw balanced allocation without protected/attributed payload quotas",
+    "Synthesis-gain capture retained for unchanged V3 accounting",
+    "Single fixed balanced internal entry point, RGB24 input only",
+    "Decoder-only PLT helpers and legacy path factories removed",
+    "Quota state and regional constrained allocator removed",
+    "Original license files copied byte-for-byte"
+  ],
+  "sourceSnapshotVerifiedUnchanged": true,
+  "finalVendoredFiles": {
+    "BalancedEncoder.cs": "105e9c842a373fde1c7dd55e9d598e63f3e0a2364ae768fe0af0e1f910ee6fdd",
+    "COPYRIGHT-JJ2000-5.1": "10c284b2af1ea5fe8516b5510a7b05a9def383e232a5e1b871be8098f75b9588",
+    "CoreJ2K.FaceOFFx.csproj": "423a565905fc0c384dd1aa201732b6e2eaceaec725a0e71ef2e6278de11a17dc",
+    "EncodingPipeline.cs": "8e514bb584c212635a05b67d8b77cae0f08a660b8e60ad7db7c51484f8fe024d",
+    "LICENSE": "492816a21e8e47818f0033d652ce0ef5ce6c20d3b6a737be9011061c0c491d94",
+    "README.md": "9c2aed6c8d06f75125f0aeb1bffc25dd70dedd19d3b4e65a3a7de540c246badc",
+    "Rgb24ImageSource.cs": "ece6af3535a2ed6289912b3d9512a1cfb9212f28fbf6c897c74eb57014762557",
+    "Util/DotnetMsgLogger.cs": "38c53fe07b688cfde4fb950decf3e45433361e164b10f8607e923e90ad1691f1",
+    "Util/EndianBinaryReader.cs": "f0241916da5aeeb92e4acd808ef217f28dba28dc3361988b9822723b3fd9e929",
+    "Util/EndianBinaryWriter.cs": "5892219fddf3b5d4308d70154aa8db78429a3beb3e51e0f55726b091747901eb",
+    "Util/SupportClass.cs": "66aea64e8f6554f197902631dd7bf0bc511be3540572e6eee9eff97c5042cb2e",
+    "j2k/IntegerSpec.cs": "85a514987c317e67675a280f6eb85b15193c8a0656e36ee12d27714f453731d4",
+    "j2k/JJ2KExceptionHandler.cs": "2fd30d8c3fa822c9fefa49f0052ccb8a45d31caf818207d1f212f34f9c0c0611",
+    "j2k/JJ2KInfo.cs": "86e9fedfc16b166ed3430e6d83898ec797bd8567eba9968734982683ec75ca23",
+    "j2k/ModuleSpec.cs": "ef5f9bed4af49e20aed772a454699e8749ea1012953fafa4f976ac13d85058c7",
+    "j2k/NoNextElementException.cs": "8409a6c0a4fa30e208ff579d6836c07dbcb6e9d1621d7ba383beb7b0c773aaec",
+    "j2k/StringSpec.cs": "1f5dbd4c11c392c94bcbdfec98d6466dbe45f46a926da60732296c8003b9928e",
+    "j2k/codestream/CBlkCoordInfo.cs": "62c09cb36c981eba96f71cfa363b7c696a45466f9d00ff7d82921a0ab78997ab",
+    "j2k/codestream/CoordInfo.cs": "a16bebeff33d883592a6fdff6805bd198317f679515cffcc3fa10198efac5770",
+    "j2k/codestream/Markers.cs": "06c14b59d7d081c966f14ab5f821613bd915347301f1c1daf29b3e6277d08551",
+    "j2k/codestream/PrecCoordInfo.cs": "98858320e7d3285c61766d9677550fe47146fc106646581fbc320c0bddbe1655",
+    "j2k/codestream/PrecInfo.cs": "dd241284ba1feaadef077bab50a9fc9368baaf65a3776fa130048edf07e3575c",
+    "j2k/codestream/ProgressionType.cs": "bc84e3092b09ca2aec6203a50deacb90500f9518b3677c3e00eb27e72c314774",
+    "j2k/codestream/writer/BitOutputBuffer.cs": "34cec6d495118cab43b549dffa04bd6d835c26804a1b549a2f50a99e5267fb20",
+    "j2k/codestream/writer/CodestreamWriter.cs": "e532ba33d39206afafb70c8fa58a1f9f87a1237e75828739e51e16e815d160a9",
+    "j2k/codestream/writer/FileCodestreamWriter.cs": "86d028b72a5276afc7ca07d718f773e19c9d9fd50a7c2cb9c911cfce07b5e1af",
+    "j2k/codestream/writer/HeaderEncoder.cs": "f3588a31664cde0931921cf2a1e089c3d7afe11dd1f18bedef8a464b424aeff7",
+    "j2k/codestream/writer/PktEncoder.cs": "2aaf5a50b4d432c1e1cb2dd5252e0810bf9f7d0f4aab2e58a7b36b6fabcf5177",
+    "j2k/codestream/writer/TagTreeEncoder.cs": "85c12029534aaa23ac4fd943c1d91d86565e45cfa07d3d2de42d07a41b608754",
+    "j2k/encoder/EncoderOptions.cs": "5a94abea6ddc963af3df88e90e42bb2a3d1a330b18897b4ba7a987de468e09e9",
+    "j2k/encoder/EncoderResult.cs": "821859db494706bd4d97d0275678b519878d03a9c5aec74668b4bb0db04a6d2d",
+    "j2k/encoder/EncoderSpecs.cs": "7be110d96a04b45e89384a08b9118d133b59577ef16d30a5d74d3f4680f2f752",
+    "j2k/encoder/PayloadTelemetry.cs": "2f73123a5d4ffda8eacb16f3eb3d29541c231c034a0fb371d3f3b70deaf33637",
+    "j2k/encoder/RoiMask.cs": "f1a0efd46a58b6c7d34c36d0e9e2d776c4a0a0d0fb23a4adea8e2b21bb744b70",
+    "j2k/encoder/RoiOptions.cs": "4d589fa20e97151441bb92390b45794beb0e5fef6be8df3af2a878a637a5f294",
+    "j2k/encoder/RoiRegion.cs": "4996ebc75e60c74586e17cfcde713eb54bd429bdde6d1bf6fac5d5fdf4b9eaf6",
+    "j2k/encoder/SharedPayloadAttribution.cs": "27f684a2bd3f2f2bb9e1983afe6af028b0d4d42583dfe6b1eb75749cbacc9122",
+    "j2k/encoder/SubbandPayloadAttribution.cs": "5cc84fa9d3fca1b819fa325fd7c052b2666d07b9d8b91109f9f1faf979e32ddd",
+    "j2k/encoder/SubbandPayloadTelemetry.cs": "21299aaedc5d8c8a83b31832c83a0d85410816dbcaca7ac78b1c4904ba5e070a",
+    "j2k/encoder/SubbandWeights.cs": "704eb2778444dd0fe2a86690ded83faf8ec7c016387ed799c202eebcd9acbd34",
+    "j2k/entropy/CBlkSizeSpec.cs": "0c122a1c4fe46f07f57d2102850374eb41ae8a906431cf89b48a707d2266dfbe",
+    "j2k/entropy/CodedCBlk.cs": "5f1d953f3dc07a41890a8f24a3107b7cc7969f842345405aa53e3ef538d48ab4",
+    "j2k/entropy/PrecinctSizeSpec.cs": "b085b2cc6d7949f1063b349e249b2f4f8eb697b2671ca1ed267367287edcc163",
+    "j2k/entropy/Progression.cs": "b8a3e7e026d908a3a2e4eb2b044641bfe8d632608a34fdbd20c5cb61919a3e56",
+    "j2k/entropy/ProgressionSpec.cs": "697d49f13eb0605ff6ae5debcb9b9774168a0ba1ef715f32117d480bab06ba5b",
+    "j2k/entropy/StdEntropyCoderOptions.cs": "60b796abc1f46377ad67046308da6116d697144df827543e5ccfcfd1ac1a334f",
+    "j2k/entropy/encoder/BitToByteOutput.cs": "03786f11f6647c4e7ae7139a198c512f0b7a33e52a499387e0c9604c446e02b7",
+    "j2k/entropy/encoder/BudgetAllocationDiagnostics.cs": "7dd1b439f22d0dedd33d7b5287b0ddc9ee61c6f54223a89bac6b995a9407c01a",
+    "j2k/entropy/encoder/ByteOutputBuffer.cs": "c00f99e566b3e0d437b6de8c3d1eb719c83d2b15f66a3d7dca7ba113e7436131",
+    "j2k/entropy/encoder/CBlkRateDistStats.cs": "f19e2bc6fd79ff6ed9496bbe0025a6ee18ed23c0377cf1990bb747121e7b8f81",
+    "j2k/entropy/encoder/CodedCBlkDataSrcEnc.cs": "0d48cf27affe1d91d2b55e7c6991865296f8acf5b1f39c3366f47c73edfb22b0",
+    "j2k/entropy/encoder/EBCOTBudgetAllocation.cs": "1899f61e89d3d5ddec2caa277f39f26bce902c2a388d7d26d76e2b8134b6cb24",
+    "j2k/entropy/encoder/EBCOTLayer.cs": "7071ade927e95f1758a6515ccc9b184901da8745b28eef21629eb8afc06e06f3",
+    "j2k/entropy/encoder/EBCOTPayloadTelemetry.cs": "351e9de3631a9a4228c38779d6e0d39752cf36c32e3cec417237ddf5932f9ecf",
+    "j2k/entropy/encoder/EBCOTRateAllocator.cs": "f9fd83a2a1ad3b23700ebcd6f67cc1edf51e38245a8e965414da67f71ccc34a2",
+    "j2k/entropy/encoder/EBCOTSharedPayloadAttribution.cs": "29360807e70b571af6d7802c74c5aff9c672e13ff93f2c863edd51007cb91221",
+    "j2k/entropy/encoder/EntropyCoder.cs": "054c4c729823c1a93c14afc7976ddd3df00f7f633ff3595ad720da2da0f22056",
+    "j2k/entropy/encoder/LayersInfo.cs": "7a494f0d6b193fc0cd7f5a001dc110d0ae92c446b86153e56e219836456efcb3",
+    "j2k/entropy/encoder/MQCoder.cs": "5c1c5867bbe8c463b08d7b3e879779a8cae52495885e376b14b78ffbd59d7cfa",
+    "j2k/entropy/encoder/PostCompRateAllocator.cs": "75052b86746b1b81d11bb032d751a4e6de49feda115608544d7c737d7a3a144f",
+    "j2k/entropy/encoder/StdEntropyCoder.cs": "b176afd084742c1a1e6484ae7366d55ad7fe4e526ceece85099e7d1542dc4395",
+    "j2k/entropy/encoder/SynthesisEnergyInfluence.cs": "69282e566edcf3f4d7ec0e2136ec5fd46265c84f59a7da2f0abded0e996a977d",
+    "j2k/entropy/encoder/SynthesisPassGainAccumulator.cs": "8b969e667539ed9dbda996f00152f302c4960a58a9c55e6afd3aa8f25397d03a",
+    "j2k/fileformat/FileFormatBoxes.cs": "1128cc698a31aaa37497decaf40b8c20c3aeaba833df36ff14324523561cd088",
+    "j2k/fileformat/writer/FileFormatWriter.cs": "14453cce5f6ea35a106857e63807d61fc15929fde7d2eafc0a59d3b0c2e43168",
+    "j2k/image/BlkImgDataSrc.cs": "cc9acd5765fd341e7c00de988898fc876b4b2f8b4871d6a910806af11236eca0",
+    "j2k/image/CompTransfSpec.cs": "99127d1430981b6150d25e4f4282fcbe31b4e1f1280cc69b445b4308a2fc7cc0",
+    "j2k/image/Coord.cs": "7f7505fcfaeb79e69521c29e90e342b90d74998f8b7408a0c5292972d9715c69",
+    "j2k/image/DataBlk.cs": "4466941c35f2ed467a23cedbfd31c9d247d0081b95247d4cb1158cbc173bd8f3",
+    "j2k/image/DataBlkFloat.cs": "2c9659667e3fccbb6157d688f905e0a07712109f732077892e20fa860af50a14",
+    "j2k/image/DataBlkInt.cs": "c4622301f776993e03474b5d98c882bbe0f6a76d22ee63264adff113b3d78cc5",
+    "j2k/image/ImgData.cs": "18703a67db99de6b775d6753e03be4f20e9d756f694f6184c448e4eedfa9b591",
+    "j2k/image/ImgDataAdapter.cs": "14e45c1232b9b2c57aaf44d3ae96ad738b98831baad2147f06f8f6bdc8fcb878",
+    "j2k/image/ImgDataConverter.cs": "aca5b077964db7054e7273a8656f0f1b98825aa3be4fd9f6db1cca6ce61f2cec",
+    "j2k/image/Tiler.cs": "539328ad31a1b03724cf10ec724f03057d24cfae7a10baf879f746cdcc6b3b0e",
+    "j2k/image/forwcomptransf/ForwCompTransf.cs": "cc7d4c183d3a583a542ac08d2026c58f4a7069cba371b8c3bcb90bdfb65f601a",
+    "j2k/image/forwcomptransf/ForwCompTransfSpec.cs": "9c9cad2a9192f29ec96bfb9cf283870efca2df2e3d74825e12068d4f996d0375",
+    "j2k/image/input/ImgReader.cs": "d3f4b5ec673d9d0756de4c43015887481ebdfda05ee2c86d161213676f60baba",
+    "j2k/io/BEBufferedRandomAccessFile.cs": "95137bcea3ef9cc64357cfb2a853deb39fa99c0842e04ff16b7af2957f3799a9",
+    "j2k/io/BinaryDataInput.cs": "1cf2e7604a85fbfec3a887ee7082a5adff7a0381604069b9e37c7527aeecd77f",
+    "j2k/io/BinaryDataOutput.cs": "2099bd1d96f9df76052a5e8fbe8963bb79d8d81da73009525c14a9aa558b3af7",
+    "j2k/io/BufferedRandomAccessFile.cs": "2295389691d7ac116b3ab867b16609450b97f32d93a2fbaa66b75fbb7b5cfc4a",
+    "j2k/io/EndianType.cs": "3c2efc6d14863683cbe949be7eb279be068a2a24dae1c7cfb4c145bc48405da5",
+    "j2k/io/RandomAccessIO.cs": "39015bf574f1f29be6249b9048a07c2f18601a212290ce35f6a9aeeff739aaa9",
+    "j2k/quantization/GuardBitsSpec.cs": "5ede0ed8656e727ddbbb573443ef7c6f9c814d086aeabe9ddaa825f390ea4048",
+    "j2k/quantization/QuantStepSizeSpec.cs": "fb7ed2f7bc1df1dbbcc5e8b3454c069332e877f3f5edfe8710cd1c0fae86a49e",
+    "j2k/quantization/QuantTypeSpec.cs": "ddf82523bad3828fccb6c549e49b1e5a6153ee573f85740fca2501215b0886f0",
+    "j2k/quantization/QuantizationType.cs": "69e5b746671958f9192d888c0b2fe678dcac51ce77624421c0c66b06498f11ec",
+    "j2k/quantization/quantizer/CBlkQuantDataSrcEnc.cs": "8cd73a62f3faff14a6444ed01110cc354d4f5ed53e85e127884ae89d143b3196",
+    "j2k/quantization/quantizer/Quantizer.cs": "26f9735c07e419726164f107f64b175824ff87ee75c1a7790cd059eef238e7c2",
+    "j2k/quantization/quantizer/StdQuantizer.cs": "2832e20e0b969c7d6fbe2b62d9b8bbe19f2bdfa4f23b1766a3943ef916e10052",
+    "j2k/roi/MaxShiftSpec.cs": "7d9c72322164b41f53f9d2ea7bf85a88028ae542e0a1b2cea4c1104053e7811a",
+    "j2k/roi/encoder/ArbROIMaskGenerator.cs": "b1e227a1a0869407c1e3386c0f05c3f4cf9e0b0c931fe67a794c606cb6a5e3f3",
+    "j2k/roi/encoder/ROI.cs": "d8c45d1b99b6667d376d7ba259f793f6a267a7556f7755df11b334f2b8827378",
+    "j2k/roi/encoder/ROIMaskGenerator.cs": "9fe517003fc05c5a0c429020feb4c221496e31dd3ccbfbba5ad59af52d491eca",
+    "j2k/roi/encoder/ROIScaler.cs": "ff184d03fe0abb1061dcc550afb17e8b83509059634d51c0bdc372945b223763",
+    "j2k/roi/encoder/RectROIMaskGenerator.cs": "764e5501f2d79e03552e736dc24fbd0749ead974234879b87c1aaf7685d5241b",
+    "j2k/roi/encoder/SubbandROIMask.cs": "c8f6afb2657a8401c2055b8ad12ab9e063cb04f1bf4368542c62670f5fc1c7c6",
+    "j2k/roi/encoder/SubbandRectROIMask.cs": "968e9a340fd81f14d6c423c8c95316eaf130b054dd75ff59c5bf83de0679f961",
+    "j2k/util/ArrayUtil.cs": "a575fece145227849b77ae3cb1ecb542d243a02c7cad0b2f0f6459021d97d732",
+    "j2k/util/FacilityManager.cs": "d5b9f05355981f7d747c3506065fafe118314bb9af800f8012eee87017837a4b",
+    "j2k/util/IMsgLogger.cs": "cf4df2dd46df21e6837fe2c715529468c9f88f324f3990b7deb8076a6554ebe4",
+    "j2k/util/MathUtil.cs": "ced27e8529b4a572f97302cf4d582e98d7cdc5c9e4a2677247c1ca32550973b8",
+    "j2k/util/MsgPrinter.cs": "5ea618e2f2cface29dd513cfea1ee8402719d70be70a5b1bd38a5967645cef29",
+    "j2k/util/ParameterList.cs": "975af88b0d688dfc81d49a7b5464d3312c0175c99bbd6df9b13b15baf7c36c6e",
+    "j2k/util/ProgressWatch.cs": "e6c12390e8e31aa2b38063023b8e780ba828db7c88194699f812bcb2ce2125b3",
+    "j2k/util/StreamMsgLogger.cs": "9dd1e1dda68cce5de850e3e5d79c7f5fefcc6e34b78f01f460a86f54d549d1c5",
+    "j2k/util/StringFormatException.cs": "0e801a8005236979388825562f6559b12620b59de6217decb6ff17e7e0d14d2d",
+    "j2k/wavelet/FilterTypes.cs": "7cb7e50084c87154dd8d9997cdb85c0733689bd4a5dfc469375cd81d77b8f2a0",
+    "j2k/wavelet/Subband.cs": "59c01b34ea92d3d3cf2312aa8cea476bc2b92143245622f21231723d69aa8c0d",
+    "j2k/wavelet/WTFilterSpec.cs": "f4493f76e98da02553dac8a6cdee9d94bbe3520fa5b54f9a331b38303f3200ec",
+    "j2k/wavelet/WaveletFilter.cs": "78a957a42f3f2718bf68b1d38a3ffd50f0cfd1203c5ea976a2c8c2e389ddebbd",
+    "j2k/wavelet/WaveletTransform.cs": "cc90d1a73bc28fb734e7de68efcd72a9505f6f0298362fffc333eaed4c20fd48",
+    "j2k/wavelet/analysis/AnWTFilter.cs": "7981351a7cf5cae2d9c97cb20e79cb1dddbce766213d16fb689b8cd6388a3e44",
+    "j2k/wavelet/analysis/AnWTFilterFloat.cs": "dbbaca6f9179494bc2c997a63a898533c2662a83f0a8a9117a77016a060633ca",
+    "j2k/wavelet/analysis/AnWTFilterFloatLift9x7.cs": "37738cda46e4f3c1dd57f19095c59ad380adf76b637edfd833ff0ef81334cad7",
+    "j2k/wavelet/analysis/AnWTFilterInt.cs": "d6186f2f097d7438ee69467db5bcfbb412a511f4c5dd6d136b2aae1cc4c99ea4",
+    "j2k/wavelet/analysis/AnWTFilterIntLift5x3.cs": "cdfe79de5b3b4012dd959d68ed06d8f24f7992bdfd99ab3aacafd6c804b4627f",
+    "j2k/wavelet/analysis/AnWTFilterSpec.cs": "5b2017f6358b299f54255c019db610e02036e4c7e2f2722b73043a54dfb2aa90",
+    "j2k/wavelet/analysis/CBlkWTData.cs": "639548b2d6ec183f1cfaf8c3a98b7b0914af22669418f2f2ed3a8c2a6474f440",
+    "j2k/wavelet/analysis/CBlkWTDataFloat.cs": "83ddcb5589d6b68b019cebb91f0fda43b2f3011b3d8a84f6d6797156de6265c3",
+    "j2k/wavelet/analysis/CBlkWTDataInt.cs": "e44bc680561f855c4f57750343a2d23f351897f8bd7b16055428971580fbd745",
+    "j2k/wavelet/analysis/CBlkWTDataSrc.cs": "207c78bdb8cab5e00608c1fd8aacec3611a7cfd0a543f1e4394b7508bdf831b9",
+    "j2k/wavelet/analysis/ForwWT.cs": "e7163574d8f48f2bdfe5a14bc8569a00d0d17d034f6cfd3c83992a88857b8187",
+    "j2k/wavelet/analysis/ForwWTDataProps.cs": "bbe27e1622c654063b107f4f7eafffc4fb2b88cb9835d9beda9ec23c10f14fb0",
+    "j2k/wavelet/analysis/ForwWTFull.cs": "e4e392a3b55017bc6191850bd69606ba002fd395f5784a023c65d48970710afc",
+    "j2k/wavelet/analysis/ForwardWT.cs": "4128bf165b567316c9ebd749fc3e7aacf9833de265d9eec150d9e6b5de955fd7",
+    "j2k/wavelet/analysis/SubbandAn.cs": "57d35cd173eb90bf991a1aca2aa025ecba99b4bb986fb162a7beb7d75c5bc0a7",
+    "j2k/wavelet/synthesis/SynWTFilter.cs": "9b157d2221c3de69af561e3dd5e0e97aeea6a0dc0419f2f3ca8b01fd70413685",
+    "j2k/wavelet/synthesis/SynWTFilterFloat.cs": "6a5665d027232f74965c7befad94b54e602f629d0947e2a15a2c8496b606e16f",
+    "j2k/wavelet/synthesis/SynWTFilterFloatLift9x7.cs": "9ce20b821b9d305007823226a50e8e80a06897c08fba6dff76f5ba8de8db366a"
+  },
+  "licenseFiles": {
+    "LICENSE": "492816a21e8e47818f0033d652ce0ef5ce6c20d3b6a737be9011061c0c491d94",
+    "COPYRIGHT-JJ2000-5.1": "10c284b2af1ea5fe8516b5510a7b05a9def383e232a5e1b871be8098f75b9588"
+  },
+  "sourceTestFiles": {
+    "tests/CoreJ2K.Tests/SharedPayloadAttributionTests.cs": "cdf0fbad70dc64c97781bb0ebcd26518f3284ee6467973939c7e6a2678805d19"
+  },
+  "recipe": {
+    "output": "JP2",
+    "sourceComponents": 3,
+    "componentPrecision": 8,
+    "componentTransform": "ICT",
+    "wavelet": "9/7",
+    "decompositionLevels": 5,
+    "codeBlockWidth": 64,
+    "codeBlockHeight": 64,
+    "qualityLayers": 1,
+    "tiles": 1,
+    "roiStartResolution": 4,
+    "roiBlockAlignment": false,
+    "allLumaUtility": 1.25,
+    "chromaUtility": 1,
+    "allocationObjective": "Raw Tier1 rate-distortion convex hull",
+    "attributionMethod": "synthesis-energy-decoder-effective-pass-v3"
+  },
+  "validation": {
+    "encoderAndAccountingTests": {
+      "net8.0": 20,
+      "net9.0": 20,
+      "net10.0": 20
+    },
+    "infrastructureEncoderTests": {
+      "net8.0": 10,
+      "net9.0": 10,
+      "net10.0": 10
+    },
+    "goldenControl": {
+      "path": "tests/CoreJ2K.FaceOFFx.Tests/Fixtures/medical-balanced.jp2",
+      "completeJp2Bytes": 11771,
+      "sha256": "0bcf6af3c6be455de0343981ed9cdd8fb4cdfd0cce7f4c99c877a8ff95e14a52",
+      "roiPixelCount": 60318,
+      "attributedFacePayloadBytes": 3383,
+      "byteExact": true,
+      "independentDecoder": "Pillow/OpenJPEG 2.5.4",
+      "decodedRgbSha256": "161aa6b722ae0fd0ccd8cf3d3833a94fe8e2bcdd0058c524f6187f24d21db129"
+    }
+  }
+}

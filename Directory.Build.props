@@ -10,6 +10,10 @@
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' != ''">true</ContinuousIntegrationBuild>
     <FaceOffxSupportedTargetFrameworks>net8.0;net9.0;net10.0</FaceOffxSupportedTargetFrameworks>
+    <!-- Ship the embedded models once; higher-runtime consumers use this compatible bundle. -->
+    <FaceOffxLibraryTargetFramework>net8.0</FaceOffxLibraryTargetFramework>
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <!-- NuGet Package Metadata -->
     <Authors>FaceOFFx Contributors</Authors>
     <Company>FaceOFFx</Company>
@@ -19,10 +23,10 @@
     <PackageProjectUrl>https://github.com/mistial-dev/FaceOFFx</PackageProjectUrl>
     <RepositoryUrl>https://github.com/mistial-dev/FaceOFFx</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>face-recognition;face-detection;facial-landmarks;age-gender;emotion;onnx;machine-learning;computer-vision</PackageTags>
+    <PackageTags>piv;face-recognition;face-detection;facial-landmarks;jpeg2000;fips201;onnx;computer-vision</PackageTags>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <Version>3.0.0</Version>
+    <Version>4.0.0</Version>
     <!-- Build Output -->
     <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts\bin\$(MSBuildProjectName)\</BaseOutputPath>
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>

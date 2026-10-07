@@ -122,8 +122,8 @@ public class QualityAssessmentPipelineTests
         var standards = new[]
         {
             new QualityAssessmentOptions { Standard = Iso19794Standard.Piv },
-            QualityAssessmentOptions.Twic,
-            QualityAssessmentOptions.Icao
+            QualityAssessmentOptions.Strict,
+            QualityAssessmentOptions.Lenient
         };
         
         // Act & Assert

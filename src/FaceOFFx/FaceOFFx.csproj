@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
+    <TargetFramework>$(FaceOffxLibraryTargetFramework)</TargetFramework>
     <PackageId>FaceOFFx</PackageId>
     <IsPackable>true</IsPackable>
     <IncludeBuildOutput>true</IncludeBuildOutput>
-    <Description>PIV-compliant facial processing library for .NET with FIPS 201-3 compliance and JPEG 2000 ROI encoding</Description>
+    <BuildProjectReferences Condition="'$(NoBuild)' == 'true'">false</BuildProjectReferences>
+    <Description>Local PIV facial-image preparation with bounded JPEG 2000 encoding and explicit verification evidence.</Description>
     <PackageTags>face-recognition;face-detection;facial-landmarks;piv;jpeg2000;fips201;onnx;machine-learning;computer-vision</PackageTags>
   </PropertyGroup>
   <!-- Reference all projects that should be included in the package -->
@@ -15,6 +16,16 @@
       PrivateAssets="all"
     />
     <ProjectReference Include="..\FaceOFFx.Models\FaceOFFx.Models.csproj" PrivateAssets="all" />
+  </ItemGroup>
+  <!-- Runtime dependencies for the project assemblies bundled below. -->
+  <ItemGroup>
+    <PackageReference Include="CSharpFunctionalExtensions" Version="3.6.0" />
+    <PackageReference Include="JetBrains.Annotations" Version="2025.2.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.7" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.7" />
+    <PackageReference Include="MetadataExtractor" Version="2.8.1" />
   </ItemGroup>
   <!-- Include all assemblies from referenced projects -->
   <PropertyGroup>
@@ -37,14 +48,43 @@
       />
     </ItemGroup>
   </Target>
-  <!-- Include ONNX models as content files -->
+  <!-- ONNX models are embedded in the bundled FaceOFFx.Models assembly. -->
   <ItemGroup>
-    <Content
-      Include="..\FaceOFFx.Models\Resources\*.onnx"
-      Pack="true"
-      PackagePath="contentFiles\any\any\Resources\"
-      CopyToOutputDirectory="PreserveNewest"
-      BuildAction="Content"
-    />
+    <None Include="..\CoreJ2K.FaceOFFx\LICENSE" Pack="true" PackagePath="licenses/CoreJ2K.FaceOFFx" />
+    <None Include="..\CoreJ2K.FaceOFFx\COPYRIGHT-JJ2000-5.1" Pack="true" PackagePath="licenses/CoreJ2K.FaceOFFx" />
+    <None Include="..\CoreJ2K.FaceOFFx\provenance.json" Pack="true" PackagePath="licenses/CoreJ2K.FaceOFFx" />
   </ItemGroup>
+  <!-- NuGet gallery images resolve to the immutable release, while repository links stay local. -->
+  <UsingTask TaskName="CreateTaggedPackageReadme" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <RepositoryReadme ParameterType="System.String" Required="true" />
+      <PackageReadmePath ParameterType="System.String" Required="true" />
+      <GalleryBaseUrl ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var text = File.ReadAllText(RepositoryReadme);
+        text = Regex.Replace(text, @"(?<prefix>(?:src|href)=[""']|\]\()docs/samples/",
+            match => match.Groups["prefix"].Value + GalleryBaseUrl);
+        Directory.CreateDirectory(Path.GetDirectoryName(PackageReadmePath));
+        File.WriteAllText(PackageReadmePath, text, new UTF8Encoding(false));
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="PreparePackageReadme" BeforeTargets="_GetPackageFiles">
+    <PropertyGroup>
+      <_RepositoryReadmePath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '../../README.md'))</_RepositoryReadmePath>
+      <_PackageReadmePath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'package-readme/README.md'))</_PackageReadmePath>
+    </PropertyGroup>
+    <CreateTaggedPackageReadme RepositoryReadme="$(_RepositoryReadmePath)" PackageReadmePath="$(_PackageReadmePath)"
+                              GalleryBaseUrl="https://raw.githubusercontent.com/mistial-dev/FaceOFFx/v$(Version)/docs/samples/" />
+    <ItemGroup>
+      <None Remove="$(_RepositoryReadmePath)" />
+      <None Include="$(_PackageReadmePath)" Pack="true" PackagePath="README.md" />
+    </ItemGroup>
+  </Target>
 </Project>

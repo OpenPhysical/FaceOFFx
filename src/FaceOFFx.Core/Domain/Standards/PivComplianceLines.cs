@@ -1,4 +1,5 @@
 using FaceOFFx.Core.Domain.Common;
+using FaceOFFx.Core.Domain.Detection;
 using JetBrains.Annotations;
 
 namespace FaceOFFx.Core.Domain.Standards;
@@ -9,7 +10,7 @@ namespace FaceOFFx.Core.Domain.Standards;
 /// </summary>
 /// <param name="LineAA_X">Vertical center line X-coordinate - must pass through nose bridge and mouth center</param>
 /// <param name="LineBB_Y">Horizontal eye line Y-coordinate - must be 50-70% from bottom edge</param>
-/// <param name="LineCC_Width">Head width in pixels - ear-to-ear distance for 7:4 ratio validation</param>
+/// <param name="LineCC_Width">Width value accompanied by its measured ear-attachment or estimated jaw basis.</param>
 /// <param name="NoseCenter">Center point of nose bridge (landmarks 27-30)</param>
 /// <param name="MouthCenter">Center point of mouth (landmarks 48, 51, 54, 57)</param>
 /// <param name="LeftEyeCenter">Center of left eye (landmarks 36-41)</param>
@@ -29,6 +30,10 @@ public record PivComplianceLines(
     Point2D RightEarPoint
 )
 {
+    /// <summary>Reports whether CC comes from anatomical measurement or jaw-contour estimation.</summary>
+    public GeometryEvidenceStatus HeadWidthStatus { get; init; } = GeometryEvidenceStatus.Estimated;
+    /// <summary>Recorded source of a caller-supplied ear-attachment measurement.</summary>
+    public string? HeadWidthMeasurementSource { get; init; }
     /// <summary>
     /// Gets the horizontal eye line as a geometric line for visualization.
     /// </summary>

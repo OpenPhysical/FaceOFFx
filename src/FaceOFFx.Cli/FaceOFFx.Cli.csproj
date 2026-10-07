@@ -2,25 +2,18 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>$(FaceOffxSupportedTargetFrameworks)</TargetFrameworks>
-    <AssemblyName>faceoffx</AssemblyName>
+    <AssemblyName>FaceOFFx.Cli</AssemblyName>
     <!-- Only enable PublishSingleFile when actually publishing -->
     <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
     <SelfContained>false</SelfContained>
-    <!-- .NET Tool Configuration -->
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>faceoffx</ToolCommandName>
-    <PackageOutputPath>./nupkg</PackageOutputPath>
-    <!-- NuGet Package Metadata -->
-    <PackageId>FaceOFFx.Cli</PackageId>
+    <IsPackable>false</IsPackable>
     <Product>FaceOFFx CLI</Product>
-    <Description>PIV-compliant facial processing CLI tool for .NET. Converts photos to FIPS 201-3 compliant ID card format with JPEG 2000 ROI encoding.</Description>
+    <Description>Local PIV facial-image preparation with bounded JPEG 2000 encoding and explicit verification evidence.</Description>
     <PackageTags>piv;facial-recognition;face-detection;biometrics;jpeg2000;fips201;id-card;cli;dotnet-tool</PackageTags>
-    <!-- Include models and dependencies in the tool package -->
-    <IncludeContentInPack>true</IncludeContentInPack>
-    <IncludeBuildOutput>true</IncludeBuildOutput>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FaceOFFx\FaceOFFx.csproj" />
     <ProjectReference Include="..\FaceOFFx.Core\FaceOFFx.Core.csproj" />
     <ProjectReference Include="..\FaceOFFx.Infrastructure\FaceOFFx.Infrastructure.csproj" />
     <ProjectReference Include="..\FaceOFFx.Models\FaceOFFx.Models.csproj" />

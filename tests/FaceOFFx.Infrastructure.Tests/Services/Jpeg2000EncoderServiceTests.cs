@@ -1,407 +1,143 @@
+using System.Buffers.Binary;
+using System.Globalization;
+using System.Security.Cryptography;
 using AwesomeAssertions;
 using FaceOFFx.Core.Domain.Detection;
+using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Infrastructure.Services;
-using Microsoft.Extensions.Logging;
-using NSubstitute;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
 
 namespace FaceOFFx.Infrastructure.Tests.Services;
 
-/// <summary>
-/// Contains unit tests for the <see cref="Jpeg2000EncoderService"/> class.
-/// Validates the functionality of JPEG2000 encoding with and without Region of Interest (ROI) configurations.
-/// </summary>
 [TestFixture]
 public class Jpeg2000EncoderServiceTests
 {
-    /// <summary>
-    /// Logger instance used to log operations and events within the
-    /// <see cref="Jpeg2000EncoderServiceTests"/> class.
-    /// </summary>
-    /// <remarks>
-    /// This is a mock or substitute instance of <see cref="ILogger{T}"/> specifically
-    /// designed for testing purposes, where T is <see cref="Jpeg2000EncoderService"/>.
-    /// It helps validate logging actions performed by the service during unit tests.
-    /// </remarks>
-    private readonly ILogger<Jpeg2000EncoderService> _logger;
+    private readonly Jpeg2000EncoderService _encoder = new(NullLogger<Jpeg2000EncoderService>.Instance);
 
-    /// <summary>
-    /// Represents a private instance of the Jpeg2000EncoderService, enabling JPEG 2000 image encoding functionality,
-    /// including support for encoding regions of interest (ROI) with customizable parameters such as base compression rate,
-    /// ROI start level, and alignment.
-    /// </summary>
-    private readonly Jpeg2000EncoderService _encoder;
-
-    /// <summary>
-    /// Unit test class for verifying the behavior and functionality of the
-    /// Jpeg2000EncoderService, which provides support for encoding images
-    /// to the JPEG 2000 format with optional region of interest (ROI) capabilities.
-    /// </summary>
-    public Jpeg2000EncoderServiceTests()
+    [TestCase(2_000)]
+    [TestCase(5_000)]
+    [TestCase(11_820)]
+    public void Encode_FixedBalancedRecipe_MeetsTheCompleteCapAndStoresRgb8(int cap)
     {
-        _logger = Substitute.For<ILogger<Jpeg2000EncoderService>>();
-        _encoder = new Jpeg2000EncoderService(_logger);
+        using var image = CreateImage();
+        var result = _encoder.Encode(image, CreateRoi(), new Jpeg2000EncodingOptions { MaximumOutputBytes = cap });
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Message : string.Empty);
+        var data = result.Value.Data;
+        data.Length.Should().BeLessThanOrEqualTo(cap);
+        var siz = FindMarker(data, 0x51);
+        var cod = FindMarker(data, 0x52);
+        BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(siz + 38, 2)).Should().Be(3);
+        for (var component = 0; component < 3; component++)
+            data.AsSpan(siz + 40 + component * 3, 3).ToArray().Should().Equal(7, 1, 1);
+        data[cod + 8].Should().Be(1);
+        data[cod + 9].Should().Be(5);
+        data[cod + 10].Should().Be(4);
+        data[cod + 11].Should().Be(4);
+        data[cod + 13].Should().Be(0);
+        FindMarker(data, 0x5e).Should().BeGreaterThan(0);
+        result.Value.RoiPixelCount.Should().Be(8_000);
+        image[0, 0].A.Should().Be(255);
     }
 
-    /// <summary>
-    /// Validates that the constructor of the Jpeg2000EncoderService initializes the instance successfully.
-    /// Asserts that a new instance of the service is not null upon initialization.
-    /// </summary>
     [Test]
-    public void Constructor_ShouldInitializeSuccessfully()
+    public void Encode_FixedByteCap_IsCultureIndependent()
     {
-        var encoder = new Jpeg2000EncoderService(_logger);
-        encoder.Should().NotBeNull();
+        using var image = CreateImage();
+        var previous = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+            var english = _encoder.Encode(image, CreateRoi(), new Jpeg2000EncodingOptions { MaximumOutputBytes = 5_000 });
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            var german = _encoder.Encode(image, CreateRoi(), new Jpeg2000EncodingOptions { MaximumOutputBytes = 5_000 });
+            english.IsSuccess.Should().BeTrue();
+            german.IsSuccess.Should().BeTrue();
+            german.Value.Data.Should().Equal(english.Value.Data);
+        }
+        finally { CultureInfo.CurrentCulture = previous; }
     }
 
-    /// <summary>
-    /// Tests the EncodeWithRoi method of the Jpeg2000EncoderService with a valid image and ROI configuration.
-    /// </summary>
-    /// <remarks>
-    /// This test validates that the method successfully encodes the provided image with the specified region of interest (ROI) using JPEG2000.
-    /// It checks that the result indicates success, the output is not null, and the encoded data length is greater than zero.
-    /// </remarks>
     [Test]
-    public void EncodeWithRoi_WithValidImage_ShouldReturnSuccess()
+    public void Encode_FixedMask_ReconcilesAllEvidenceAndPreservesCallerPixels()
     {
-        using var image = new Image<Rgba32>(420, 560);
-        image.Mutate(static ctx => ctx.Fill(Color.White));
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(420, 560);
-        roiSetResult.IsSuccess.Should().BeTrue();
-
-        var result = _encoder.EncodeWithRoi(image, roiSetResult.Value);
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-        result.Value.Length.Should().BeGreaterThan(0);
+        using var image = CreateImage();
+        var before = new Rgba32[160 * 200];
+        image.CopyPixelDataTo(before);
+        var pixels = new byte[160 * 200];
+        for (var y = 50; y < 150; y++)
+        for (var x = 40; x < 120; x++) pixels[y * 160 + x] = 1;
+        var roi = CreateRoi() with { Mask = FacialRoiMask.FromBytes(160, 200, pixels) };
+        var result = _encoder.Encode(image, roi, new Jpeg2000EncodingOptions { MaximumOutputBytes = 5_000 });
+        result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Message : string.Empty);
+        var payload = result.Value.PayloadTelemetry!;
+        var attribution = result.Value.SharedPayloadAttribution!;
+        payload.TotalOutputBytes.Should().Be(result.Value.Data.Length);
+        payload.Subbands.Sum(row => row.PayloadBytes).Should().Be(payload.PacketBodyBytes);
+        (payload.MainAndTileHeaderBytes + payload.PacketHeaderBytes + payload.PacketBodyBytes +
+            payload.EndOfCodestreamBytes + payload.ContainerBytes).Should().Be(result.Value.Data.Length);
+        attribution.PacketBodyBytes.Should().Be(payload.PacketBodyBytes);
+        (attribution.AttributedFacePayloadBytes + attribution.OutsidePayloadBytes).Should().Be(payload.PacketBodyBytes);
+        attribution.RoiPixelCount.Should().Be(8_000);
+        attribution.AttributedFacePayloadBytes.Should().BeGreaterThan(0);
+        result.Value.RoiMaskSha256.Should().Be(Convert.ToHexString(SHA256.HashData(pixels)).ToLowerInvariant());
+        payload.WholeBandPromotedBytes.Should().BeGreaterThan(0);
+        result.Value.AllocationCandidateCount.Should().BeGreaterThan(0);
+        result.Value.AllocationSimulationCount.Should().BeGreaterThan(0);
+        var after = new Rgba32[before.Length];
+        image.CopyPixelDataTo(after);
+        after.Should().Equal(before);
+        roi.Mask!.ToArray().Should().Equal(pixels);
     }
 
-    /// <summary>
-    /// Tests the successful encoding of an image with a Region of Interest (ROI) enabled.
-    /// </summary>
-    /// <remarks>
-    /// This method validates that the encoding process, when ROI is enabled, completes successfully
-    /// and produces a valid encoded output. It ensures the <see cref="Jpeg2000EncoderService.EncodeWithRoi"/>
-    /// correctly handles the provided image and ROI configuration.
-    /// </remarks>
-    /// <seealso cref="Jpeg2000EncoderService"/>
-    /// <seealso cref="FacialRoiSet.CreateAppendixC6"/>
-    [Test]
-    public void EncodeWithRoi_WithRoiEnabled_ShouldEncodeSuccessfully()
-    {
-        using var image = new Image<Rgba32>(420, 560);
-        image.Mutate(static ctx => ctx.Fill(Color.Gray));
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(420, 560);
-
-        var result = _encoder.EncodeWithRoi(
-            image,
-            roiSetResult.Value,
-            baseRate: 0.7f,
-            roiStartLevel: 3,
-            enableRoi: true,
-            roiAlign: false
-        );
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-    }
-
-    /// <summary>
-    /// Tests the <see cref="Jpeg2000EncoderService.EncodeWithRoi"/> method to ensure that when ROI encoding is disabled,
-    /// the image is encoded without applying any region of interest settings.
-    /// </summary>
-    /// <remarks>
-    /// This test verifies that the method successfully encodes the image without incorporating ROI adjustments
-    /// when the ROI feature is explicitly disabled. It validates:
-    /// - The encoding operation completes successfully.
-    /// - The resulting encoded data is not null.
-    /// </remarks>
-    /// <exception cref="AssertionException">
-    /// Thrown when the test's expectations regarding the success of the encoding operation or the non-nullity of the output are not met.
-    /// </exception>
-    [Test]
-    public void EncodeWithRoi_WithRoiDisabled_ShouldEncodeWithoutRoi()
-    {
-        using var image = new Image<Rgba32>(420, 560);
-        image.Mutate(ctx => ctx.Fill(Color.Blue));
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(420, 560);
-
-        var result = _encoder.EncodeWithRoi(
-            image,
-            roiSetResult.Value,
-            baseRate: 1.0f,
-            roiStartLevel: 1,
-            enableRoi: false
-        );
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-    }
-
-    /// <summary>
-    /// Verifies that encoding an image with a specified region of interest (ROI) and different
-    /// base rates adjusts the resulting file size appropriately.
-    /// </summary>
-    /// <param name="baseRate">The base compression rate to be applied during the encoding process.</param>
-    [TestCase(0.6f)]
-    [TestCase(0.7f)]
-    [TestCase(0.8f)]
-    [TestCase(1.0f)]
-    [TestCase(1.2f)]
-    public void EncodeWithRoi_WithDifferentBaseRates_ShouldAdjustFileSize(float baseRate)
-    {
-        using var image = new Image<Rgba32>(420, 560);
-        DrawTestPattern(image);
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(420, 560);
-
-        var result = _encoder.EncodeWithRoi(
-            image,
-            roiSetResult.Value,
-            baseRate: baseRate,
-            enableRoi: true
-        );
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-        result.Value.Length.Should().BeGreaterThan(0);
-    }
-
-    /// <summary>
-    /// Tests the ability of the Jpeg2000 encoder to encode an image successfully
-    /// using different Region of Interest (ROI) start levels.
-    /// </summary>
-    /// <param name="roiStartLevel">
-    /// Specifies the ROI start level to be tested, which determines
-    /// the compression prioritization within the ROI region.
-    /// </param>
     [TestCase(0)]
-    [TestCase(1)]
-    [TestCase(2)]
-    [TestCase(3)]
-    public void EncodeWithRoi_WithDifferentRoiStartLevels_ShouldEncodeSuccessfully(
-        int roiStartLevel
-    )
+    [TestCase(-1)]
+    [TestCase(80)]
+    public void Encode_InsufficientOrInvalidCap_ReturnsFailure(int cap)
     {
-        using var image = new Image<Rgba32>(420, 560);
-        DrawTestPattern(image);
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(420, 560);
-
-        var result = _encoder.EncodeWithRoi(
-            image,
-            roiSetResult.Value,
-            baseRate: 0.7f,
-            roiStartLevel: roiStartLevel,
-            enableRoi: true
-        );
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
+        using var image = CreateImage();
+        _encoder.Encode(image, CreateRoi(), new Jpeg2000EncodingOptions { MaximumOutputBytes = cap }).IsFailure.Should().BeTrue();
+        image[0, 0].A.Should().Be(255);
     }
 
-    /// <summary>
-    /// Validates the functionality of ROI-based encoding with varying ROI alignment settings.
-    /// Ensures the specified ROI alignment parameters are applied accurately during encoding.
-    /// </summary>
-    /// <param name="roiAlign">A boolean parameter indicating whether Region of Interest (ROI) alignment is enabled or not during the encoding process.</param>
-    [TestCase(true)]
-    [TestCase(false)]
-    public void EncodeWithRoi_WithDifferentRoiAlignment_ShouldEncodeSuccessfully(bool roiAlign)
-    {
-        using var image = new Image<Rgba32>(420, 560);
-        DrawTestPattern(image);
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(420, 560);
-
-        var result = _encoder.EncodeWithRoi(
-            image,
-            roiSetResult.Value,
-            baseRate: 0.7f,
-            roiStartLevel: 3,
-            enableRoi: true,
-            roiAlign: roiAlign
-        );
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-    }
-
-    /// <summary>
-    /// Tests whether the JPEG 2000 encoder correctly encodes an image
-    /// when provided with a custom Region of Interest (ROI) configuration.
-    /// Verifies that the encoding process succeeds and produces a non-null result.
-    /// </summary>
     [Test]
-    public void EncodeWithRoi_WithCustomRoiRegion_ShouldEncodeSuccessfully()
+    public void Encode_RepeatedRequests_AreDeterministic()
     {
-        using var image = new Image<Rgba32>(420, 560);
-        DrawTestPattern(image);
-
-        var customBox = new RoiBoundingBox(100, 100, 220, 300);
-        var landmarkIndices = Enumerable.Range(0, 68).ToList();
-        var innerRegion = new RoiRegion("CustomInner", 3, customBox, landmarkIndices);
-        var roiSet = new FacialRoiSet(innerRegion);
-
-        var result = _encoder.EncodeWithRoi(image, roiSet, baseRate: 0.7f, enableRoi: true);
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
+        using var image = CreateImage();
+        var options = new Jpeg2000EncodingOptions { MaximumOutputBytes = 5_000 };
+        var first = _encoder.Encode(image, CreateRoi(), options);
+        var second = _encoder.Encode(image, CreateRoi(), options);
+        first.IsSuccess.Should().BeTrue();
+        second.IsSuccess.Should().BeTrue();
+        second.Value.Data.Should().Equal(first.Value.Data);
+        second.Value.SharedPayloadAttribution!.FacePayloadByteEstimate.Should().Be(first.Value.SharedPayloadAttribution!.FacePayloadByteEstimate);
     }
 
-    /// Tests the encoding of images with Region of Interest (ROI) support
-    /// ensuring proper handling across different image dimensions.
-    /// <param name="width">The width of the image to be tested.</param>
-    /// <param name="height">The height of the image to be tested.</param>
-    [TestCase(320, 240)]
-    [TestCase(640, 480)]
-    [TestCase(800, 600)]
-    [TestCase(1024, 768)]
-    public void EncodeWithRoi_WithVariousImageSizes_ShouldHandleCorrectly(int width, int height)
+    private static FacialRoiSet CreateRoi() => new(new RoiRegion(
+        "Face", 3, new RoiBoundingBox(40, 50, 80, 100), Enumerable.Range(0, 68).ToArray()));
+
+    private static Image<Rgba32> CreateImage()
     {
-        using var image = new Image<Rgba32>(width, height);
-        image.Mutate(ctx => ctx.Fill(Color.White));
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(width, height);
-
-        var result = _encoder.EncodeWithRoi(image, roiSetResult.Value);
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-        result.Value.Length.Should().BeGreaterThan(0);
-    }
-
-    /// <summary>
-    /// Tests the JPEG 2000 encoder's ability to process a complex image with a region of interest (ROI)
-    /// while ensuring that the encoded image maintains expected quality standards.
-    /// </summary>
-    /// <remarks>
-    /// This method creates a complex image with a test pattern, defines a facial ROI using predefined settings,
-    /// and encodes the image using the JPEG 2000 encoder with ROI enabled. The encoded result is validated
-    /// to ensure successful processing and preservation of quality within a specified range of file size.
-    /// </remarks>
-    /// <exception cref="AssertionException">
-    /// Thrown if the encoding process does not succeed, the result is null, or the file size
-    /// does not fall within the expected range.
-    /// </exception>
-    [Test]
-    public void EncodeWithRoi_WithComplexImage_ShouldMaintainQuality()
-    {
-        using var image = new Image<Rgba32>(420, 560);
-        DrawComplexTestPattern(image);
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(420, 560);
-
-        var result = _encoder.EncodeWithRoi(
-            image,
-            roiSetResult.Value,
-            baseRate: 0.7f,
-            roiStartLevel: 3,
-            enableRoi: true
-        );
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-        result.Value.Length.Should().BeInRange(15000, 30000);
-    }
-
-    /// <summary>
-    /// Ensures that multiple calls to the EncodeWithRoi method of the
-    /// Jpeg2000EncoderService do not interfere with each other by
-    /// testing the encoding process with two distinct images.
-    /// </summary>
-    /// <remarks>
-    /// The test verifies that the encoding results of two separate method invocations,
-    /// when provided with the same Region of Interest (ROI) settings, remain unique
-    /// and independent of each other. It ensures that the encoder's internal state is not shared
-    /// or corrupted between consecutive calls, maintaining thread safety and correctness.
-    /// </remarks>
-    /// <exception cref="AssertionException">
-    /// Thrown if any of the following conditions are not met:
-    /// - Both calls to EncodeWithRoi succeed.
-    /// - The outputs of the two calls are not equivalent.
-    /// </exception>
-    [Test]
-    public void EncodeWithRoi_MultipleCalls_ShouldNotInterfere()
-    {
-        using var image1 = new Image<Rgba32>(420, 560);
-        using var image2 = new Image<Rgba32>(420, 560);
-        image1.Mutate(ctx => ctx.Fill(Color.Red));
-        image2.Mutate(ctx => ctx.Fill(Color.Blue));
-
-        var roiSetResult = FacialRoiSet.CreateAppendixC6(420, 560);
-
-        var result1 = _encoder.EncodeWithRoi(image1, roiSetResult.Value, enableRoi: true);
-        var result2 = _encoder.EncodeWithRoi(image2, roiSetResult.Value, enableRoi: true);
-
-        result1.IsSuccess.Should().BeTrue();
-        result2.IsSuccess.Should().BeTrue();
-        result1.Value.Should().NotBeEquivalentTo(result2.Value);
-    }
-
-    /// <summary>
-    /// Validates the behavior of the Jpeg2000 encoder when processing an image
-    /// with an ROI that aligns precisely with the image's edge dimensions.
-    /// Ensures that the encoder handles edge cases involving boundary-aligned ROIs gracefully.
-    /// </summary>
-    [Test]
-    public void EncodeWithRoi_WithEdgeCaseRoi_ShouldHandleGracefully()
-    {
-        using var image = new Image<Rgba32>(420, 560);
-        DrawTestPattern(image);
-
-        var edgeBox = new RoiBoundingBox(0, 0, 420, 560);
-        var landmarkIndices = new List<int> { 0 };
-        var innerRegion = new RoiRegion("FullImage", 3, edgeBox, landmarkIndices);
-        var roiSet = new FacialRoiSet(innerRegion);
-
-        var result = _encoder.EncodeWithRoi(image, roiSet, enableRoi: true);
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-    }
-
-    /// <summary>
-    /// Draws a test pattern on the provided image.
-    /// </summary>
-    /// <param name="image">The image on which the test pattern will be drawn.</param>
-    private static void DrawTestPattern(Image<Rgba32> image)
-    {
-        image.Mutate(ctx =>
+        var image = new Image<Rgba32>(160, 200);
+        var random = new Random(719);
+        image.ProcessPixelRows(accessor =>
         {
-            ctx.Fill(Color.LightGray);
-            ctx.Fill(Color.DarkGray, new Rectangle(50, 50, 320, 460));
-            ctx.Fill(Color.White, new Rectangle(100, 100, 220, 360));
-        });
-    }
-
-    /// <summary>
-    /// Draws a complex test pattern on the provided image.
-    /// </summary>
-    /// <param name="image">The image on which the test pattern will be drawn. Must be initialized prior to calling this method.</param>
-    private static void DrawComplexTestPattern(Image<Rgba32> image)
-    {
-        image.Mutate(ctx =>
-        {
-            var gradient = ctx.BackgroundColor(Color.White);
-
-            for (var i = 0; i < 10; i++)
+            for (var y = 0; y < accessor.Height; y++)
             {
-                var color = Color.FromRgb((byte)(i * 25), (byte)(255 - i * 25), 128);
-                ctx.Fill(color, new Rectangle(i * 40, i * 50, 40, 50));
+                var row = accessor.GetRowSpan(y);
+                for (var x = 0; x < row.Length; x++)
+                    row[x] = new Rgba32((byte)random.Next(256), (byte)random.Next(256), (byte)random.Next(256));
             }
-
-            // Draw diagonal lines for visual complexity
-            var pen = Pens.Solid(Color.Black, 2);
-            ctx.DrawLine(pen, new PointF(0, 0), new PointF(image.Width, image.Height));
-            ctx.DrawLine(pen, new PointF(image.Width, 0), new PointF(0, image.Height));
         });
+        return image;
+    }
+
+    private static int FindMarker(byte[] data, byte marker)
+    {
+        for (var index = 0; index < data.Length - 1; index++)
+            if (data[index] == 255 && data[index + 1] == marker) return index;
+        throw new AssertionException($"Missing marker {marker:x2}.");
     }
 }

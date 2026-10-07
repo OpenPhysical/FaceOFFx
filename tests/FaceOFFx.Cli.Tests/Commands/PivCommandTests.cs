@@ -1,6 +1,7 @@
-using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text.Json;
 using AwesomeAssertions;
+using FaceOFFx.Core.Domain.Transformations;
 using FaceOFFx.Tests.Common;
 using NUnit.Framework;
 
@@ -10,176 +11,102 @@ namespace FaceOFFx.Cli.Tests.Commands;
 [NonParallelizable]
 public class PivCommandTests : IntegrationTestBase
 {
-    private string _cliAssemblyPath = null!;
-    private string _testImagePath = null!;
-
-    [OneTimeSetUp]
-    public override void OneTimeSetUp()
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task PrimaryAndAlias_WriteBoundedJp2AndRegionalEvidence(bool compatibilityAlias)
     {
-        base.OneTimeSetUp();
-
-        var currentDir = TestContext.CurrentContext.TestDirectory;
-        var searchDir = new DirectoryInfo(currentDir);
-
-        while (searchDir != null && !File.Exists(Path.Combine(searchDir.FullName, "FaceOFFx.sln")))
-        {
-            searchDir = searchDir.Parent;
-        }
-
-        if (searchDir == null)
-        {
-            throw new InvalidOperationException("Could not find solution root");
-        }
-
-        _cliAssemblyPath = Path.Combine(
-            searchDir.FullName,
-            "artifacts",
-            "bin",
-            "FaceOFFx.Cli",
-            "Debug",
-            "net8.0",
-            "faceoffx.dll");
-
-        _testImagePath = PeopleCorpus.SubjectSource("generic-guy", "png");
+        var source = PeopleCorpus.WatermarkedCardholderSource();
+        var output = Path.Combine(TempDirectory, "portrait.jp2");
+        var arguments = new List<string>();
+        if (compatibilityAlias) arguments.Add("piv");
+        arguments.AddRange([source, "--filesize-target", "preferred", "--output", output, "--json"]);
+        var result = await CliProcessHarness.Run(arguments.ToArray());
+        result.ExitCode.Should().Be(0, result.Stderr);
+        var encoded = await File.ReadAllBytesAsync(output);
+        encoded.Length.Should().BeLessThanOrEqualTo(22_000);
+        using var report = JsonDocument.Parse(await File.ReadAllBytesAsync(output + ".json"));
+        var root = report.RootElement;
+        root.GetProperty("Profile").GetString().Should().Be("piv");
+        root.GetProperty("AutomatedEncodingPassed").GetBoolean().Should().BeTrue();
+        root.GetProperty("SourceSha256").GetString().Should().Be(
+            Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(source))).ToLowerInvariant());
+        root.GetProperty("ImageSha256").GetString().Should().Be(
+            Convert.ToHexString(SHA256.HashData(encoded)).ToLowerInvariant());
+        root.GetProperty("VerificationRequirements").GetArrayLength().Should().BeGreaterThan(0);
+        root.GetProperty("RoiCoverage").GetProperty("Algorithm").GetString().Should().Be("landmark-face-hull-v1");
+        root.GetProperty("SourceColorEvidence").GetProperty("Status").GetInt32().Should().Be((int)PivSourceColorStatus.AssumedSrgb);
+        root.GetProperty("FileSizeTarget").GetProperty("MaximumBytes").GetInt32().Should().Be(22_000);
+        var evidence = root.GetProperty("EncodingEvidence");
+        var regional = evidence.GetProperty("RegionalCompressionVerification");
+        regional.GetProperty("MeasuredCompressionRatio").GetDouble().Should().BeGreaterThan(0);
+        regional.GetProperty("AttributionMethod").GetString().Should().NotBeNullOrEmpty();
+        var codec = evidence.GetProperty("CodecEvidence");
+        codec.TryGetProperty("Data", out _).Should().BeFalse();
+        codec.GetProperty("PayloadTelemetry").GetProperty("TotalOutputBytes").GetInt64().Should().Be(encoded.Length);
+        using var stdout = JsonDocument.Parse(result.Stdout);
+        stdout.RootElement.GetProperty("AutomatedEncodingPassed").GetBoolean().Should().BeTrue();
     }
 
     [Test]
-    public async Task PivRecipe_WithValidImage_WritesArtifactAndProvenance()
+    public async Task ExistingOutput_RequiresExplicitOverwriteAndPreservesSource()
     {
-        var outputDir = Path.Combine(TempDirectory, "piv-job");
-        Directory.CreateDirectory(outputDir);
+        var source = PeopleCorpus.WatermarkedCardholderSource();
+        var output = Path.Combine(TempDirectory, "existing.jp2");
+        byte[] sentinel = [1, 2, 3, 4];
+        await File.WriteAllBytesAsync(output, sentinel);
+        var before = SHA256.HashData(await File.ReadAllBytesAsync(source));
+        var result = await CliProcessHarness.Run(source, "--output", output);
+        result.ExitCode.Should().NotBe(0);
+        (await File.ReadAllBytesAsync(output)).Should().Equal(sentinel);
+        SHA256.HashData(await File.ReadAllBytesAsync(source)).Should().Equal(before);
+        File.Exists(output + ".json").Should().BeFalse();
+    }
 
-        var exitCode = await RunCliCommand(
-            $"piv \"{_testImagePath}\" --output-dir \"{outputDir}\"");
-
-        exitCode.Should().Be(0);
-        File.Exists(Path.Combine(outputDir, "source.piv.jp2")).Should().BeTrue();
-        File.Exists(Path.Combine(outputDir, "source.piv.print.jpg")).Should().BeTrue();
-        File.Exists(Path.Combine(outputDir, "source.piv.provenance.json")).Should().BeTrue();
-
-        var provenance = await File.ReadAllTextAsync(
-            Path.Combine(outputDir, "source.piv.provenance.json"));
-
-        provenance.Should().Contain("sp800-76-2-table12-note4");
-        provenance.Should().Contain("fips201-3-4.2.3.1");
-        provenance.Should().Contain("piv-output-geometry");
+    [TestCase("--block-size", "16")]
+    [TestCase("--start-level", "6")]
+    [TestCase("--luma-utility", "0")]
+    [TestCase("--size-profile", "other")]
+    [TestCase("--face-region", "other")]
+    [TestCase("--source-color", "other")]
+    [TestCase("--filesize-target", "other")]
+    [TestCase("--filesize-target", "0")]
+    [TestCase("--filesize-target", "-1")]
+    [TestCase("--filesize-target", "12,500")]
+    [TestCase("--filesize-target", "12500.0")]
+    [TestCase("--filesize-target", "2147483647")]
+    public async Task InvalidEncodingControl_LeavesOutputUntouched(string option, string value)
+    {
+        var output = Path.Combine(TempDirectory, "invalid.jp2");
+        var result = await CliProcessHarness.Run(PeopleCorpus.SubjectSource("carter", "jpg"),
+            "--output", output, option, value);
+        result.ExitCode.Should().NotBe(0);
+        File.Exists(output).Should().BeFalse();
     }
 
     [Test]
-    public async Task PivRecipe_WithJson_WritesMachineReadableStdout()
+    public async Task MinimumTarget_EncodesUntaggedSourceAndRetainsRegionalReview()
     {
-        var outputDir = Path.Combine(TempDirectory, "piv-json-job");
-        Directory.CreateDirectory(outputDir);
-
-        var processInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = $"\"{_cliAssemblyPath}\" piv \"{_testImagePath}\" --output-dir \"{outputDir}\" --json",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(processInfo)
-            ?? throw new InvalidOperationException("Failed to start process");
-
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        process.ExitCode.Should().Be(0);
-        stdout.Should().NotContain("PIV · ICAO · TWIC Biometrics");
-        using var json = JsonDocument.Parse(stdout);
-        json.RootElement.GetProperty("Document").GetString().Should().Be("piv");
-        json.RootElement.GetProperty("ProvenancePath").GetString().Should().Contain(".provenance.json");
-        json.RootElement.GetProperty("Deliverables")[0].GetProperty("Passed").GetBoolean().Should().BeTrue();
+        var output = Path.Combine(TempDirectory, "minimum.jp2");
+        var result = await CliProcessHarness.Run(PeopleCorpus.WatermarkedCardholderSource(), "--output", output, "--json");
+        result.ExitCode.Should().Be(0, result.Stderr);
+        using var json = JsonDocument.Parse(result.Stdout);
+        json.RootElement.GetProperty("SourceColorEvidence").GetProperty("Status").GetInt32()
+            .Should().Be((int)PivSourceColorStatus.AssumedSrgb);
+        json.RootElement.GetProperty("VerificationRequirements").EnumerateArray().Select(value => value.GetString())
+            .Should().Contain(value => value != null && value.Contains("operational shared-wavelet"));
+        (await File.ReadAllBytesAsync(output)).Length.Should().BeLessThanOrEqualTo(11_820);
+        File.Exists(output + ".json").Should().BeTrue();
     }
 
     [Test]
-    public async Task PivRecipe_WithMinimumFileSizeTarget_WritesTargetInJson()
+    public async Task NumericTarget_UsesTheSameLibraryByteCeiling()
     {
-        var outputDir = Path.Combine(TempDirectory, "piv-minimum-json-job");
-        Directory.CreateDirectory(outputDir);
-
-        var processInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = $"\"{_cliAssemblyPath}\" piv \"{_testImagePath}\" --variant digital --output-dir \"{outputDir}\" --filesize-target minimum --json",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(processInfo)
-            ?? throw new InvalidOperationException("Failed to start process");
-
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        process.ExitCode.Should().Be(0);
-        using var json = JsonDocument.Parse(stdout);
-        var deliverable = json.RootElement.GetProperty("Deliverables")[0];
-        deliverable.GetProperty("FileSizeBytes").GetInt32().Should().BeLessThanOrEqualTo(12000);
-        deliverable.GetProperty("ProductionDefaults").GetProperty("fileSizeTarget").GetString().Should().Be("minimum");
-        deliverable.GetProperty("ProductionDefaults").GetProperty("maxFileSizeBytes").GetString().Should().Be("12000");
-    }
-
-    [Test]
-    public async Task PivRecipe_PrintVariantWithFileSizeTarget_ReturnsFailure()
-    {
-        var outputDir = Path.Combine(TempDirectory, "piv-print-target-job");
-        Directory.CreateDirectory(outputDir);
-
-        var exitCode = await RunCliCommand(
-            $"piv \"{_testImagePath}\" --variant print --output-dir \"{outputDir}\" --filesize-target minimum");
-
-        exitCode.Should().NotBe(0);
-    }
-
-    [Test]
-    public async Task NonPivRecipe_WithFileSizeTargetOption_ReturnsFailure()
-    {
-        var outputDir = Path.Combine(TempDirectory, "non-piv-target-job");
-        Directory.CreateDirectory(outputDir);
-
-        var exitCode = await RunCliCommand(
-            $"us-passport \"{_testImagePath}\" --output-dir \"{outputDir}\" --filesize-target minimum");
-
-        exitCode.Should().NotBe(0);
-    }
-
-    [Test]
-    public void DocumentsCommand_ListsSupportedDocumentWorkflows()
-    {
-        var tester = CliTestHarness.Create();
-
-        var result = tester.Run("documents");
-
-        result.ExitCode.Should().Be(0);
-        result.Output.Should().Contain("piv");
-        result.Output.Should().Contain("us-passport");
-        result.Output.Should().Contain("canada-perman");
-        result.Output.Should().Contain("canada-proof-");
-    }
-
-    private async Task<int> RunCliCommand(string arguments)
-    {
-        var processInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = $"\"{_cliAssemblyPath}\" {arguments}",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process =
-            Process.Start(processInfo)
-            ?? throw new InvalidOperationException("Failed to start process");
-
-        await process.WaitForExitAsync();
-        return process.ExitCode;
+        var output = Path.Combine(TempDirectory, "custom.jp2");
+        var result = await CliProcessHarness.Run(PeopleCorpus.WatermarkedCardholderSource(),
+            "--filesize-target", "12500", "--output", output, "--json");
+        result.ExitCode.Should().Be(0, result.Stderr);
+        using var json = JsonDocument.Parse(result.Stdout);
+        json.RootElement.GetProperty("FileSizeTarget").GetProperty("MaximumBytes").GetInt32().Should().Be(12_500);
+        (await File.ReadAllBytesAsync(output)).Length.Should().BeLessThanOrEqualTo(12_500);
     }
 }

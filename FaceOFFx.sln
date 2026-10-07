@@ -38,6 +38,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FaceOFFx.Diagnostics.Cli", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FaceOFFx.Diagnostics.Cli.Tests", "tests\FaceOFFx.Diagnostics.Cli.Tests\FaceOFFx.Diagnostics.Cli.Tests.csproj", "{5CE77BE4-82B1-4B48-96A6-59F9644E2B3F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreJ2K.FaceOFFx", "src\CoreJ2K.FaceOFFx\CoreJ2K.FaceOFFx.csproj", "{A1234567-1234-1234-1234-123456789012}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreJ2K.FaceOFFx.Tests", "tests\CoreJ2K.FaceOFFx.Tests\CoreJ2K.FaceOFFx.Tests.csproj", "{A1234567-1234-1234-1234-123456789013}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,6 +52,14 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A1234567-1234-1234-1234-123456789013}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1234567-1234-1234-1234-123456789013}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1234567-1234-1234-1234-123456789013}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1234567-1234-1234-1234-123456789013}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1234567-1234-1234-1234-123456789012}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1234567-1234-1234-1234-123456789012}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1234567-1234-1234-1234-123456789012}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1234567-1234-1234-1234-123456789012}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A1234567-1234-1234-1234-123456789001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A1234567-1234-1234-1234-123456789001}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1234567-1234-1234-1234-123456789001}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -185,6 +197,8 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{A1234567-1234-1234-1234-123456789013} = {8B8D4D1A-FF14-4E66-B8F5-FB5CFE2BCC6C}
+		{A1234567-1234-1234-1234-123456789012} = {8B8D4D1A-FF14-4E66-B8F5-FB5CFE2BCC6A}
 		{A1234567-1234-1234-1234-123456789001} = {8B8D4D1A-FF14-4E66-B8F5-FB5CFE2BCC6A}
 		{A1234567-1234-1234-1234-123456789002} = {8B8D4D1A-FF14-4E66-B8F5-FB5CFE2BCC6A}
 		{A1234567-1234-1234-1234-123456789004} = {8B8D4D1A-FF14-4E66-B8F5-FB5CFE2BCC6A}

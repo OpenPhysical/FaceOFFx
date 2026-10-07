@@ -56,7 +56,7 @@ public record QualityAssessmentOptions
     /// <summary>
     /// Maximum rotation correction to apply (degrees)
     /// </summary>
-    public float MaxRotationCorrection { get; init; } = 15f;
+    public float MaxRotationCorrection { get; init; } = 5f;
     
     /// <summary>
     /// Strict compliance preset - high quality threshold with enforcement
@@ -94,35 +94,12 @@ public record QualityAssessmentOptions
     };
     
     /// <summary>
-    /// TWIC-specific preset
-    /// </summary>
-    public static QualityAssessmentOptions Twic => new()
-    {
-        EnforceCompliance = true,
-        MinQualityThreshold = 0.75f,
-        Standard = Iso19794Standard.Twic
-    };
-    
-    /// <summary>
-    /// ICAO passport preset
-    /// </summary>
-    public static QualityAssessmentOptions Icao => new()
-    {
-        EnforceCompliance = true,
-        MinQualityThreshold = 0.8f,
-        Standard = Iso19794Standard.Icao
-    };
-    
-    /// <summary>
     /// Creates options for a specific standard
     /// </summary>
     public static QualityAssessmentOptions ForStandard(string standard) => standard?.ToLowerInvariant() switch
     {
         "piv" => new() { Standard = Iso19794Standard.Piv },
-        "twic" => Twic,
-        "icao" or "passport" => Icao,
-        "cac" => new() { Standard = Iso19794Standard.Cac },
-        _ => new() { Standard = Iso19794Standard.Piv }
+        _ => throw new ArgumentException("The quality assessment profile identifier must be PIV.", nameof(standard))
     };
     
     /// <summary>
@@ -150,18 +127,18 @@ public record QualityAssessmentOptions
 }
 
 /// <summary>
-/// ISO/IEC 19794-5 standard variants
+/// PIV landmark-quality scoring profile. Anatomical measurements are evaluated by the portrait geometry pipeline.
 /// </summary>
 [PublicAPI]
 public record Iso19794Standard
 {
     /// <summary>
-    /// The name of the standard (e.g., "PIV", "TWIC", "ICAO")
+    /// The PIV profile name.
     /// </summary>
     public string Name { get; }
     
     /// <summary>
-    /// Expected image dimensions in pixels for this standard
+    /// Default scoring canvas. PIV supports other source-supported portrait dimensions.
     /// </summary>
     public ImageDimensions ExpectedDimensions { get; }
     
@@ -206,46 +183,11 @@ public record Iso19794Standard
     /// </summary>
     public static Iso19794Standard Piv { get; } = new(
         "PIV",
-        new ImageDimensions(420, 560),
+        new ImageDimensions(480, 640),
         minHeadWidthRatio: 0.5f,
-        maxHeadWidthRatio: 0.75f,
+        maxHeadWidthRatio: 240f / 420f,
         minIpd: 90f,
         maxIpd: 120f
     );
     
-    /// <summary>
-    /// TWIC (Transportation Worker Identification Credential) standard
-    /// </summary>
-    public static Iso19794Standard Twic { get; } = new(
-        "TWIC",
-        new ImageDimensions(420, 560),
-        minHeadWidthRatio: 0.5f,
-        maxHeadWidthRatio: 0.75f,
-        minIpd: 90f,
-        maxIpd: 120f
-    );
-    
-    /// <summary>
-    /// ICAO (International Civil Aviation Organization) passport standard
-    /// </summary>
-    public static Iso19794Standard Icao { get; } = new(
-        "ICAO",
-        new ImageDimensions(413, 531), // 35mm x 45mm at 300 DPI
-        minHeadWidthRatio: 0.5f,
-        maxHeadWidthRatio: 0.75f,
-        minIpd: 90f,
-        maxIpd: 120f
-    );
-    
-    /// <summary>
-    /// CAC (Common Access Card) standard
-    /// </summary>
-    public static Iso19794Standard Cac { get; } = new(
-        "CAC",
-        new ImageDimensions(420, 560),
-        minHeadWidthRatio: 0.5f,
-        maxHeadWidthRatio: 0.75f,
-        minIpd: 90f,
-        maxIpd: 120f
-    );
 }

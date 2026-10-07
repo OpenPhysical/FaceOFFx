@@ -27,4 +27,13 @@ public static class PeopleCorpus
 
     public static string SubjectVariant(string subjectId, string fileName) =>
         Path.Combine(SubjectDirectory(subjectId), fileName);
+
+    public static string WatermarkedCardholderSource()
+    {
+        var path = Path.Combine(FindSolutionRoot(), "datasets", "samples", "cardholders",
+            "source_watermarked", "construction", "german-male.png");
+        if (!File.Exists(path))
+            NUnit.Framework.Assert.Ignore("This integration check requires the local source-watermarked cardholder corpus.");
+        return path;
+    }
 }

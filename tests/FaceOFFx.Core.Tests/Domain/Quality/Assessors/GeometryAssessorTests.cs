@@ -104,20 +104,17 @@ public class GeometryAssessorTests
     }
     
     /// <summary>
-    /// Verifies that different compliance standards (PIV, TWIC, ICAO, CAC) apply their specific criteria correctly
+    /// Verifies the PIV quality profile retains its scoring canvas.
     /// </summary>
     [Test]
-    public void Assess_WithDifferentStandards_AppliesCorrectCriteria()
+    public void Assess_WithPivProfile_AppliesScoringCriteria()
     {
         // Arrange
         var imageDims = new ImageDimensions(420, 560);
         var landmarks = CreateCenteredLandmarks(imageDims);
         var standards = new[] 
         { 
-            Iso19794Standard.Piv,
-            Iso19794Standard.Twic,
-            Iso19794Standard.Icao,
-            Iso19794Standard.Cac
+            Iso19794Standard.Piv
         };
         
         // Act & Assert

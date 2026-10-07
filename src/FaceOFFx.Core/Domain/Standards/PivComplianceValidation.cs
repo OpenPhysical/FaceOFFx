@@ -1,19 +1,20 @@
 using JetBrains.Annotations;
+using FaceOFFx.Core.Domain.Detection;
 
 namespace FaceOFFx.Core.Domain.Standards;
 
 /// <summary>
-/// Represents the validation results for PIV compliance according to INCITS 385-2004 Section 8.
+/// Records selected PIV candidate geometry checks and the remaining anatomical and capture verification.
 /// </summary>
 /// <param name="IsAAAligned">True if nose and mouth centers align with the vertical center line</param>
 /// <param name="IsBBPositioned">True if eye line is positioned 50-70% from bottom edge</param>
 /// <param name="IsCCRatioValid">True if head width meets minimum 7:4 ratio (image width : head width)</param>
-/// <param name="IsFullyCompliant">True if all PIV requirements are met</param>
+/// <param name="IsFullyCompliant">External complete-conformance assertion; automatic line validation records remaining verification.</param>
 /// <param name="AADeviation">Deviation of face center line from image center in pixels</param>
 /// <param name="BBFromBottom">Actual percentage of eye line from bottom edge (0.5-0.7 is compliant)</param>
 /// <param name="CCRatio">Current image width : head width ratio (must be ≥ 1.75 for 7:4)</param>
 /// <param name="HeadWidthPixels">Actual head width in pixels</param>
-/// <param name="MinRequiredHeadWidth">Minimum required head width for current image size</param>
+/// <param name="MinRequiredHeadWidth">NIST minimum ear-attachment width, 240 pixels.</param>
 /// <param name="Issues">List of specific compliance issues found</param>
 /// <param name="Recommendations">List of recommended corrections</param>
 [PublicAPI]
@@ -31,6 +32,16 @@ public record PivComplianceValidation(
     IReadOnlyList<string> Recommendations
 )
 {
+    /// <summary>Measurement basis for the displayed CC width.</summary>
+    public GeometryEvidenceStatus HeadWidthStatus { get; init; }
+    /// <summary>Reports whether the frame width exceeds 420 pixels.</summary>
+    public bool IsFrameWidthValid { get; init; }
+    /// <summary>Reports a measured anatomical width of at least 240 pixels.</summary>
+    public bool IsHeadResolutionValid { get; init; }
+    /// <summary>Screening result using the available width value and its recorded basis.</summary>
+    public bool WidthGeometryScreenPassed { get; init; }
+    /// <summary>Acquisition and anatomical checks required beyond the measured lines.</summary>
+    public IReadOnlyList<string> VerificationRequirements { get; init; } = [];
     /// <summary>
     /// PIV compliance thresholds and constants.
     /// </summary>
@@ -132,38 +143,51 @@ public record PivComplianceValidation(
 
         // Validate Line CC (Head Width Ratio)
         var ccRatio = lines.GetImageToHeadWidthRatio(imageWidth);
-        var minRequiredHeadWidth = imageWidth / Thresholds.MinWidthRatio;
+        const float minRequiredHeadWidth = 240;
+        var maxAllowedHeadWidth = imageWidth / Thresholds.MinWidthRatio;
         // Use proper floating point comparison with epsilon tolerance
         const float epsilon = 0.001f; // Small tolerance for floating point precision
-        var isCCRatioValid =
-            ccRatio >= (Thresholds.MinWidthRatio - epsilon)
-            || Math.Abs(ccRatio - Thresholds.MinWidthRatio) < epsilon;
+        var ratioWithinBounds = float.IsFinite(ccRatio) && ccRatio >= Thresholds.MinWidthRatio - epsilon;
+        var headWidthWithinBounds = float.IsFinite(lines.LineCC_Width) && lines.LineCC_Width >= minRequiredHeadWidth;
+        var measuredWidth = lines.HeadWidthStatus == GeometryEvidenceStatus.Measured &&
+            !string.IsNullOrWhiteSpace(lines.HeadWidthMeasurementSource);
+        var isCCRatioValid = measuredWidth && ratioWithinBounds;
+        var frameWidthValid = imageWidth > 420;
 
-        if (!isCCRatioValid)
+        if (!ratioWithinBounds)
         {
             issues.Add(
                 $"Head width ratio {ccRatio:F2} below minimum {Thresholds.MinWidthRatio:F2} (7:4)"
             );
             issues.Add(
-                $"Head width {lines.LineCC_Width:F0}px below minimum {minRequiredHeadWidth:F0}px"
+                $"Width value {lines.LineCC_Width:F0}px exceeds the maximum {maxAllowedHeadWidth:F0}px for this frame"
             );
             recommendations.Add(
-                $"Increase head size in crop or use higher resolution source image"
+                "Retain a wider source-supported crop to provide the required head-width margin"
             );
         }
-
-        var isFullyCompliant = isAAAligned && isBBPositioned && isCCRatioValid;
-
-        if (isFullyCompliant)
+        if (!headWidthWithinBounds)
         {
-            recommendations.Add("Image meets all PIV compliance requirements");
+            issues.Add($"Width value {lines.LineCC_Width:F0}px is below the 240-pixel anatomical-resolution threshold");
+            recommendations.Add("Use a native-resolution source and verify at least 240 pixels across the ear-to-head attachments");
         }
+        if (!frameWidthValid)
+        {
+            issues.Add($"Frame width {imageWidth}px requires a native-resolution canvas wider than 420 pixels");
+            recommendations.Add("Select a source-supported canvas with width greater than 420 pixels");
+        }
+        var requirements = new List<string>
+        {
+            "Verify the true crown-to-chin height, complete head and shoulder coverage, and optical acquisition requirements.",
+            "Verify frontal pose, neutral expression, scene quality, source history, color encoding, and final signed-record size."
+        };
+        if (!measuredWidth) requirements.Add("Measure CC at the ear-to-head attachments and record the measurement source.");
 
         return new PivComplianceValidation(
             isAAAligned,
             isBBPositioned,
             isCCRatioValid,
-            isFullyCompliant,
+            false,
             aaDeviation,
             bbFromBottom,
             ccRatio,
@@ -171,7 +195,14 @@ public record PivComplianceValidation(
             minRequiredHeadWidth,
             issues,
             recommendations
-        );
+        )
+        {
+            HeadWidthStatus = measuredWidth ? GeometryEvidenceStatus.Measured : GeometryEvidenceStatus.Estimated,
+            IsFrameWidthValid = frameWidthValid,
+            IsHeadResolutionValid = measuredWidth && headWidthWithinBounds,
+            WidthGeometryScreenPassed = ratioWithinBounds && headWidthWithinBounds && frameWidthValid,
+            VerificationRequirements = requirements.AsReadOnly()
+        };
     }
 
     /// <summary>
@@ -185,7 +216,7 @@ public record PivComplianceValidation(
                 return ComplianceSeverity.Compliant;
             if (Issues.Count >= 3)
                 return ComplianceSeverity.Critical;
-            if (!IsCCRatioValid)
+            if (!WidthGeometryScreenPassed)
                 return ComplianceSeverity.High;
             if (!IsBBPositioned)
                 return ComplianceSeverity.Medium;
@@ -198,8 +229,8 @@ public record PivComplianceValidation(
     /// </summary>
     public string Summary =>
         IsFullyCompliant
-            ? "PIV compliant"
-            : $"PIV non-compliant: {Issues.Count} issues ({Severity} severity)";
+            ? "Externally verified PIV conformance"
+            : $"PIV candidate: {Issues.Count} geometry issues; {VerificationRequirements.Count} verification requirements ({HeadWidthStatus} CC width)";
 
     /// <summary>
     /// Gets detailed compliance report for debugging.
@@ -210,11 +241,11 @@ public record PivComplianceValidation(
         {
             var report = new List<string>
             {
-                $"PIV Compliance Report:",
+                $"PIV Candidate Geometry Report:",
                 $"  Line AA (Center): {(IsAAAligned ? "✓" : "✗")} Deviation: {AADeviation:F1}px",
                 $"  Line BB (Eyes): {(IsBBPositioned ? "✓" : "✗")} Position: {BBFromBottom:P1} from bottom",
-                $"  Line CC (Width): {(IsCCRatioValid ? "✓" : "✗")} Ratio: {CCRatio:F2} (head: {HeadWidthPixels:F0}px)",
-                $"  Overall: {(IsFullyCompliant ? "COMPLIANT" : $"NON-COMPLIANT ({Severity})")}",
+                $"  Line CC (Width): {HeadWidthStatus}; ratio {CCRatio:F2}, width {HeadWidthPixels:F0}px",
+                $"  Overall: {Summary}",
             };
 
             if (Issues.Any())
@@ -227,6 +258,11 @@ public record PivComplianceValidation(
             {
                 report.Add("  Recommendations:");
                 report.AddRange(Recommendations.Select(rec => $"    - {rec}"));
+            }
+            if (VerificationRequirements.Any())
+            {
+                report.Add("  Required verification:");
+                report.AddRange(VerificationRequirements.Select(requirement => $"    - {requirement}"));
             }
 
             return string.Join(Environment.NewLine, report);

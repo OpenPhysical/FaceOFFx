@@ -46,7 +46,7 @@ public class QualityAcceptanceEvaluatorTests
     public void Evaluate_RejectsNonCompliantAssessmentWhenComplianceIsEnforced()
     {
         var assessment = CreateAssessment(overallValue: 0.92f, criticalViolation: true);
-        var options = QualityAssessmentOptions.StrictForStandard("icao");
+        var options = QualityAssessmentOptions.StrictForStandard("piv");
 
         var result = QualityAcceptanceEvaluator.Evaluate(assessment, options);
 
@@ -57,9 +57,9 @@ public class QualityAcceptanceEvaluatorTests
     [Test]
     public void StrictForStandard_PreservesRequestedStandardAndOverrideThreshold()
     {
-        var options = QualityAssessmentOptions.StrictForStandard("icao", 0.9f);
+        var options = QualityAssessmentOptions.StrictForStandard("piv", 0.9f);
 
-        options.Standard.Should().Be(Iso19794Standard.Icao);
+        options.Standard.Should().Be(Iso19794Standard.Piv);
         options.EnforceCompliance.Should().BeTrue();
         options.MinQualityThreshold.Should().Be(0.9f);
     }

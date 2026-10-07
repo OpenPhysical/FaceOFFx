@@ -1,4 +1,5 @@
 using FaceOFFx.Core.Domain.Common;
+using System.Numerics;
 using SixLabors.ImageSharp;
 
 namespace FaceOFFx.Core.Domain.Transformations;
@@ -63,15 +64,11 @@ public static class RenderTransformMapBuilder
         ImageDimensions outputDimensions)
     {
         var rotate = BuildExpandedRotationTransform(sourceDimensions, rotatedDimensions, rotationDegrees);
-        var cropAndResize = TransformationMatrix.Identity
-            .Translate(-cropRectangle.X, -cropRectangle.Y)
-            .Scale(
-                (float)outputDimensions.Width / cropRectangle.Width,
-                (float)outputDimensions.Height / cropRectangle.Height,
-                0,
-                0);
-
-        var sourceToOutput = cropAndResize * rotate;
+        // Matrix3x2 transforms row vectors, so the operations follow their application order.
+        var cropAndResize = Matrix3x2.CreateTranslation(-cropRectangle.X, -cropRectangle.Y)
+            * Matrix3x2.CreateScale((float)outputDimensions.Width / cropRectangle.Width,
+                (float)outputDimensions.Height / cropRectangle.Height);
+        var sourceToOutput = TransformationMatrix.FromMatrix(rotate.ToMatrix() * cropAndResize);
         return sourceToOutput.GetInverse()
             .ToPipelineResult(new GeometryError("Render transform is not invertible.", "render-transform"))
             .Map(inverse => new RenderTransformMap(
@@ -112,9 +109,8 @@ public static class RenderTransformMapBuilder
         var newCenterX = rotatedDimensions.Width / 2f;
         var newCenterY = rotatedDimensions.Height / 2f;
 
-        return TransformationMatrix.Identity
-            .Translate(-oldCenterX, -oldCenterY)
-            .Rotate(rotationDegrees, 0, 0)
-            .Translate(newCenterX, newCenterY);
+        return TransformationMatrix.FromMatrix(Matrix3x2.CreateTranslation(-oldCenterX, -oldCenterY)
+            * Matrix3x2.CreateRotation(rotationDegrees * (float)(Math.PI / 180))
+            * Matrix3x2.CreateTranslation(newCenterX, newCenterY));
     }
 }
