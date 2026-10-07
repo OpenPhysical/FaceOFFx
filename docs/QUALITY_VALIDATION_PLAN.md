@@ -1,79 +1,32 @@
-# FaceOFFx Diagnostics Validation Plan
+# FaceOFFx diagnostics validation
 
-## Overview
+The release product prepares PIV images. The separate diagnostics executable supplies detection overlays, controlled sharpness variations and PIV sample assets.
 
-This document outlines the current validation strategy for FaceOFFx diagnostics and document workflows. The release CLI is document-only; engineering validation runs through `faceoffx-diagnostics`, the canonical people corpus, and behavior-heavy core/infrastructure tests.
+## Inputs and controls
 
-## Validation Components
-
-### 1. Corpus Setup
-
-```bash
-ls tests/test-images/people
-```
-
-The tracked people corpus is the shared source for:
-- detection verification
-- overlay inspection
-- document crop rendering
-- representative workflow tests
-
-### 2. Diagnostics CLI Testing
+The tracked people corpus supports detection and overlay regressions. The local source-watermarked corpus supports portrait studies. Preserve original sources and record hashes; untagged inputs retain an automatic sRGB-assumption record.
 
 ```bash
 faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
-faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
-faceoffx-diagnostics crop --corpus people --profile canada-passport --variant print --output artifacts/diagnostics/crop
 faceoffx-diagnostics sharpness blur --corpus people
 faceoffx-diagnostics sharpness measure --input artifacts/diagnostics/sharpness/blur-progressions --json
+faceoffx photo.jpg --filesize-target minimum --output portrait.jp2
 ```
 
-### 3. Release Workflow Testing
+Export fixed-recipe PIV JP2s through `docs samples` with an explicit input, named size target and a new or empty output directory. The development Pillow/OpenJPEG renderer creates previews. [Contributor instructions](CONTRIBUTING.md) contain both commands.
 
-```bash
-faceoffx piv input.jpg
-faceoffx us-passport input.jpg --variant digital
-faceoffx canada-proof-of-citizenship input.jpg --variant print
-```
+## Evidence to retain
 
-These commands should be covered mostly through infrastructure/core behavior tests and only lightly through CLI smoke tests.
+- Source, crop, fixed mask and output hashes.
+- Source/output dimensions, uniform transform, original crop support and anatomical measurement bases.
+- Source color method, source ICC hash when present, and any automatic sRGB assumption.
+- Complete JP2 size, committed packet/subband bytes, attribution convention and measured face ratio.
+- Native decoded face/outer detail and controlled blur/geometry regression results.
 
-### 4. Validation Focus
-
-- corpus manifest verification
-- reverse-projected overlays on originals
-- crop parity between diagnostics and release workflows
-- document-specific render and validation behavior
-- provenance separation between blocking, advisory, and manual checks
-
-## Quick Start Guide
-
-```bash
-# 1. Verify detection and landmarks
-faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
-
-# 2. Generate overlays for manual review
-faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
-
-# 3. Generate profile crops
-faceoffx-diagnostics crop --corpus people --profile canada-passport --variant print --output artifacts/diagnostics/crop
-
-# 4. Run the release workflow on a real file
-faceoffx us-passport tests/test-images/people/generic-guy/source.jpg --variant digital
-```
+A target succeeds after source-supported geometry and its complete JP2 byte ceiling pass. Regional compression, capture/anatomical review and complete signed-object lengths remain issuer review requirements. [Compression accounting](PIV-COMPRESSION-ACCOUNTING.md) defines the engineering regional estimate.
 
 ## Troubleshooting
 
-### Common Issues
+Inspect detection overlays when a source lacks a usable single face. Inspect candidate traces when source margins or anatomical geometry prevent a crop. For capacity failures, retain the fixed mask and actual allocation evidence. A supported larger allowance or better native source framing can provide more encoding room.
 
-1. **No face detected**:
-   - verify the corpus expectation for that subject
-   - inspect the overlay output for framing or pose issues
-
-2. **Unexpected crop**:
-   - compare `faceoffx-diagnostics crop` output with the release workflow output
-   - inspect the generated manifest and overlay guides
-
-## Conclusion
-
-This validation plan keeps the public product simple while preserving deep engineering visibility through the separate diagnostics tool.
+Use [API](API.md) for the current library and [CLI architecture](CLI_ARCHITECTURE.md) for operator behavior.

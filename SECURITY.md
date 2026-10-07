@@ -2,12 +2,9 @@
 
 ## Supported Versions
 
-We release patches for security vulnerabilities. Which versions are eligible for receiving such patches depends on the CVSS v3.0 Rating:
-
-| Version | Supported          |
-|---------|--------------------|
-| 1.x.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+Security fixes target the current **4.x** line. Published **2.x** packages are historical
+releases; contact the security address below to establish the maintenance status of a
+specific release before relying on it for deployment.
 
 ## Reporting a Vulnerability
 
@@ -78,24 +75,27 @@ If you are using FaceOFFx to process government ID photos or PIV cards, you shou
 FaceOFFx includes several security features:
 
 - **Input Validation**: Validates image formats and dimensions
-- **Memory Safety**: Uses managed memory through .NET
-- **No External Network Calls**: All processing is done locally
-- **Dependency Security**: Regular updates of dependencies
-- **SBOM Generation**: Software Bill of Materials for supply chain transparency
+- **Managed Processing**: Uses .NET image/codec code and native ONNX Runtime inference
+- **Local Processing**: Portrait preparation uses embedded models locally
+- **Dependency Inventory**: Dependency licenses and the SBOM support supply-chain review
 
 ## Known Security Considerations
 
 ### ONNX Model Security
 
-- ONNX models are embedded as resources and cannot be tampered with at runtime
-- Models are loaded from embedded resources only, not from external files
-- Model inference runs in a sandboxed environment
+- ONNX models are loaded from embedded assembly resources
+- Validate package provenance and assembly integrity in the deployment workflow
+- Apply operating-system isolation and resource limits around native inference
 
 ### Image Processing
 
 - All image processing is performed locally with validated inputs
 - Input images are validated before processing
-- Memory usage is bounded during processing
+- Source dimensions are guarded at 64 million pixels; decoded images, conversion buffers,
+  native inference and encoder workspaces still require deployment memory planning
+- The encoder-only CoreJ2K source is vendored in `src/CoreJ2K.FaceOFFx`; its
+  [supplemental inventory](sbom/vendored-codec.json) identifies retained BSD3 and JJ2000
+  notices. Regenerate the complete dependency SBOM from the final package for release
 
 ## Additional Resources
 

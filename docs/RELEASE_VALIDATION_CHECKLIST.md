@@ -1,5 +1,7 @@
 # Release Validation Checklist - FaceOFFx v2.1.0
 
+Historical release record for v2.1.0. Current PIV-only usage and verification gates are documented in [API](API.md), [diagnostics validation](QUALITY_VALIDATION_PLAN.md) and [compression accounting](PIV-COMPRESSION-ACCOUNTING.md).
+
 ## Pre-Release Validation ✅
 
 ### Code Quality
@@ -128,4 +130,4 @@
 **Release Prepared By:** Claude Code Assistant  
 **Date:** 2025-01-05  
 **Release Version:** 2.1.0  
-**Release Type:** Minor (new features, no breaking changes)  
+**Release Type:** Minor (new features, no breaking changes)

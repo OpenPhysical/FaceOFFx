@@ -1,763 +1,240 @@
-# FaceOFFx – PIV-Compatible Facial Processing for .NET
+# FaceOFFx: balanced PIV JPEG 2000 portraits for .NET
 
-![FaceOFFx ROI Visualization](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/generic_guy_roi_300w.jpg)
+FaceOFFx is a library for preparing a source-supported PIV portrait and encoding it within
+a chosen JPEG 2000 file-size ceiling. It runs locally with embedded face-detection and
+landmark models, and returns geometry, color and regional-compression review evidence.
 
-*"I want to take his face... off."*
-— Castor Troy, *Face/Off* (1997)
+[Library](#library) · [CLI](#cli) · [Encoding](#encoding-and-review) ·
+[Gallery](#sample-gallery) · [Development](#development)
 
-[Quick Start](#quick-start) • [Installation](#installation) • [Samples](#sample-gallery) • [API](#api-reference) • [CLI](#cli-usage) • [Configuration](#configuration)
+## Library
 
----
+Use the **FaceOFFx NuGet library** for one fixed balanced recipe and one size control.
+This checkout builds version **4.0.0**:
 
-## About
+```bash
+dotnet pack src/FaceOFFx/FaceOFFx.csproj -c Release -o artifacts/packages
+```
 
-FaceOFFx is a specialized, high-performance facial processing library for .NET, focused on **PIV (Personal Identity
-Verification)**
-compatibility for issuing credentials that follow government standards (FIPS 201). Derived from the excellent *
-*[FaceONNX](https://github.com/FaceONNX/FaceONNX)** library,
-FaceOFFx extends its capabilities with PIV-specific transformations, FIPS 201-3 compatibility features, and advanced JPEG
-2000 ROI encoding.
-
-### Key Features
-
-- **PIV Card Compatibility** - FIPS 201-3 compatible 420×560 output
-- **JPEG 2000 ROI Encoding** - Smart compression with profile-defined hard caps or explicit rates
-- **68-Point Landmark Detection** - Precise facial feature mapping
-- **High Performance** - Direct ONNX Runtime integration
-- **Cross-Platform** - Windows, Linux, macOS via .NET 8, 9, and 10
-- **Self-Contained** - Embedded models, no external dependencies
-- **Pre-trained Models Only** - Uses existing RetinaFace and PFLD models, no training performed
-
-## Quick Start
-
-### Profile Encoding API
-
-The public library API is profile-first. Choose a `ProfileSpecification`, pass source image bytes to
-`ProfileEncoder`, and handle the typed railway result:
+Add that directory to your consumer's NuGet sources alongside NuGet.org for dependencies,
+then reference `FaceOFFx` version4.0.0. The library targets .NET8 and supports .NET8/9/10
+applications. The examples below use the package built from this checkout.
 
 ```csharp
-using FaceOFFx.Infrastructure.Services;
-using FaceOFFx.Core.Domain.Transformations;
-using Microsoft.Extensions.Logging.Abstractions;
+using FaceOFFx;
 
-byte[] imageData = File.ReadAllBytes("photo.jpg");
-
-using var loggerFactory = NullLoggerFactory.Instance;
-using var serviceFactory = new OnnxFacialProcessingServiceFactory(loggerFactory);
-
-var geometryPipeline = new FaceGeometryPipeline(
-    serviceFactory,
-    NullLogger<FaceGeometryPipeline>.Instance);
-
-var encoder = new ProfileEncoder(
-    geometryPipeline,
-    serviceFactory,
-    NullLogger<ProfileEncoder>.Instance);
-
-var result = await encoder.ProcessAsync(imageData, ProfileSpecifications.Piv);
+using var encoder = new PivImageEncoder();
+var result = await encoder.EncodeFileAsync("photo.jpg", PivFileSizeTarget.Minimum);
 if (result.IsFailure)
 {
-    Console.WriteLine($"Processing failed: [{result.Error.Code}] {result.Error.Message}");
+    Console.Error.WriteLine(result.Error.Message);
     return;
 }
 
-File.WriteAllBytes("piv.jp2", result.Value.ImageData);
-Console.WriteLine($"Profile: {result.Value.Profile.DisplayName}");
-Console.WriteLine($"Output: {result.Value.OutputDimensions.Width}x{result.Value.OutputDimensions.Height}");
-Console.WriteLine($"Size: {result.Value.Encoding.FileSize:N0} bytes");
-Console.WriteLine($"Rate: {result.Value.Encoding.CompressionRate:F2} bpp");
+await File.WriteAllBytesAsync("portrait.jp2", result.Value.ImageData);
+foreach (var requirement in result.Value.VerificationRequirements)
+    Console.WriteLine(requirement);
 ```
 
-The PIV profile renders a 420×560 card portrait, preserves the facial ROI at higher quality,
-and solves for the highest-quality JPEG 2000 candidate under the named `preferred` 22KB
-card-image cap. Use the named `minimum` target when the raw JP2 output must leave room for
-later card-container wrapping and signing overhead.
+`EncodeAsync(byte[], fileSizeTarget, cancellationToken)` accepts in-memory input. Omitting
+the target selects `Minimum`. Reuse the encoder, await calls and dispose it when finished.
+Cancellation propagates as `OperationCanceledException`; expected processing failures
+return `Result<PivEncodingResult, PipelineError>`.
 
-### Document Workflows
+```csharp
+var preferred = await encoder.EncodeFileAsync("photo.jpg", PivFileSizeTarget.Preferred);
+var custom = await encoder.EncodeFileAsync("photo.jpg", PivFileSizeTarget.FromBytes(16_000));
+```
 
-The primary CLI surface is now document-specific. These commands analyze the source photo, render the requested artifact set, validate the actual outputs, and write a provenance JSON file with the cited rules that were applied.
+The immutable result carries JPEG 2000 bytes, output dimensions and landmarks, selected
+file-size target, crop/region/color evidence, encoding measurements and merged review
+requirements. See [API](docs/API.md) and the [4.0 migration notes](docs/RELEASE-NOTES.md).
+
+## CLI
+
+The CLI is a thin wrapper over the library. With the .NET10 SDK installed, build and run
+it from this checkout:
 
 ```bash
-# Federal PIV issuance bundle
-faceoffx piv photo.jpg
-
-# Federal PIV digital card image using the minimum-capacity target
-faceoffx piv photo.jpg --variant digital --filesize-target minimum
-
-# U.S. passport paper photo
-faceoffx us-passport photo.jpg
-
-# U.S. passport digital photo
-faceoffx us-passport photo.jpg --variant digital
-
-# U.S. permanent resident photo
-faceoffx us-permanent-resident photo.jpg
-
-# Canadian passport paper photo
-faceoffx canada-passport photo.jpg
-
-# Canadian permanent resident card photo
-faceoffx canada-permanent-resident photo.jpg
-
-# Canadian proof of citizenship digital photo
-faceoffx canada-proof-of-citizenship photo.jpg --variant digital
-
-# Discover shipped document workflows and variants
-faceoffx documents
+dotnet build FaceOFFx.sln -c Release
+dotnet run --project src/FaceOFFx.Cli -c Release --framework net8.0 -- \
+  photo.jpg --filesize-target minimum --output portrait.jp2
 ```
 
-### Diagnostics Workflow
+Use `--filesize-target minimum`, `preferred`, or a positive byte count. `--json` writes
+machine-readable evidence; `--debug` sends logs to stderr. The default image path is
+`INPUT.piv.jp2`, with evidence at `INPUT.piv.jp2.json`. Existing files require `--overwrite`.
+Writes use staged files, individual atomic renames and rollback; interrupted processes
+can leave recovery files adjacent to the output.
 
-Engineering diagnostics now live in a separate tool so the release CLI stays document-focused:
+Exit code **0** means a portrait was encoded within the selected file ceiling and passed
+the automated source-support and framing checks. The sidecar keeps enrollment and
+regional-compression review requirements visible.
 
-```bash
-faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
-faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
-```
+## Encoding and review
 
-`faceoffx-diagnostics detect` writes one folder per subject plus a root `manifest.json`. Each
-subject folder contains an ordered set of PNGs that shows the human-detection pipeline step
-by step:
+The stored canvas is **480×640**, rendered in one uniform affine Lanczos3 pass with native
+source support and scale at or below 1. The fixed framing ladder retains head resolution,
+eye position and source margins. Anatomical measurements retain their estimated or
+verified basis in the result.
 
-- `00-original.png`: Source image with no overlays
-- `10-coarse.png`: RetinaFace detector box and 5-point landmarks
-- `20-chip-locate.png`: Projected chip footprint on the source image
-- `30-chip.png`: Canonical extracted chip
-- `40-fine-chip.png`: Fine 68-point landmarks on the chip
-- `50-fine-source.png`: Fine 68-point landmarks projected back into source coordinates
+The fixed balanced Part 1 recipe uses one tile, one quality layer, irreversible **9/7**,
+ICT, **ROI start level 4**, **64×64** code blocks and **luma utility 1.25** on every luma
+subband including LL. Chroma utility is 1. Allocation uses the balanced rate-distortion
+objective within the complete JP2 ceiling.
 
-Example:
+The face-centered coding mask is the hull of all 68 jaw, brow, eye, nose and mouth
+landmarks with a fixed **3% jaw-width margin**, constructed before allocation. Full-head
+framing and inner-mask placement have separate review evidence.
 
-```bash
-faceoffx-diagnostics detect --corpus people --output /tmp/faceoffx-human-detect-stages
-open -a Finder /tmp/faceoffx-human-detect-stages
-```
+Regional accounting uses `synthesis-energy-decoder-effective-pass-v3`. It apportions
+actual packet-body payload using spatial synthesis influence and modeled decoder-retained
+coding benefit. For `A` RGB24 pixels, the method estimate is `3*A / attributedFaceBytes`.
+Face/outside payload, headers and JP2 boxes reconcile with actual file bytes. The ledger
+is an engineering measurement for regional review, with its assumptions documented in
+[compression accounting](docs/PIV-COMPRESSION-ACCOUNTING.md).
 
-The output layout looks like this:
+The on-card face-region requirement is **24:1** under the accepted regional accounting.
+The gallery keeps each method estimate visible for that review, alongside actual bytes.
 
-```text
-artifacts/diagnostics/detect/
-├── manifest.json
-├── generic-guy/
-│   ├── 00-original.png
-│   ├── 10-coarse.png
-│   ├── 20-chip-locate.png
-│   ├── 30-chip.png
-│   ├── 40-fine-chip.png
-│   └── 50-fine-source.png
-└── person-01/
-    ├── 00-original.png
-    ├── 10-coarse.png
-    ├── 20-chip-locate.png
-    ├── 30-chip.png
-    ├── 40-fine-chip.png
-    └── 50-fine-source.png
-```
+Enrollment qualification requires reviewed ear-attachment and crown measurements,
+optical capture resolution, frontal pose, neutral expression, uniform background and
+illumination, trusted source/color history, recognition evidence and issuer/card
+interoperability. Review regional compression against the applicable NIST requirements
+and the recorded measurement convention.
 
-#### Profile Encoding Goals
+### File-size targets
 
-PIV encoding is specified by the profile, not by caller-side option bags:
+| Target | Complete JP2 ceiling | Required biometric capacity | Required complete-object capacity |
+| --- | ---: | ---: | ---: |
+| `Minimum` | 11,820 bytes | 12,704 bytes | 12,710 bytes |
+| `Preferred` | 22,000 bytes | 22,884 bytes | 22,890 bytes |
+| `FromBytes(N)` | N bytes | N + 884 bytes | `RequiredObjectBytes` |
 
-- PIV uses the named `preferred` 22KB hard cap for the card facial image by default.
-- PIV also exposes a named `minimum` 12KB target for minimum-capacity card workflows that need room below the SP 800-73 cardholder facial-image container minimum for CBEFF, signing, and wrapping overhead.
-- The encoding solver chooses the highest-quality JPEG 2000 candidate that fits under the cap.
-- ROI behavior is part of the `EncodingSpecification` attached to the profile.
+The container arithmetic reserves **46 FAC**, **88 CBEFF**, **750 signature** and
+**6 outer-tag** bytes for the named targets. Custom targets expose size-dependent BER
+wrapper arithmetic through `RequiredBiometricValueBytes` and `RequiredObjectBytes`.
+Confirm that the credential supports the required capacity and
+verify actual record/signature/tag lengths during issuer serialization.
 
-The `minimum` target caps the raw JP2 profile output. FaceOFFx does not claim to size a final
-CBEFF-wrapped or signed card object unless that wrapping is performed and measured by the caller.
+### Source color
 
-#### JPEG 2000 Compression Guidelines
+Embedded sRGB and EXIF sRGB are recorded automatically. Supported RGB matrix/TRC ICC
+profiles are converted to sRGB at source resolution. Other embedded profiles produce a
+request for a supported color-managed export. Untagged pixels are automatically treated
+as sRGB and recorded as **AssumedSrgb**, with acquisition/color-history review retained.
+The source guard permits up to **64 million pixels**.
 
-For 420×560 images:
+## Sample gallery
 
-| Rate (bpp) | Approx. Size | Quality Level |
-|------------|--------------|---------------|
-| 0.36       | 11.6KB       | Small card image |
-| 0.68       | 20.6KB       | PIV card output |
-| 0.96       | 29.5KB       | More texture detail |
-| 1.70       | 49.8KB       | High-detail comparison |
-| 4.00       | 82.1KB       | Very high-detail comparison |
+Each row uses the public library with the same fixed recipe at **minimum** and
+**preferred** ceilings. Source thumbnails are 420 pixels wide; output previews are native
+independent **Pillow/OpenJPEG decodes of the linked JP2 files**. Region links display the
+hash-verified coding mask. Each review record includes bytes, source/mask hashes, color
+basis, regional estimates and enrollment requirements.
 
-## Installation
+<!-- gallery:start -->
+### George W. Bush
 
-### As a .NET Global Tool
+| Source | Minimum | Preferred |
+| --- | --- | --- |
+| <a href="docs/samples/source/bush.png"><img src="docs/samples/source/bush.png" width="160" alt="George W. Bush source"></a> | Source review required<br>[decision](docs/samples/piv/bush_minimum.json) | Source review required<br>[decision](docs/samples/piv/bush_preferred.json) |
 
-```bash
-# Install from NuGet
-dotnet tool install --global FaceOFFx.Cli
+### Jimmy Carter
 
-# Update to latest version
-dotnet tool update --global FaceOFFx.Cli
-```
+| Source | Minimum | Preferred |
+| --- | --- | --- |
+| <a href="docs/samples/source/carter.png"><img src="docs/samples/source/carter.png" width="160" alt="Jimmy Carter source"></a> | Source review required<br>[decision](docs/samples/piv/carter_minimum.json) | Source review required<br>[decision](docs/samples/piv/carter_preferred.json) |
 
-### As a Library (NuGet Package)
+### Boris Johnson
 
-```bash
-# Package Manager
-dotnet add package FaceOFFx
+| Source | Minimum | Preferred |
+| --- | --- | --- |
+| <a href="docs/samples/source/johnson.png"><img src="docs/samples/source/johnson.png" width="160" alt="Boris Johnson source"></a> | <a href="docs/samples/piv/johnson_minimum.png"><img src="docs/samples/piv/johnson_minimum.png" width="160" alt="Boris Johnson minimum"></a><br>11,672 JP2 bytes<br>47.568:1 method estimate<br>[JP2](docs/samples/piv/johnson_minimum.jp2) · [region](docs/samples/piv/johnson_minimum_roi.png) · [review](docs/samples/piv/johnson_minimum.json) | <a href="docs/samples/piv/johnson_preferred.png"><img src="docs/samples/piv/johnson_preferred.png" width="160" alt="Boris Johnson preferred"></a><br>21,977 JP2 bytes<br>19.857:1 method estimate<br>[JP2](docs/samples/piv/johnson_preferred.jp2) · [region](docs/samples/piv/johnson_preferred_roi.png) · [review](docs/samples/piv/johnson_preferred.json) |
 
-# Package Manager Console
-Install-Package FaceOFFx
-```
+### Keir Starmer
 
-### Requirements
+| Source | Minimum | Preferred |
+| --- | --- | --- |
+| <a href="docs/samples/source/starmer.png"><img src="docs/samples/source/starmer.png" width="160" alt="Keir Starmer source"></a> | <a href="docs/samples/piv/starmer_minimum.png"><img src="docs/samples/piv/starmer_minimum.png" width="160" alt="Keir Starmer minimum"></a><br>11,791 JP2 bytes<br>43.064:1 method estimate<br>[JP2](docs/samples/piv/starmer_minimum.jp2) · [region](docs/samples/piv/starmer_minimum_roi.png) · [review](docs/samples/piv/starmer_minimum.json) | <a href="docs/samples/piv/starmer_preferred.png"><img src="docs/samples/piv/starmer_preferred.png" width="160" alt="Keir Starmer preferred"></a><br>21,841 JP2 bytes<br>17.197:1 method estimate<br>[JP2](docs/samples/piv/starmer_preferred.jp2) · [region](docs/samples/piv/starmer_preferred_roi.png) · [review](docs/samples/piv/starmer_preferred.json) |
 
-- .NET 8.0, 9.0, or 10.0
-- Windows, Linux, or macOS
-- No GPU required (CPU inference supported)
+### John H. Glenn Jr.
 
-## Sample Gallery
+| Source | Minimum | Preferred |
+| --- | --- | --- |
+| <a href="docs/samples/source/glenn.png"><img src="docs/samples/source/glenn.png" width="160" alt="John H. Glenn Jr. source"></a> | Source review required<br>[decision](docs/samples/piv/glenn_minimum.json) | Source review required<br>[decision](docs/samples/piv/glenn_preferred.json) |
 
-These assets are generated from the canonical people corpus with the v3 diagnostics CLI:
+### Watermarked construction sample
+
+| Source | Minimum | Preferred |
+| --- | --- | --- |
+| <a href="docs/samples/source/construction.png"><img src="docs/samples/source/construction.png" width="160" alt="Watermarked construction sample source"></a> | <a href="docs/samples/piv/construction_minimum.png"><img src="docs/samples/piv/construction_minimum.png" width="160" alt="Watermarked construction sample minimum"></a><br>11,658 JP2 bytes<br>44.393:1 method estimate<br>[JP2](docs/samples/piv/construction_minimum.jp2) · [region](docs/samples/piv/construction_minimum_roi.png) · [review](docs/samples/piv/construction_minimum.json) | <a href="docs/samples/piv/construction_preferred.png"><img src="docs/samples/piv/construction_preferred.png" width="160" alt="Watermarked construction sample preferred"></a><br>21,844 JP2 bytes<br>17.707:1 method estimate<br>[JP2](docs/samples/piv/construction_preferred.jp2) · [region](docs/samples/piv/construction_preferred_roi.png) · [review](docs/samples/piv/construction_preferred.json) |
+
+### Watermarked medical sample
+
+| Source | Minimum | Preferred |
+| --- | --- | --- |
+| <a href="docs/samples/source/medical.png"><img src="docs/samples/source/medical.png" width="160" alt="Watermarked medical sample source"></a> | <a href="docs/samples/piv/medical_minimum.png"><img src="docs/samples/piv/medical_minimum.png" width="160" alt="Watermarked medical sample minimum"></a><br>11,771 JP2 bytes<br>53.489:1 method estimate<br>[JP2](docs/samples/piv/medical_minimum.jp2) · [region](docs/samples/piv/medical_minimum_roi.png) · [review](docs/samples/piv/medical_minimum.json) | <a href="docs/samples/piv/medical_preferred.png"><img src="docs/samples/piv/medical_preferred.png" width="160" alt="Watermarked medical sample preferred"></a><br>21,962 JP2 bytes<br>21.713:1 method estimate<br>[JP2](docs/samples/piv/medical_preferred.jp2) · [region](docs/samples/piv/medical_preferred_roi.png) · [review](docs/samples/piv/medical_preferred.json) |
+
+### Generic Guy illustration control
+
+| Source | Minimum | Preferred |
+| --- | --- | --- |
+| <a href="docs/samples/source/generic_guy.png"><img src="docs/samples/source/generic_guy.png" width="160" alt="Generic Guy illustration control source"></a> | Source review required<br>[decision](docs/samples/piv/generic_guy_minimum.json) | Source review required<br>[decision](docs/samples/piv/generic_guy_preferred.json) |
+<!-- gallery:end -->
+
+Bush, Carter, Johnson, Starmer and the illustration remain source controls. Construction
+and medical use the supplied `datasets/samples/cardholders/source_watermarked` originals,
+preserving their watermarks and source hashes. Their provenance remains part of enrollment
+review. The illustration is a detector test control.
+
+John H. Glenn Jr.'s historical portrait is an informational test example. Source credit:
+[NASA, December 1962](https://www.nasa.gov/image-article/portrait-of-astronaut-john-h-glenn-jr-2/).
+Its original asset and hash are recorded in [source metadata](tests/test-images/people/glenn/source.json).
+Apply NASA's [media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/),
+including identifiable-person conditions for promotional reuse.
+
+Regenerate with Python, Pillow/OpenJPEG and NumPy installed, and the local watermarked
+fixtures available:
 
 ```bash
 tests/regenerate_docs_images.sh
 ```
 
-The source images shown here are 420px-wide display thumbnails. Processing uses the full-resolution
-test inputs, then writes decoded PNG previews of the actual JPEG 2000 outputs.
-
-| Subject | Source | PIV Output | ROI Visualization | Encoded Size |
-|---------|--------|------------|-------------------|--------------|
-| Generic Guy | ![Generic Guy Source](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/generic_guy_420w.jpg) | ![Generic Guy PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/generic_guy_piv.png) | ![Generic Guy ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/generic_guy_roi.jpg) | 20,612 bytes at 0.68 bpp |
-| Bush | ![Bush Source](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/bush_420w.jpg) | ![Bush PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/bush_piv.png) | ![Bush ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/bush_roi.jpg) | 20,451 bytes at 0.68 bpp |
-| Carter | ![Carter Source](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/carter_420w.jpg) | ![Carter PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/carter_piv.png) | ![Carter ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/carter_roi.jpg) | 20,641 bytes at 0.68 bpp |
-| Johnson | ![Johnson Source](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/original/johnson_420w.jpg) | ![Johnson PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/johnson_piv.png) | ![Johnson ROI](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/roi/johnson_roi.jpg) | 20,481 bytes at 0.68 bpp |
-
-### File Size Comparison - Keir Starmer
-
-This comparison uses the same PIV crop and ROI. Only the JPEG 2000 rate changes, so the table shows
-how small the encoded file can get and what extra bytes buy visually.
-
-| **0.36 bpp** | **0.68 bpp** | **0.96 bpp** |
-|--------------|--------------|--------------|
-| ![Starmer 0.36 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_036.png) | ![Starmer 0.68 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_068.png) | ![Starmer 0.96 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_096.png) |
-| **Size**: 11,648 bytes | **Size**: 20,610 bytes | **Size**: 29,479 bytes |
-| Small card image | PIV card output | More texture detail |
-
-| **1.70 bpp** | **4.00 bpp** |
-|--------------|--------------|
-| ![Starmer 1.70 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_170.png) | ![Starmer 4.00 bpp](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_rate_400.png) |
-| **Size**: 49,765 bytes | **Size**: 82,111 bytes |
-| High-detail comparison | Very high-detail comparison |
-
-### Document Crop Comparison
-
-FaceOFFx uses the same detected face geometry to render different document crops. The README keeps
-this comparison compact so the PIV path remains the main example.
-
-| PIV Card | ICAO Portrait | Canada PR Card |
-|----------|---------------|----------------|
-| ![Starmer PIV](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_piv.png) | ![Starmer ICAO](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_icao.png) | ![Starmer Canada PR](https://raw.githubusercontent.com/mistial-dev/FaceOFFx/master/docs/samples/processed/starmer_canada_pr.png) |
-| 420×560, 20,610 bytes | 413×531, 54,493 bytes | 50mm × 70mm crop, 420px display preview |
-
-### Understanding the Visualizations
-
-- **Red Box**: ROI region with highest quality preservation
-- **Blue Line (AA)**: Vertical center alignment
-- **Green Line (BB)**: Horizontal eye line (should be 55-60% from bottom)
-- **Purple Line (CC)**: Head width measurement used by PIV crop solving
-
-### Head Width Measurement (Line CC)
-
-The head width measurement is crucial for PIV compatibility but presents challenges with 68-point facial landmarks:
-
-**What we measure**: The widest points of the face contour (landmarks 0-16), which represent the jawline from ear to
-ear. We then create a level line at the average Y-position of these widest points.
-
-**Why this approach**:
-
-- The 68-point landmark model doesn't include true ear positions
-- Using the widest jaw points provides a consistent measurement
-- Leveling the line improves visual aesthetics while maintaining accurate width
-
-**Limitations**:
-
-- The measurement is typically lower than actual ear level
-- True head width at the temples/ears may be wider
-- This is a fundamental limitation of the 68-point model
-
-**PIV Compatibility**: The current PIV solver targets the accepted card head-width band on a 420px output.
-It tries 235px, 225px, 215px, and 210px candidates in order and keeps the first candidate that also satisfies
-eye-line, margin, rotation, and inter-pupillary-distance constraints.
-
-## API Reference
-
-### Profile Encoder
-
-```csharp
-var profile = ProfileSpecifications.Piv;
-var result = await encoder.ProcessAsync(imageData, profile);
-
-if (result.IsFailure)
-{
-    Console.WriteLine(result.Error.Message);
-    return;
-}
-
-await File.WriteAllBytesAsync("piv.jp2", result.Value.ImageData);
-```
-
-`ProfileEncodingResult` contains the encoded bytes plus the decisions made by the pipeline:
-
-```csharp
-var output = result.Value;
-Console.WriteLine(output.Profile.Id);
-Console.WriteLine(output.Encoding.FileSize);
-Console.WriteLine(output.Encoding.CompressionRate);
-Console.WriteLine(output.RotationDegrees);
-Console.WriteLine(output.CandidateTraces.Count);
-```
-
-## Configuration
-
-### Profile Specifications
-
-Profiles are plain immutable domain records. A profile defines:
-
-- face-selection requirements
-- portrait dimensions and crop candidate ladder
-- head-width, eye-line, margin, rotation, and IPD constraints
-- JPEG 2000 ROI settings
-- encoding goal
-
-`ProfileSpecifications.Piv` uses a hard byte cap. The encoding solver tests a bounded, deterministic compression ladder and accepts the first candidate that fits, which is the highest-quality accepted candidate for that ladder.
-
-Other document crops use the same canonical face geometry and their own immutable specifications. The compact crop comparison above shows where ICAO and Canada permanent resident card output differ from the PIV card render.
-
-## CLI Usage
-
-### Primary Commands
-
-```bash
-faceoffx piv photo.jpg
-faceoffx us-passport photo.jpg
-faceoffx us-permanent-resident photo.jpg
-faceoffx canada-passport photo.jpg
-faceoffx canada-permanent-resident photo.jpg
-faceoffx canada-citizenship-grant photo.jpg
-faceoffx canada-proof-of-citizenship photo.jpg
-faceoffx documents
-```
-
-### Variants
-
-```bash
-# PIV card image only
-faceoffx piv photo.jpg --variant digital
-
-# PIV printed Zone 1F photo only
-faceoffx piv photo.jpg --variant print
-
-# U.S. passport digital upload
-faceoffx us-passport photo.jpg --variant digital
-
-# U.S. permanent resident digital upload
-faceoffx us-permanent-resident photo.jpg --variant digital
-
-# Canadian permanent resident digital upload
-faceoffx canada-permanent-resident photo.jpg --variant digital
-
-# Canadian proof of citizenship digital upload
-faceoffx canada-proof-of-citizenship photo.jpg --variant digital
-```
-
-### Machine-Readable Output
-
-```bash
-faceoffx piv photo.jpg --json
-faceoffx us-passport photo.jpg --json
-faceoffx canada-passport photo.jpg --json
-```
-
-`--json` writes a clean JSON job summary to stdout. Rendered artifacts and the provenance file are written to the output directory.
-
-### Provenance and Explanation
-
-```bash
-# Write outputs to a specific directory
-faceoffx piv photo.jpg --output-dir ./out
-
-# Show the cited clauses used by the workflow
-faceoffx piv photo.jpg --explain
-```
-
-Each document command writes a provenance JSON file alongside the outputs. The provenance file records the selected document, variant, automated checks, manual checklist items, production defaults, and exact citations used by the workflow.
-
-### Error Handling
-
-```csharp
-var result = await encoder.ProcessAsync(imageData, ProfileSpecifications.Piv);
-if (result.IsFailure)
-{
-    Console.WriteLine($"Processing failed: [{result.Error.Code}] {result.Error.Message}");
-    return;
-}
-
-Console.WriteLine($"Processed size: {result.Value.Encoding.FileSize} bytes");
-if (result.Value.Encoding.TargetFileSize.HasValue)
-{
-    Console.WriteLine($"Target cap was: {result.Value.Encoding.TargetFileSize.Value}");
-}
-```
-
 ## Development
 
-### Building from Source
+The encoder-only codec is vendored in **`src/CoreJ2K.FaceOFFx`**, with its license and
+upstream notices retained. Build from this repository alone using the .NET10 SDK.
+The complete test matrix also needs the .NET8, .NET9 and .NET10 runtimes:
 
 ```bash
-# Clone the repository
-git clone https://github.com/mistial-dev/FaceOFFx.git
-cd FaceOFFx
-
-# Build the solution
-dotnet build
-
-# Run tests
-dotnet test
-
-# Create NuGet package
-dotnet pack --configuration Release
+dotnet build FaceOFFx.sln -c Release
+dotnet test FaceOFFx.sln -c Release
+dotnet pack src/FaceOFFx/FaceOFFx.csproj -c Release
 ```
 
-### Project Structure
+Public lifecycle is in `src/FaceOFFx`, PIV rules in `FaceOFFx.Core`, image/ONNX integration
+in `FaceOFFx.Infrastructure`, embedded models in `FaceOFFx.Models`, and the light CLI
+in `FaceOFFx.Cli`. Engineering diagnostics export JP2s and evidence; development tooling
+independently renders their previews:
 
-```text
-FaceOFFx/
-├── src/
-│   ├── FaceOFFx/                # Domain models and interfaces
-│   ├── FaceOFFx.Infrastructure/ # ONNX implementations
-│   ├── FaceOFFx.Models/         # Embedded ONNX models
-│   └── FaceOFFx.Cli/           # Command-line interface
-├── tests/                      # Unit and integration tests
-└── docs/                       # Documentation and samples
+```bash
+dotnet run --project src/FaceOFFx.Diagnostics.Cli -c Release --framework net8.0 -- \
+  docs samples --input photo.jpg --output artifacts/review
+python3 scripts/ReadmeGallery/render_diagnostics.py artifacts/review
 ```
 
-## Technical Details
-
-### PIV Compatibility (FIPS 201-3)
-
-FaceOFFx ensures compatibility with government standards:
-
-- **Output**: 420×560 pixels (3:4 aspect ratio)
-- **Face Width**: PIV card head-width candidate solving for the accepted 210-240px band
-- **Eye Position**: 55-60% from bottom of image
-- **Rotation**: Maximum ±5° correction
-- **Centering**: Face properly centered with margins
-
-### JPEG 2000 ROI Encoding
-
-The library uses advanced ROI (Region of Interest) encoding to optimize quality:
-
-- **Single Facial Region** - Highest quality preservation for the complete facial area
-- **Background** - Lower quality for non-facial areas
-- **Smooth Transitions** - Level 3 default prevents harsh boundaries
-
-## Neural Network Models
-
-FaceOFFx uses two specialized ONNX models for facial processing, each optimized for specific tasks in the PIV compatibility pipeline.
-
-### Face Detection Model (RetinaFace)
-
-**File**: `FaceDetector.onnx` (104MB, stored with Git LFS)
-**Architecture**: RetinaFace single-stage face detector
-**Input**: 640×640×3 RGB image, normalized to [0,1]
-**Output**: Face bounding boxes with confidence scores and 5 key facial points
-
-The RetinaFace model performs the first stage of human detection and provides the coarse geometry
-used to seed the rest of the pipeline:
-
-- **Bounding boxes**: Precise face region coordinates
-- **Confidence scores**: Detection confidence (typically >0.8 for processing)
-- **5-point landmarks**: Eyes (2), nose tip (1), mouth corners (2)
-- **Frontal face filtering**: Optimized for government ID photo orientations
-
-**Pre-processing**: Images are resized to 640×640 with padding to maintain aspect ratio, then
-converted into the tensor format expected by the detector.
-
-**Post-processing**: Non-maximum suppression filters overlapping detections. The highest-confidence
-usable face becomes the canonical face candidate for downstream chip extraction and fine landmark
-solving.
-
-### Landmark Detection Model (PFLD)
-
-**File**: `landmarks_68_pfld.onnx` (2.8MB)
-**Architecture**: PFLD (Practical Facial Landmark Detector)
-**Input**: 112×112×3 RGB face crop, normalized to [0,1]
-**Output**: 136 floats (68 landmarks × 2 coordinates)
-
-The PFLD model extracts precise 68-point facial landmarks using the standard iBUG annotation scheme.
-In FaceOFFx it is not run over the whole image. It is run over a normalized 112×112 chip derived
-from the coarse RetinaFace solve, and the resulting fine landmarks are then projected back into the
-original source-image coordinate system.
-
-#### Why There Are Two Landmark Stages
-
-- **Coarse stage**: RetinaFace gives a detection box plus 5 facial keypoints.
-- **Canonical chip stage**: FaceOFFx uses those coarse landmarks to build a stable chip transform.
-- **Fine stage**: PFLD runs on that canonical chip and returns precise 68-point landmarks.
-- **Back-projection stage**: The chip transform is inverted so the fine landmarks line up with the
-  original source image and with all later crop/render transforms.
-
-This split is what the diagnostics visualizer shows in `10-coarse.png`, `20-chip-locate.png`,
-`30-chip.png`, `40-fine-chip.png`, and `50-fine-source.png`.
-
-#### Landmark Layout
-
-- **Face outline** (0-16): Jawline from ear to ear
-- **Right eyebrow** (17-21): Outer to inner points
-- **Left eyebrow** (22-26): Inner to outer points
-- **Nose bridge** (27-30): Top to bottom
-- **Lower nose** (31-35): Nostrils and tip
-- **Right eye** (36-41): Clockwise from outer corner
-- **Left eye** (42-47): Clockwise from outer corner
-- **Outer mouth** (48-59): Clockwise from left corner
-- **Inner mouth** (60-67): Clockwise from left corner
-
-**Coordinate System**: The PFLD output is normalized to the 112×112 chip input. FaceOFFx removes
-any chip padding, rescales those points into chip space, and then maps them back into original
-image coordinates.
-
-**Precision**: The PFLD model achieves sub-pixel accuracy for facial feature localization, essential for precise PIV alignment and ROI calculation.
-
-### Model Performance Characteristics
-
-| Model      | Inference Time* | Memory Usage | Accuracy            |
-|------------|-----------------|--------------|---------------------|
-| RetinaFace | ~50ms           | ~200MB       | >95% face detection |
-| PFLD       | ~15ms           | ~50MB        | <2px landmark error |
-
-*CPU inference on modern Intel/AMD processors
-
-### ONNX Models Table
-
-| Model                    | Purpose            | Input Size | Framework  |
-|--------------------------|--------------------|------------|------------|
-| `FaceDetector.onnx`      | Face detection     | 640×640    | RetinaFace |
-| `landmarks_68_pfld.onnx` | Landmark detection | 112×112    | PFLD       |
-
-## Image Processing Pipeline
-
-FaceOFFx follows a single profile-encoding pipeline to transform input images into profile-compliant JPEG 2000 files:
-
-### 1. Image Loading and Validation
-
-```
-Input Image (any format) → ImageSharp Image<Rgba32>
-```
-
-- Supports JPEG, PNG, BMP, TIFF, and other common formats
-- Converts to consistent RGBA32 format for processing
-- Validates image dimensions and format compatibility
-
-### 2. Coarse Detection Phase
-
-```
-Image<Rgba32> → RetinaFace Model → DetectedFace[]
-```
-
-- Resize image to 640×640 with aspect-preserving padding
-- Convert the padded image into the detector tensor format
-- Run ONNX inference to detect faces
-- Decode bounding boxes, confidence, and 5-point landmarks
-- Filter overlapping detections with non-maximum suppression
-- Select the single best face for downstream processing
-
-### 3. Canonical Chip Construction
-
-```
-DetectedFace + 5-point landmarks → Canonical chip transform → 112×112 chip
-```
-
-- Build a stable chip transform from the coarse face solve
-- Extract a normalized 112×112 chip from the original image
-- Preserve the forward and inverse transform so chip-space points can be mapped back to source
-  space exactly
-
-### 4. Fine Landmark Detection Phase
-
-```
-112×112 chip → PFLD Model → 68 chip-space landmarks
-```
-
-- Normalize to [0,1] for ONNX inference
-- Extract 68-point facial landmarks
-- Project the fine landmarks back into full image coordinates
-
-### 5. Canonical Geometry Resolution
-
-```
-Coarse detection + chip transform + fine landmarks → CanonicalFaceGeometry
-```
-
-- Combine the original-space fine landmarks with the chip transform
-- Preserve the exact relationship between source image, chip, and later portrait outputs
-- Use this canonical geometry as the single source of truth for later render and validation steps
-
-### 6. Portrait Transformation Sequence
-
-```
-CanonicalFaceGeometry + profile spec → PortraitPlanSolver → Rotate → Crop → Resize → output portrait
-```
-
-**Critical Order**: Rotation is applied to the full original image first to avoid black borders.
-Cropping and resizing follow after the eye line and face placement are solved from the canonical
-geometry.
-
-#### Rotation Phase
-
-- Rotate entire source image by calculated angle
-- Use high-quality bicubic interpolation
-- Maintain full image dimensions during rotation
-
-#### Cropping Phase
-
-- Calculate face position from the canonical original-space landmarks
-- Apply the profile-specific crop candidate selected by `PortraitPlanSolver`
-- Preserve the exact transform map from source coordinates to output coordinates
-
-#### Resizing Phase
-
-- Scale cropped region to exactly 420×560 pixels
-- Use bicubic resampling for optimal quality
-- Maintain aspect ratio through padding if needed
-
-### 7. Landmark Transformation
-
-```
-Original Landmarks → Transform Matrix → PIV Space Landmarks
-```
-
-- Apply same rotation, crop, and scale transforms to landmarks
-- Ensure landmarks align with transformed face position
-- Validate eye positions and head placement against the requested standard
-
-### 8. ROI Region Calculation
-
-```
-PIV Landmarks → Facial Region Analysis → ROI Bounds
-```
-
-- Calculate inner facial region encompassing key features
-- Include eyes, eyebrows, nose, mouth, and surrounding area
-- Apply 1% padding around detected facial features
-- Generate rectangular ROI bounds for JPEG 2000 encoding
-
-### 9. JPEG 2000 Encoding with ROI
-
-```
-Rendered profile portrait + ROI → EncodingPlanSolver → CoreJ2K → JP2 File
-```
-
-- **Single tile encoding**: Use one 420×560 tile for optimal compression
-- **ROI priority**: Encode facial region at higher quality (levels 0-3)
-- **Background compression**: Apply base compression rate to non-ROI areas
-- **PIV encoding goal**: Hard-cap solving for the card facial image
-
-### Processing Flow Diagram
-
-```
-Input Image
-    ↓
-Coarse Detection (RetinaFace 640×640)
-    ↓
-Canonical Chip Construction (112×112)
-    ↓
-Fine Landmark Detection (PFLD on chip)
-    ↓
-Back-Projection To Source Coordinates
-    ↓
-Canonical Face Geometry
-    ↓
-Image Transformation (Rotate → Crop → Resize)
-    ↓
-Landmark Transformation (Match image transforms)
-    ↓
-ROI Calculation (Facial region bounds)
-    ↓
-Profile Encoding Solver (Single tile + ROI)
-    ↓
-Profile-Compatible JP2 Output
-```
-
-### Coordinate System Transformations
-
-The pipeline involves multiple coordinate spaces:
-
-1. **Original Image Space**: Source image dimensions (e.g., 1920×1080)
-2. **Detection Tensor Space**: 640×640 detector input
-3. **Chip Space**: Canonical 112×112 chip coordinates
-4. **Fine Landmark Space**: Normalized landmark coordinates relative to the chip
-5. **Rotated Image Space**: Original dimensions after rotation
-6. **Output Portrait Space**: Final rendered dimensions such as 420×560
-
-Each transform is preserved explicitly so facial features can be mapped forward and backward without
-re-solving detection or landmarks. The diagnostics command exists to make those stage boundaries
-visible on real inputs.
-
-## Requirements
-
-- **.NET 8.0, 9.0, or 10.0**
-- **Dependencies**:
-  - Microsoft.ML.OnnxRuntime (CPU inference)
-  - SixLabors.ImageSharp (Image processing)
-  - CoreJ2K (JPEG 2000 encoding)
-  - CSharpFunctionalExtensions (Error handling)
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](docs/CONTRIBUTING.md) for details on our code of conduct
-and the process for submitting pull requests.
-
-## Security and Supply Chain
-
-### Software Bill of Materials (SBOM)
-
-A complete Software Bill of Materials is available in [sbom/faceoffx-sbom.json](sbom/faceoffx-sbom.json) in CycloneDX
-format. This includes:
-
-- All direct and transitive dependencies
-- License information for each component
-- Version information and checksums
-
-### Security Policy
-
-For security vulnerabilities, please see our [Security Policy](SECURITY.md).
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments & Credits
-
-### Models and Software Used
-
-| Component                      | Description                                                 | License      | Source/Credit                                                                                   |
-|--------------------------------|-------------------------------------------------------------|--------------|-------------------------------------------------------------------------------------------------|
-| **FaceONNX**                   | Base facial processing library this project is derived from | MIT          | [FaceONNX/FaceONNX](https://github.com/FaceONNX/FaceONNX)                                       |
-| **RetinaFace**                 | Face detection model (FaceDetector.onnx)                    | MIT          | [discipleofhamilton/RetinaFace](https://github.com/discipleofhamilton/RetinaFace)               |
-| **PFLD**                       | 68-point facial landmark detection (landmarks_68_pfld.onnx) | MIT          | [FaceONNX/FaceONNX.Models](https://github.com/FaceONNX/FaceONNX.Models)                         |
-| **ONNX Runtime**               | High-performance inference engine                           | MIT          | [Microsoft/onnxruntime](https://github.com/microsoft/onnxruntime)                               |
-| **ImageSharp**                 | Cross-platform 2D graphics library                          | Apache-2.0   | [SixLabors/ImageSharp](https://github.com/SixLabors/ImageSharp)                                 |
-| **CoreJ2K**                    | JPEG 2000 encoding with ROI support                         | BSD-2-Clause | [cinderblocks/CoreJ2K](https://github.com/cinderblocks/CoreJ2K)                                 |
-| **CSharpFunctionalExtensions** | Functional programming extensions                           | MIT          | [vkhorikov/CSharpFunctionalExtensions](https://github.com/vkhorikov/CSharpFunctionalExtensions) |
-| **Spectre.Console**            | Beautiful console applications                              | MIT          | [spectreconsole/spectre.console](https://github.com/spectreconsole/spectre.console)             |
-
-### Standards and Specifications
-
-| Standard            | Description                                                 | Organization |
-|---------------------|-------------------------------------------------------------|--------------|
-| **FIPS 201-3**      | Personal Identity Verification (PIV) Requirements           | NIST         |
-| **INCITS 385-2004** | Face Recognition Format for Data Interchange                | ANSI/INCITS  |
-| **SP 800-76-2**     | Biometric Specifications for Personal Identity Verification | NIST         |
-
-### Special Thanks
-
-- **FaceONNX** - This project is derived from FaceONNX, which provides the foundational facial processing capabilities
-  and model infrastructure
-- The **68-point facial landmark** annotation scheme was originally developed by the iBUG group at Imperial College
-  London
-
-### Quote
-
-> "Face... off... No more drugs for that man!" - [Watch Scene](https://www.youtube.com/watch?v=3bdv8MjwzxA)
+See [contributing](docs/CONTRIBUTING.md), [security](SECURITY.md), the
+[vendored codec inventory](sbom/vendored-codec.json) and the
+[historical dependency SBOM](sbom/faceoffx-sbom.json). Regenerate the complete dependency
+graph for release. Handle portraits and evidence under the enrollment
+system's authorization, access-control and retention policies.
+
+## Credits and license
+
+FaceOFFx derives from [FaceONNX](https://github.com/FaceONNX/FaceONNX), using RetinaFace,
+PFLD, ONNX Runtime, ImageSharp, the vendored CoreJ2K encoder, CSharpFunctionalExtensions
+and Spectre.Console. Dependency licenses accompany package metadata and codec notices.
+
+PIV requirements are drawn from FIPS 201-3, NIST SP 800-76-2, SP 800-73-5, SP 800-85B,
+INCITS 385 and ISO/IEC 15444-1. FaceOFFx is licensed under [MIT](LICENSE).

@@ -76,17 +76,9 @@ This document provides citations for all academic datasets used for validation t
    └── icao-synthetic/
    ```
 
-3. **Processing Commands**:
-   ```bash
-   # Validate SFHQ-T2I with relaxed cropping
-   dotnet run -- dataset validate ./dataset/SFHQ-T2I --standard piv --relaxed-crop
-   
-   # Process WIDER FACE with quality filtering
-   dotnet run -- dataset validate ./dataset/wider-face --standard piv --filter-quality
-   
-   # Validate ICAO compliance
-   dotnet run -- dataset validate ./dataset/icao-synthetic --standard icao
-   ```
+3. **Current product workflow**: select a suitable source photograph and use
+   `PivImageEncoder` or `faceoffx photo.jpg --filesize-target minimum`. Dataset screening
+   and historical ICAO controls are engineering activities with separate review evidence.
 
 ## Ethical Considerations
 

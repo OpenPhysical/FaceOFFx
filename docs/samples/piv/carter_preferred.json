@@ -1,0 +1,16 @@
+{
+  "Id": "carter",
+  "Label": "Jimmy Carter",
+  "SourcePath": "tests/test-images/people/carter/source.jpg",
+  "SourceKind": "Existing photographic test fixture",
+  "SourceSha256": "6ca266c9e465cea3b25fb43924edce1805c42bf8f6c049112395e4b9940a5a1e",
+  "SourceWidth": 2324,
+  "SourceHeight": 2969,
+  "SourceIccProfileSha256": "20789fdbea9835251a4f0796c8bf45cbd964896044886540da21ffc7457af0ab",
+  "SizeProfile": "Preferred",
+  "SourcePreview": "docs/samples/source/carter.png",
+  "Status": "ReviewRequired",
+  "ErrorCode": "render",
+  "Error": "A source-supported crop and image allocation are required for \u0027PIV\u0027. No portrait crop satisfied the profile requirements. The approximate nose and mouth centerline requires a more frontal, centered source photograph. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. The approximate nose and mouth centerline requires a more frontal, centered source photograph. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. The approximate nose and mouth centerline requires a more frontal, centered source photograph. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. The approximate nose and mouth centerline requires a more frontal, centered source photograph. (profile-portrait) (profile-portrait) Final check: No portrait crop satisfied the profile requirements. The approximate nose and mouth centerline requires a more frontal, centered source photograph. (profile-portrait) (profile-portrait) (piv)",
+  "MaximumJp2Bytes": 22000
+}

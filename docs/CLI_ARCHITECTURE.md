@@ -1,58 +1,35 @@
-# FaceOFFx CLI Architecture
+# FaceOFFx CLI architecture
 
-## Overview
-
-FaceOFFx now exposes a document-first CLI. The primary user-facing commands are:
-
-- `piv`
-- `us-passport`
-- `us-permanent-resident`
-- `canada-passport`
-- `canada-permanent-resident`
-- `canada-citizenship-grant`
-- `canada-proof-of-citizenship`
-- `documents`
-
-Each document command runs one complete workflow: input analysis, portrait rendering, output validation, and provenance writing.
-
-## Public Model
-
-The public model is intentionally small:
-
-- a document command selects the product being issued
-- an optional `--variant` selects a named alternate output set
-- `--output-dir` controls where artifacts and provenance are written
-- `--json` emits a machine-readable job summary
-- `--explain` prints the cited clauses behind the workflow
-
-Examples:
+The release CLI is a thin wrapper around `PivImageEncoder`.
 
 ```bash
-faceoffx piv photo.jpg
-faceoffx piv photo.jpg --variant digital
-faceoffx us-passport photo.jpg --variant digital
-faceoffx canada-proof-of-citizenship photo.jpg --variant digital --json
-faceoffx documents
+faceoffx photo.jpg --filesize-target minimum --output portrait.jp2
+faceoffx photo.jpg --filesize-target preferred --json
+faceoffx photo.jpg --filesize-target 16000 --output portrait.jp2
 ```
 
-## Internal Shape
+## Controls
 
-The current implementation keeps the workflow surface narrow instead of building a general planner:
+`--filesize-target` accepts minimum (11,820 bytes), preferred (22,000 bytes) or a positive
+byte count. The balanced recipe is fixed. `--json` writes evidence to stdout; `--debug`
+sends logs to stderr. Existing image/evidence paths require explicit `--overwrite`.
+The default output is `INPUT.piv.jp2`, with evidence at `INPUT.piv.jp2.json`.
 
-- `DocumentCatalog` defines shipped documents, variants, citations, and typed workflow metadata.
-- `DocumentJobRunner` executes one job end to end.
-- `DocumentWorkflowFamily.Piv` routes to the PIV-specific processing path.
-- `DocumentWorkflowFamily.PassportStyle` routes to the passport-style render/validate path.
+## Pipeline and persistence
 
-`DeliverableKind` is typed so rendering and validation do not depend on string keys.
+`PivCommand` resolves an immutable `PivFileSizeTarget` and calls the library. Source color
+and orientation are prepared before single-face detection and canonical landmarks.
+The source-supported affine renderer constructs the fixed face mask, then the vendored
+balanced encoder enforces the complete JP2 ceiling.
 
-## Validation Model
+Success writes image bytes and evidence using staged files, individual atomic renames
+and rollback. A process interruption may leave adjacent recovery files. Evidence carries
+source/output hashes, target, geometry, mask coverage, color basis, regional accounting
+and merged enrollment-review requirements.
 
-Validation is split into two stages:
+## Development previews
 
-- input checks decide whether the source capture is usable for the requested document
-- output checks run on the actual rendered artifact
-
-Blocking automated checks are citation-backed. Manual-only requirements remain visible in provenance and human output, but they do not flip the automated pass/fail result.
-
-Raw input IPD is advisory only. It is not used as a standalone blocker for source captures.
+The diagnostic tool exports JP2s and a manifest with `PendingIndependentDecode` previews.
+`scripts/ReadmeGallery/render_diagnostics.py` creates hash-checked Pillow/OpenJPEG PNGs.
+The renderer is development tooling. Current product usage is in [API](API.md) and
+[README](../README.md).

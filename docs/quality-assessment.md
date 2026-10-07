@@ -1,47 +1,18 @@
-# Quality Assessment Internals
+# Quality assessment internals
 
-## Overview
-
-FaceOFFx still contains internal quality-analysis components for symmetry, sharpness, and geometry, but they are no longer exposed as release CLI commands. The shipped product surface is document-first, and diagnostics now live in `faceoffx-diagnostics`.
-
-Use these internals in two places:
-
-- document workflows, where they support input suitability or advisory findings
-- diagnostics runs, where you want batch measurements and visual inspection across the people corpus
-
-## Current Operator Path
-
-For visual or batch inspection, use the diagnostics CLI:
+FaceOFFx retains symmetry, sharpness and landmark geometry utilities for PIV diagnostics. The public product prepares a PIV JP2 and its verification evidence through `PivImageEncoder` or the release CLI.
 
 ```bash
-faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
+faceoffx photo.jpg --filesize-target minimum --output portrait.jp2
 faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
 faceoffx-diagnostics sharpness blur --corpus people
 faceoffx-diagnostics sharpness measure --input artifacts/diagnostics/sharpness/blur-progressions --json
 ```
 
-## Current Product Path
+Symmetry uses facial left/right Gabor comparisons. Sharpness uses frequency-domain and regional measurements. Geometry uses detected landmark relationships. These engineering signals support review, and their configured percentage thresholds express implementation policy.
 
-For actual issuance workflows, use the document commands:
+The production geometry evidence separately records source support, native scale and anatomical measurement bases. Region coverage remains estimated until the selected feature boundary is reviewed. The codec ledger records committed bytes and the measured regional ratio.
 
-```bash
-faceoffx piv photo.jpg
-faceoffx us-passport photo.jpg --variant digital
-faceoffx canada-proof-of-citizenship photo.jpg --variant print
-```
+Backdrop diagnostics require an explicit retained-head mask/envelope and chin protection. Pixel-channel statistics and codec subband telemetry have distinct measurement bases. Low-texture border regions carry candidate status, and ambiguous regions remain unknown.
 
-## Internal Metrics
-
-The current internal analyzers still cover:
-
-- facial symmetry via Gabor-based left/right comparison
-- sharpness via frequency-domain analysis and regional scoring
-- geometry via landmark-derived measurements
-
-These are useful engineering signals, but they are not presented as standalone compliance commands anymore.
-
-## Notes
-
-- The old `faceoffx quality` and `faceoffx process` command examples in earlier versions of this repository are obsolete.
-- When you need engineering visibility, prefer `faceoffx-diagnostics`.
-- When you need a user-facing result, prefer the document commands and their provenance output.
+See [quality architecture](QUALITY_SYSTEM.md) for internal models, [API](API.md) for encoding, and [compression accounting](PIV-COMPRESSION-ACCOUNTING.md) for the PIV regional method.

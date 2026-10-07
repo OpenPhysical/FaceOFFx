@@ -1,0 +1,16 @@
+{
+  "Id": "bush",
+  "Label": "George W. Bush",
+  "SourcePath": "tests/test-images/people/bush/source.jpg",
+  "SourceKind": "Existing photographic test fixture",
+  "SourceSha256": "d935c932c2989f1d0d23ab02b401a5905ebea9c9a6beefb5cf6d150b031cbb37",
+  "SourceWidth": 808,
+  "SourceHeight": 1024,
+  "SourceIccProfileSha256": "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e",
+  "SizeProfile": "Preferred",
+  "SourcePreview": "docs/samples/source/bush.png",
+  "Status": "ReviewRequired",
+  "ErrorCode": "render",
+  "Error": "A source-supported crop and image allocation are required for \u0027PIV\u0027. No portrait crop satisfied the profile requirements. Crop margins in output pixels: left 86.8, right 84.4, top 13.5; required sides 12, top 24. Crown basis: estimated, crown Y 43.9, crop 139,25,672,896. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. Crop margins in output pixels: left 93.3, right 91.1, top 23.9; required sides 12, top 24. Crown basis: estimated, crown Y 43.9, crop 124,9,702,936. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. Crop margins in output pixels: left 79.6, right 77.2, top 2.2; required sides 12, top 24. Crown basis: estimated, crown Y 43.9, crop 154,41,642,856. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. The inverse crop polygon requires pixels beyond the original source boundary. (profile-portrait) Final check: No portrait crop satisfied the profile requirements. The inverse crop polygon requires pixels beyond the original source boundary. (profile-portrait) (piv)",
+  "MaximumJp2Bytes": 22000
+}

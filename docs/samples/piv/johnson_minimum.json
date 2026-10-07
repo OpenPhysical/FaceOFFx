@@ -1,0 +1,1469 @@
+{
+  "Id": "johnson",
+  "Label": "Boris Johnson",
+  "SourcePath": "tests/test-images/people/johnson/source.jpg",
+  "SourceKind": "Existing photographic test fixture",
+  "SourceSha256": "a41c342be0419f62c3e563530e47308ec5a2e4adf62d048326a8b2db13c3f13f",
+  "SourceWidth": 1728,
+  "SourceHeight": 2160,
+  "SourceIccProfileSha256": "e5f6ffb83b6d3491301dd750975684cc5cc2a1951c994a14b08cfdaa0d75a041",
+  "SizeProfile": "Minimum",
+  "SourcePreview": "docs/samples/source/johnson.png",
+  "ImagePath": "docs/samples/piv/johnson_minimum.jp2",
+  "PreviewPath": "docs/samples/piv/johnson_minimum.png",
+  "RoiPreviewPath": "docs/samples/piv/johnson_minimum_roi.png",
+  "MaskPath": "docs/samples/piv/johnson_minimum_mask.png",
+  "MaskSha256": "f69dbd4fd1250dfab47310f26ca173f079737fcb8e2fb7533a49c7bd7048dfd0",
+  "ImageSha256": "9b5e14b9da056bf7b63f22e7eb9abedf8080c08ea8bf8acb9bea1b3c938e35e6",
+  "Status": "EncodedWithinBudget",
+  "FileSizeBytes": 11672,
+  "OutputDimensions": {
+    "Width": 480,
+    "Height": 640,
+    "AspectRatio": 0.75
+  },
+  "MaximumJp2Bytes": 11820,
+  "Recipe": {
+    "StartResolutionLevel": 4,
+    "CodeBlockSize": 64,
+    "LumaUtility": 1.25,
+    "FaceRegion": "LandmarkFace",
+    "AllocationFloor": "None"
+  },
+  "GeometryEvidence": {
+    "SourceJawWidth": 364.9101,
+    "OutputJawWidth": 257.20535,
+    "HeadWidthCC": {
+      "SourcePixels": 364.9101,
+      "OutputPixels": 257.20535,
+      "Status": "Estimated",
+      "Basis": "Jaw contour landmarks 0-16"
+    },
+    "HeadHeightDD": {
+      "SourcePixels": 614.5392,
+      "OutputPixels": 433.15536,
+      "Status": "Estimated",
+      "Basis": "Eyebrow-to-chin extrapolation, crown offset 0.8"
+    },
+    "SourceRollDegrees": -3.116373,
+    "EyeLineFromTopRatio": 0.40017527,
+    "SourceToOutputScale": 0.7048458,
+    "OriginalPixelSupportVerified": true,
+    "VerificationRequirements": [
+      "Verify the acquisition calibration, optical resolution, camera distance, and square-pixel source geometry.",
+      "Verify frontal yaw and pitch, neutral expression, illumination, focus, complete head and shoulder coverage, and original-capture history.",
+      "Measure CC at the ear-to-head attachments in source and output; the current width is a jaw-contour estimate.",
+      "Verify the true hair crown and full head outline; the current crown-to-chin height is a landmark-based estimate."
+    ]
+  },
+  "RoiCoverage": {
+    "Algorithm": "landmark-face-hull-v1",
+    "Status": "Estimated",
+    "ForeheadExtensionRatio": 0,
+    "PaddingRatio": 0.03,
+    "Boundary": [
+      {
+        "X": 106.95581,
+        "Y": 250.01886
+      },
+      {
+        "X": 154.07498,
+        "Y": 230.78647
+      },
+      {
+        "X": 175.88925,
+        "Y": 227.15662
+      },
+      {
+        "X": 296.63968,
+        "Y": 226.30069
+      },
+      {
+        "X": 317.1525,
+        "Y": 229.40823
+      },
+      {
+        "X": 364.0076,
+        "Y": 251.69662
+      },
+      {
+        "X": 364.1611,
+        "Y": 286.1587
+      },
+      {
+        "X": 361.71048,
+        "Y": 320.92093
+      },
+      {
+        "X": 356.12448,
+        "Y": 355.96295
+      },
+      {
+        "X": 345.23807,
+        "Y": 389.21497
+      },
+      {
+        "X": 327.09445,
+        "Y": 418.80865
+      },
+      {
+        "X": 302.50778,
+        "Y": 443.034
+      },
+      {
+        "X": 273.6143,
+        "Y": 460.99765
+      },
+      {
+        "X": 239.60715,
+        "Y": 466.94254
+      },
+      {
+        "X": 204.88803,
+        "Y": 462.03848
+      },
+      {
+        "X": 173.95978,
+        "Y": 445.1618
+      },
+      {
+        "X": 147.52905,
+        "Y": 420.73206
+      },
+      {
+        "X": 128.47598,
+        "Y": 391.26773
+      },
+      {
+        "X": 117.56915,
+        "Y": 357.6418
+      },
+      {
+        "X": 112.398346,
+        "Y": 321.795
+      },
+      {
+        "X": 108.56311,
+        "Y": 285.62033
+      }
+    ],
+    "VerificationRequirements": [
+      "Review the detected brows, eyes, nose, mouth, and complete jaw contour against the source; the innermost region is the 68-feature hull with a fixed localization margin."
+    ],
+    "FaceRegion": "LandmarkFace"
+  },
+  "SourceColorEvidence": {
+    "Status": "ConvertedMatrixRgb",
+    "Method": "icc-matrix-trc-d50-to-srgb-relative-colorimetric-v1",
+    "EmbeddedProfileSha256": "e5f6ffb83b6d3491301dd750975684cc5cc2a1951c994a14b08cfdaa0d75a041",
+    "PixelsConverted": true,
+    "VerificationRequirements": [
+      "Verify source-profile provenance and the capture workflow's color accuracy."
+    ]
+  },
+  "EncodingEvidence": {
+    "CompressionRate": 0.30395833,
+    "FileSize": 11672,
+    "TargetFileSize": {
+      "Value": 11820,
+      "HasValue": true,
+      "HasNoValue": false
+    },
+    "AttemptedRates": [],
+    "TargetFileSizeId": {
+      "Value": "minimum",
+      "HasValue": true,
+      "HasNoValue": false
+    },
+    "CodecEvidence": {
+      "CodestreamBytes": 11587,
+      "ContainerBytes": 85,
+      "RoiPixelCount": 57367,
+      "RequestedMinimumProtectedPayloadBytes": null,
+      "ProtectedPayloadBytes": 1427,
+      "ProtectedPayloadAccounting": "Emitted Maxshift protected coding-phase payload; packet, codestream and container headers and promoted coarse-resolution payload are accounted separately. Spatial regional attribution is available through the separately reported versioned synthesis-energy convention.",
+      "AllocationCandidateCount": 49,
+      "AllocationSimulationCount": 23,
+      "PayloadTelemetry": {
+        "Subbands": [
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 283,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 283,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 207,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 207,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 191,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 191,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 167,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 167,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 506,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 506,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 407,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 407,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 338,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 338,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 2,
+            "PayloadBytes": 986,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 986,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 2,
+            "PayloadBytes": 708,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 708,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 2,
+            "PayloadBytes": 678,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 678,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 6,
+            "PayloadBytes": 1538,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 1538,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 6,
+            "PayloadBytes": 1337,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 1337,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 6,
+            "PayloadBytes": 1126,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 1126,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 9,
+            "PayloadBytes": 639,
+            "ProtectedMaxshiftPhaseBytes": 639,
+            "WholeBandPromotedBytes": 0,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 561
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 9,
+            "PayloadBytes": 425,
+            "ProtectedMaxshiftPhaseBytes": 425,
+            "WholeBandPromotedBytes": 0,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 331
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 9,
+            "PayloadBytes": 363,
+            "ProtectedMaxshiftPhaseBytes": 363,
+            "WholeBandPromotedBytes": 0,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 319
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 174,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 174,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 74,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 74,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 59,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 59,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 38,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 38,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 65,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 65,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 52,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 52,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 21,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 21,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 35,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 35,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 2,
+            "PayloadBytes": 21,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 21,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 4,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 4,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 25,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 25,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 181,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 181,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 79,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 79,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 66,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 66,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 43,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 43,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 101,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 101,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 70,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 70,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 4,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 4,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 2,
+            "PayloadBytes": 59,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 59,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 2,
+            "PayloadBytes": 59,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 59,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 4,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 4,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "EmittedCodeBlockCount": 2,
+            "PayloadBytes": 38,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 38,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 4,
+            "Subband": "LH",
+            "EmittedCodeBlockCount": 1,
+            "PayloadBytes": 22,
+            "ProtectedMaxshiftPhaseBytes": 0,
+            "WholeBandPromotedBytes": 22,
+            "CodeBlockPromotedBytes": 0,
+            "OutsideRoiCodeBlockBytes": 0,
+            "MixedOrRefinementBytes": 0,
+            "ProtectedPhaseBytesInMixedCodeBlocks": 0
+          }
+        ],
+        "CodestreamBytes": 11587,
+        "ContainerBytes": 85,
+        "EndOfCodestreamBytes": 2,
+        "EmittedPacketCount": 18,
+        "EmittedCodeBlockCount": 85,
+        "MainAndTileHeaderBytes": 151,
+        "PacketHeaderBytes": 241,
+        "PacketBodyBytes": 11193,
+        "ProtectedMaxshiftPhaseBytes": 1427,
+        "WholeBandPromotedBytes": 9766,
+        "CodeBlockPromotedBytes": 0,
+        "OutsideRoiCodeBlockBytes": 0,
+        "MixedOrRefinementBytes": 0,
+        "ProtectedPhaseBytesInMixedCodeBlocks": 1211,
+        "TotalOutputBytes": 11672
+      },
+      "SharedPayloadAttribution": {
+        "MethodId": "synthesis-energy-decoder-effective-pass-v3",
+        "Subbands": [
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "PayloadBytes": 283,
+            "FacePayloadByteEstimate": 50.82498483174351
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "PayloadBytes": 207,
+            "FacePayloadByteEstimate": 39.552838688693306
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "PayloadBytes": 191,
+            "FacePayloadByteEstimate": 44.398077653296355
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "PayloadBytes": 167,
+            "FacePayloadByteEstimate": 40.002175103680905
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "PayloadBytes": 506,
+            "FacePayloadByteEstimate": 110.845817036499
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "PayloadBytes": 407,
+            "FacePayloadByteEstimate": 110.36414676565907
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "PayloadBytes": 338,
+            "FacePayloadByteEstimate": 94.36185594661873
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "PayloadBytes": 986,
+            "FacePayloadByteEstimate": 238.75659751091072
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "PayloadBytes": 708,
+            "FacePayloadByteEstimate": 240.22918713982403
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "PayloadBytes": 678,
+            "FacePayloadByteEstimate": 171.6673157047304
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "PayloadBytes": 1538,
+            "FacePayloadByteEstimate": 292.15078028435244
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "LH",
+            "PayloadBytes": 1337,
+            "FacePayloadByteEstimate": 393.12579606908935
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "HH",
+            "PayloadBytes": 1126,
+            "FacePayloadByteEstimate": 184.5023194720746
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "HL",
+            "PayloadBytes": 639,
+            "FacePayloadByteEstimate": 578.018675712987
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "LH",
+            "PayloadBytes": 425,
+            "FacePayloadByteEstimate": 406.1250642718171
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "HH",
+            "PayloadBytes": 363,
+            "FacePayloadByteEstimate": 326.18434525691356
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "PayloadBytes": 174,
+            "FacePayloadByteEstimate": 29.034248877401616
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "PayloadBytes": 74,
+            "FacePayloadByteEstimate": 13.751352014786619
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "PayloadBytes": 59,
+            "FacePayloadByteEstimate": 8.629223592287696
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "PayloadBytes": 38,
+            "FacePayloadByteEstimate": 10.402685499582736
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "PayloadBytes": 65,
+            "FacePayloadByteEstimate": 7.940332561936116
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "PayloadBytes": 52,
+            "FacePayloadByteEstimate": 9.98553779577692
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "PayloadBytes": 21,
+            "FacePayloadByteEstimate": 1.2046234197208587
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "PayloadBytes": 35,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "PayloadBytes": 21,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "PayloadBytes": 4,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "PayloadBytes": 25,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "PayloadBytes": 181,
+            "FacePayloadByteEstimate": 48.22901891693529
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "PayloadBytes": 79,
+            "FacePayloadByteEstimate": 19.900719445351168
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "PayloadBytes": 66,
+            "FacePayloadByteEstimate": 17.979136924604507
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "PayloadBytes": 43,
+            "FacePayloadByteEstimate": 15.627188847799452
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "PayloadBytes": 101,
+            "FacePayloadByteEstimate": 30.842379207164115
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "PayloadBytes": 70,
+            "FacePayloadByteEstimate": 41.735646395544364
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "PayloadBytes": 4,
+            "FacePayloadByteEstimate": 3.1412527269644445e-09
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "PayloadBytes": 59,
+            "FacePayloadByteEstimate": 11.214958912620682
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "PayloadBytes": 59,
+            "FacePayloadByteEstimate": 28.75942331251656
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "PayloadBytes": 4,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "PayloadBytes": 38,
+            "FacePayloadByteEstimate": 1.7706829406912261
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 4,
+            "Subband": "LH",
+            "PayloadBytes": 22,
+            "FacePayloadByteEstimate": 0
+          }
+        ],
+        "RoiPixelCount": 57367,
+        "PacketBodyBytes": 11193,
+        "FacePayloadByteEstimate": 3618.1171361167517,
+        "AttributedFacePayloadBytes": 3618,
+        "OutsidePayloadBytes": 7575
+      },
+      "RoiMaskSha256": "f69dbd4fd1250dfab47310f26ca173f079737fcb8e2fb7533a49c7bd7048dfd0",
+      "RequestedMinimumAttributedFacePayloadBytes": null,
+      "OptimisticAttributedFacePayloadUpperBound": null
+    },
+    "CardBudget": {
+      "MaximumBiometricValueBytes": 12704,
+      "MaximumObjectBytes": 12710,
+      "FacialRecordBytes": 46,
+      "CbeffBytes": 88,
+      "MaximumSignatureBytes": 750,
+      "ObjectTagBytes": 6,
+      "MaximumJpeg2000Bytes": 11820
+    },
+    "RegionalCompressionVerification": {
+      "Status": "ExceedsLimit",
+      "MeetsLimit": false,
+      "MaximumCompressionRatio": 24,
+      "RoiPixelCount": 57367,
+      "UncompressedRegionBytes": 172101,
+      "MinimumAttributedPayloadBytes": 7171,
+      "AttributedPayloadBytes": 3618,
+      "MeasuredCompressionRatio": 47.56799336650083,
+      "AttributionMethod": "synthesis-energy-decoder-effective-pass-v3",
+      "Attribution": {
+        "MethodId": "synthesis-energy-decoder-effective-pass-v3",
+        "Subbands": [
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "PayloadBytes": 283,
+            "FacePayloadByteEstimate": 50.82498483174351
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "PayloadBytes": 207,
+            "FacePayloadByteEstimate": 39.552838688693306
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "PayloadBytes": 191,
+            "FacePayloadByteEstimate": 44.398077653296355
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "PayloadBytes": 167,
+            "FacePayloadByteEstimate": 40.002175103680905
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "PayloadBytes": 506,
+            "FacePayloadByteEstimate": 110.845817036499
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "PayloadBytes": 407,
+            "FacePayloadByteEstimate": 110.36414676565907
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "PayloadBytes": 338,
+            "FacePayloadByteEstimate": 94.36185594661873
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "PayloadBytes": 986,
+            "FacePayloadByteEstimate": 238.75659751091072
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "PayloadBytes": 708,
+            "FacePayloadByteEstimate": 240.22918713982403
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "PayloadBytes": 678,
+            "FacePayloadByteEstimate": 171.6673157047304
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "PayloadBytes": 1538,
+            "FacePayloadByteEstimate": 292.15078028435244
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "LH",
+            "PayloadBytes": 1337,
+            "FacePayloadByteEstimate": 393.12579606908935
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 4,
+            "Subband": "HH",
+            "PayloadBytes": 1126,
+            "FacePayloadByteEstimate": 184.5023194720746
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "HL",
+            "PayloadBytes": 639,
+            "FacePayloadByteEstimate": 578.018675712987
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "LH",
+            "PayloadBytes": 425,
+            "FacePayloadByteEstimate": 406.1250642718171
+          },
+          {
+            "Tile": 0,
+            "Component": 0,
+            "ResolutionLevel": 5,
+            "Subband": "HH",
+            "PayloadBytes": 363,
+            "FacePayloadByteEstimate": 326.18434525691356
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "PayloadBytes": 174,
+            "FacePayloadByteEstimate": 29.034248877401616
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "PayloadBytes": 74,
+            "FacePayloadByteEstimate": 13.751352014786619
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "PayloadBytes": 59,
+            "FacePayloadByteEstimate": 8.629223592287696
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "PayloadBytes": 38,
+            "FacePayloadByteEstimate": 10.402685499582736
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "PayloadBytes": 65,
+            "FacePayloadByteEstimate": 7.940332561936116
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "PayloadBytes": 52,
+            "FacePayloadByteEstimate": 9.98553779577692
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "PayloadBytes": 21,
+            "FacePayloadByteEstimate": 1.2046234197208587
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "PayloadBytes": 35,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "PayloadBytes": 21,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "PayloadBytes": 4,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 1,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "PayloadBytes": 25,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 0,
+            "Subband": "LL",
+            "PayloadBytes": 181,
+            "FacePayloadByteEstimate": 48.22901891693529
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "HL",
+            "PayloadBytes": 79,
+            "FacePayloadByteEstimate": 19.900719445351168
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "LH",
+            "PayloadBytes": 66,
+            "FacePayloadByteEstimate": 17.979136924604507
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 1,
+            "Subband": "HH",
+            "PayloadBytes": 43,
+            "FacePayloadByteEstimate": 15.627188847799452
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "HL",
+            "PayloadBytes": 101,
+            "FacePayloadByteEstimate": 30.842379207164115
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "LH",
+            "PayloadBytes": 70,
+            "FacePayloadByteEstimate": 41.735646395544364
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 2,
+            "Subband": "HH",
+            "PayloadBytes": 4,
+            "FacePayloadByteEstimate": 3.1412527269644445e-09
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "HL",
+            "PayloadBytes": 59,
+            "FacePayloadByteEstimate": 11.214958912620682
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "LH",
+            "PayloadBytes": 59,
+            "FacePayloadByteEstimate": 28.75942331251656
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 3,
+            "Subband": "HH",
+            "PayloadBytes": 4,
+            "FacePayloadByteEstimate": 0
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 4,
+            "Subband": "HL",
+            "PayloadBytes": 38,
+            "FacePayloadByteEstimate": 1.7706829406912261
+          },
+          {
+            "Tile": 0,
+            "Component": 2,
+            "ResolutionLevel": 4,
+            "Subband": "LH",
+            "PayloadBytes": 22,
+            "FacePayloadByteEstimate": 0
+          }
+        ],
+        "RoiPixelCount": 57367,
+        "PacketBodyBytes": 11193,
+        "FacePayloadByteEstimate": 3618.1171361167517,
+        "AttributedFacePayloadBytes": 3618,
+        "OutsidePayloadBytes": 7575
+      },
+      "Statement": "Face payload 3618 bytes, required 7171 bytes at 24:1, measured by synthesis-energy-decoder-effective-pass-v3.",
+      "ProtectedPayloadInterpretation": "Protected-phase payload is a codec allocation diagnostic."
+    }
+  },
+  "VerificationRequirements": [
+    "Verify the acquisition calibration, optical resolution, camera distance, and square-pixel source geometry.",
+    "Verify frontal yaw and pitch, neutral expression, illumination, focus, complete head and shoulder coverage, and original-capture history.",
+    "Measure CC at the ear-to-head attachments in source and output; the current width is a jaw-contour estimate.",
+    "Verify the true hair crown and full head outline; the current crown-to-chin height is a landmark-based estimate.",
+    "Review the detected brows, eyes, nose, mouth, and complete jaw contour against the source; the innermost region is the 68-feature hull with a fixed localization margin.",
+    "Verify source-profile provenance and the capture workflow's color accuracy.",
+    "Verify actual issuer signature length, credential wrapping and available card storage for the selected JP2 allowance.",
+    "Review the 24:1 face-region requirement using the recorded operational shared-wavelet attribution method and issuer acceptance policy."
+  ],
+  "PreviewStatus": "IndependentlyDecoded",
+  "PreviewDecoder": "Pillow/OpenJPEG 2.5.4",
+  "PreviewSha256": "e2f4afdadf179d7b165fc2470a3771a6915eeec37505a2cbc2ed933f8e56225a",
+  "IndependentVerification": {
+    "Decoder": "Pillow/OpenJPEG 2.5.4",
+    "Structure": {
+      "CodestreamBytes": 11587,
+      "ContainerBytes": 85,
+      "StructuralHeaderBytes": 153,
+      "PacketHeaderAndBodyBytes": 11434,
+      "QuantizationSegments": [
+        {
+          "Marker": "0xff5c",
+          "SegmentSha256": "c0959fa8bb948a114684a8f8b38a8669061c19bd1488277da732932d8213a62e"
+        }
+      ],
+      "Rgn": [
+        [
+          0,
+          14
+        ],
+        [
+          1,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ]
+    },
+    "RgbPixelSha256": "6010cccece9b1ef8b5c852c5075e44dbe24580fa2a1dead7ca3e3f3d2b569085",
+    "ActualMaskHashVerified": true,
+    "RegionalLedgerConservationVerified": true,
+    "RegionalScope": "Versioned engineering estimate; enrollment review required"
+  }
+}

@@ -1,5 +1,29 @@
 # FaceOFFx Release Notes
 
+## 4.0.0, balanced PIV library
+
+The public API is `PivImageEncoder` with an immutable `PivFileSizeTarget`: minimum
+11,820 bytes, preferred 22,000 bytes, or `FromBytes(int)`. Encoding uses one fixed
+balanced recipe: start4, 64×64 blocks, luma utility1.25 and the landmark face mask.
+
+The encoder-only CoreJ2K source is vendored in this repository. Public packages target
+.NET8 and support consumption by .NET8/9/10 applications. The CLI is a light library
+wrapper with `--filesize-target`, output and evidence controls.
+
+Migration: replace prior processor/options/preset calls with
+`EncodeAsync(bytes, target)` or `EncodeFileAsync(path, target)`, and handle
+`Result<PivEncodingResult, PipelineError>`. Review the merged `VerificationRequirements`
+alongside geometry, automatic color preparation and versioned regional estimates.
+Untagged samples record `AssumedSrgb`. The JP2 ceiling is the automated encoding gate;
+regional compression and enrollment evidence are review requirements.
+
+README examples use the actual public path at both named targets, with independently
+decoded previews and retained source watermarks. [API](API.md) documents current usage.
+
+## Historical release records
+
+The sections below preserve the APIs and claims recorded for earlier releases.
+
 ## 2.0.0 (2025-07-30)
 
 ### Major Breaking Changes & Enhanced Target Size Control

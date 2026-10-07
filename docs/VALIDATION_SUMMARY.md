@@ -1,131 +1,27 @@
-# FaceOFFx Diagnostics Validation Summary
+# FaceOFFx validation summary
 
-## Overview
+FaceOFFx verifies PIV image preparation through domain, infrastructure, public-facade and CLI behavior tests. Current release gates are the solution build and tests; historical versioned release records retain their original counts.
 
-This document summarizes the current diagnostics-oriented validation approach in FaceOFFx. The normal release CLI is document-only; engineering validation now runs through `faceoffx-diagnostics` and the tracked people corpus.
+## Covered behavior
 
-## Completed Features
+Canonical geometry connects coarse detection, a normalized chip, fine source-space landmarks and one-pass rendering. Tests exercise native scale, rotated source corners, crop margins and explicit anatomical measurement status.
 
-### 1. Corpus-Based Detection and Overlay ✅
+Fixed region tests cover all detected features, localization padding, mask ownership and budget independence. Encoder tests verify complete JP2 caps, committed packet/component/subband reconciliation and the versioned shared-payload review ledger.
 
-The diagnostics CLI now supports batch face detection, landmark extraction, reverse-projected overlays, and profile-specific crop rendering over the canonical people corpus.
+Source-color tests cover automatic untagged sRGB assumptions, EXIF-declared and numerically verified sRGB, bounded matrix/TRC conversion, independent Little CMS vectors and failure preservation. Public/CLI tests cover lifecycle, cancellation, structured output, staged paired persistence and source/output separation.
 
-**Usage**:
+## Diagnostics
+
 ```bash
 faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
-faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
+faceoffx-diagnostics sharpness blur --corpus people
+faceoffx-diagnostics sharpness measure --input artifacts/diagnostics/sharpness/blur-progressions --json
 ```
 
-### 2. Test Image Infrastructure ✅
+Use the production PIV encoder for final crop and byte evidence. Frozen comparison controls preserve their source, crop and mask hashes, allocation settings and attribution version.
 
-**Scripts Created**:
-- `setup-test-images.sh`: Main setup script with options for:
-  - Synthetic face downloads (Generated.photos, This Person Does Not Exist)
-  - Open Images V7 dataset integration
-  - User-provided images
-  - Geometric test patterns
-- `apply-quality-variations.sh`: Creates test variations including:
-  - Blur levels (slight, moderate, severe)
-  - Rotation angles (5°, 10°, 15°, 20°)
-  - Size and position variations
-  - Illumination and contrast changes
+## Issuance evidence
 
-### 3. Batch Crop Rendering ✅
+Automated results establish the configured image cap and source-supported geometry, and record regional estimates under the FaceOFFx convention. The issuer completes regional-method acceptance, capture/optical-resolution, true anatomical boundary, pose/expression, uniform-background/illumination and color-provenance review, then verifies and signs the complete object.
 
-The diagnostics CLI can render the same crops used by the release workflows, but in batch, against a corpus or a path.
-
-**Usage**:
-```bash
-faceoffx-diagnostics crop --corpus people --profile piv --variant digital --output artifacts/diagnostics/crop
-faceoffx-diagnostics crop --corpus people --profile canada-passport --variant print --output artifacts/diagnostics/crop
-```
-
-### 4. Human Review Dashboard ✅
-
-**Script**: `quality-review-dashboard.sh`
-
-Interactive features:
-- **Individual Review Mode**: Side-by-side image comparison
-- **Batch Review Mode**: Quick keyboard shortcuts (a=agree, d=disagree)
-- **Review Tracking**: JSON-based storage with timestamps
-- **Statistics View**: Agreement rates and reviewer performance
-- **Report Export**: Markdown reports with detailed reviews
-
-**Usage**:
-```bash
-./scripts/quality-review-dashboard.sh
-```
-
-### 6. Comprehensive Documentation ✅
-
-**Documents Created**:
-- `QUALITY_VALIDATION_PLAN.md`: Current diagnostics validation strategy
-- `CHANGELOG.md`: Updated with all v2.1 features
-- `VALIDATION_SUMMARY.md`: This summary document
-
-## Quality Improvements
-
-### Code Quality Enhancements
-- Fixed all DRY violations in assessors
-- Extracted magic numbers to named constants
-- Improved error messages for user clarity
-- Added comprehensive edge case handling
-- Standardized MathF usage for consistency
-
-### Test Coverage
-- Created 31 new unit tests for quality components
-- Achieved 78-100% coverage for assessors
-- Added integration tests for full pipeline
-- Validated edge cases (NaN, Infinity, null inputs)
-
-## Validation Workflow
-
-### Recommended Process
-
-1. **Use the canonical people corpus**
-   ```bash
-   ls tests/test-images/people
-   ```
-
-2. **Run detection verification**
-   ```bash
-   faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect --verify
-   ```
-
-3. **Generate overlays**
-   ```bash
-   faceoffx-diagnostics detect --corpus people --output artifacts/diagnostics/detect
-   ```
-
-4. **Render workflow crops**
-   ```bash
-   faceoffx-diagnostics crop --corpus people --profile canada-passport --variant print --output artifacts/diagnostics/crop
-   ```
-
-5. **Export Reports**
-   - Use dashboard to export review reports
-   - Analyze CSV for trends
-   - Share HTML reports with stakeholders
-
-## Key Benefits
-
-1. **Transparency**: Overlays and manifests make detection and crop behavior visible
-2. **Efficiency**: Corpus-wide batch commands handle review quickly
-3. **Traceability**: Verification output is written to manifests and generated artifacts
-4. **Parity**: Diagnostics crop rendering reuses the same workflow logic as the release CLI
-
-## Performance Metrics
-
-- Batch detection and crop runs are bounded by model load and image processing cost
-- Performance tuning should focus on reuse of detection and render logic, not on duplicated CLI paths
-
-## Future Enhancements
-
-Potential improvements:
-- richer overlay guides per document workflow
-- stronger corpus expectation metadata in `corpus.json`
-- automated golden-image diffs for diagnostics overlays
-
-## Conclusion
-
-The current validation path is simpler: release behavior is document-only, and engineering validation lives in `faceoffx-diagnostics` plus behavior-heavy core/infrastructure tests.
+See [API](API.md), [compression accounting](PIV-COMPRESSION-ACCOUNTING.md), [diagnostics validation](QUALITY_VALIDATION_PLAN.md) and [contributor instructions](CONTRIBUTING.md).

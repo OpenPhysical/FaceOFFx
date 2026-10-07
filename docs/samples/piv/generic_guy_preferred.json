@@ -1,0 +1,16 @@
+{
+  "Id": "generic_guy",
+  "Label": "Generic Guy illustration control",
+  "SourcePath": "tests/test-images/people/generic-guy/source.png",
+  "SourceKind": "Illustrated detector regression fixture",
+  "SourceSha256": "0e5adcaf2aef1a1fbb2882734f4383043a0e3acfc1e86a3d3bb848e7cad468f3",
+  "SourceWidth": 1024,
+  "SourceHeight": 1536,
+  "SourceIccProfileSha256": null,
+  "SizeProfile": "Preferred",
+  "SourcePreview": "docs/samples/source/generic_guy.png",
+  "Status": "ReviewRequired",
+  "ErrorCode": "render",
+  "Error": "A source-supported crop and image allocation are required for \u0027PIV\u0027. No portrait crop satisfied the profile requirements. Crop margins in output pixels: left 86.0, right 85.1, top -13.5; required sides 12, top 24. Crown basis: estimated, crown Y -25.6, crop 81,0,906,1208. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. Crop margins in output pixels: left 92.8, right 92.0, top -12.9; required sides 12, top 24. Crown basis: estimated, crown Y -25.6, crop 60,0,948,1264. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. Crop margins in output pixels: left 79.3, right 77.9, top -14.1; required sides 12, top 24. Crown basis: estimated, crown Y -25.6, crop 100,0,867,1156. (profile-portrait) (profile-portrait) No portrait crop satisfied the profile requirements. Crop margins in output pixels: left 96.2, right 94.9, top -12.7; required sides 12, top 24. Crown basis: estimated, crown Y -25.6, crop 49,0,969,1292. (profile-portrait) (profile-portrait) Final check: No portrait crop satisfied the profile requirements. Crop margins in output pixels: left 96.2, right 94.9, top -12.7; required sides 12, top 24. Crown basis: estimated, crown Y -25.6, crop 49,0,969,1292. (profile-portrait) (profile-portrait) (piv)",
+  "MaximumJp2Bytes": 22000
+}

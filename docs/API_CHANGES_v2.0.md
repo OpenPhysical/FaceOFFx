@@ -1,5 +1,8 @@
 # API Changes and Breaking Changes - FaceOFFx v2.0
 
+Historical API record for version2.0. Current version4.0 uses the fixed balanced PIV
+library described in [API](API.md) and [migration notes](RELEASE-NOTES.md).
+
 ## Overview
 
 This document outlines the API changes and breaking changes introduced in FaceOFFx v2.0 with the addition of the ISO/IEC 19794-5 quality assessment system.

@@ -15,7 +15,7 @@ contributing to the project.
 
 ### Prerequisites
 
-- .NET 8.0 SDK or later
+- .NET10 SDK, with .NET8/9/10 runtimes for the complete test matrix
 - Visual Studio 2022, VS Code, or JetBrains Rider
 - Git
 
@@ -33,11 +33,20 @@ dotnet build
 dotnet test
 
 # Run the release CLI
-dotnet run --project src/FaceOFFx.Cli -- us-passport sample.jpg --variant digital
+dotnet run --project src/FaceOFFx.Cli --framework net8.0 -- sample.jpg --filesize-target preferred --output portrait.jp2
 
 # Run the diagnostics CLI
-dotnet run --project src/FaceOFFx.Diagnostics.Cli -- detect --corpus people --output artifacts/diagnostics/detect
+dotnet run --project src/FaceOFFx.Diagnostics.Cli --framework net8.0 -- detect --corpus people --output artifacts/diagnostics/detect
+
+# Generate samples from a source-watermarked portrait
+dotnet run --project src/FaceOFFx.Diagnostics.Cli --framework net8.0 -- docs samples \
+  --input datasets/samples/cardholders/source_watermarked/construction/german-male.png \
+  --size-profile preferred \
+  --output artifacts/diagnostics/docs-samples
+python3 scripts/ReadmeGallery/render_diagnostics.py artifacts/diagnostics/docs-samples
 ```
+
+Samples require a new or empty output directory. Untagged samples record an automatic sRGB assumption; supported embedded RGB matrix profiles are converted before analysis. The manifest retains source hashes, color evidence, capacity and fixed landmark-mask review. JP2 exports are independently decoded by the development Python renderer. Select a named corpus with `--corpus` instead.
 
 ## Code Style Guidelines
 
@@ -153,9 +162,9 @@ We welcome feature requests! Please:
 
 1. Update version numbers in project files
 2. Update CHANGELOG.md with release notes
-3. Create a git tag: `git tag v1.0.0`
-4. Push tag: `git push origin v1.0.0`
-5. GitHub Actions will build and publish to NuGet
+3. Build and test library/tool packages and verify licenses, bundled models and local consumers
+4. Create and push a signed version tag only under release authorization
+5. Review CI artifacts; NuGet publication is a separately authorized manual step
 
 ## Questions?
 

@@ -1,5 +1,7 @@
 # Epic-001: Two-Stage Geometry Pipeline
 
+Historical migration record. The completed passport-style steps describe the earlier document architecture. Current production rendering uses the same canonical geometry for the PIV-only workflow; see [CLI architecture](../CLI_ARCHITECTURE.md).
+
 ## Summary
 - Replace the inference-heavy render path with one canonical geometry pipeline:
   1. coarse face detection on the original image

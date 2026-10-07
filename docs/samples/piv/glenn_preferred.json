@@ -1,0 +1,16 @@
+{
+  "Id": "glenn",
+  "Label": "John H. Glenn Jr.",
+  "SourcePath": "tests/test-images/people/glenn/source.jpg",
+  "SourceKind": "NASA historical portrait",
+  "SourceSha256": "09d1af00da493b69681e4678a7448c665516ebe90c930dfd93bd7db333f17942",
+  "SourceWidth": 1041,
+  "SourceHeight": 1324,
+  "SourceIccProfileSha256": "2b3aa1645779a9e634744faf9b01e9102b0c9b88fd6deced7934df86b949af7e",
+  "SizeProfile": "Preferred",
+  "SourcePreview": "docs/samples/source/glenn.png",
+  "Status": "ReviewRequired",
+  "ErrorCode": "render",
+  "Error": "A source-supported crop and image allocation are required for \u0027PIV\u0027. Inter-pupillary distance 87.7px is below the required minimum 90px. (profile-portrait) Inter-pupillary distance 87.7px is below the required minimum 90px. (profile-portrait) Inter-pupillary distance 87.7px is below the required minimum 90px. (profile-portrait) Inter-pupillary distance 87.7px is below the required minimum 90px. (profile-portrait) Final check: Inter-pupillary distance 87.7px is below the required minimum 90px. (profile-portrait) (piv)",
+  "MaximumJp2Bytes": 22000
+}
